@@ -195,6 +195,9 @@ export SERVER_IP SSH_KEY
 source "${SCRIPT_DIR}/lib/common.sh"
 build_ssh_opts
 
+# ── Clear stale host keys (servers get rebuilt) ───────
+ssh-keygen -R "${SERVER_IP}" 2>/dev/null || true
+
 # ── Detect SSH User ────────────────────────────────────
 info "Probing SSH access to ${SERVER_IP}..."
 SSH_USER=$(detect_ssh_user)
