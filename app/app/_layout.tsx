@@ -1,21 +1,23 @@
 import { useEffect, useState } from "react";
-import { Slot, router, usePathname, useRootNavigationState } from "expo-router";
+import { Slot, usePathname } from "expo-router";
 import { View, ActivityIndicator, StyleSheet } from "react-native";
 import { checkAuth, getToken, getSetupStatus } from "../services/api";
 
 const PUBLIC_PATHS = ["/login", "/onboarding", "/invite"];
 
+function navigate(path: string) {
+  if (typeof window !== "undefined") {
+    window.location.href = path;
+  }
+}
+
 export default function RootLayout() {
-  const [checking, setChecking] = useState(true);
+  const [ready, setReady] = useState(false);
   const pathname = usePathname();
-  const navState = useRootNavigationState();
 
   useEffect(() => {
-    // Wait until navigation is ready before redirecting
-    if (!navState?.key) return;
-
     if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
-      setChecking(false);
+      setReady(true);
       return;
     }
 
@@ -23,29 +25,28 @@ export default function RootLayout() {
       try {
         const setup = await getSetupStatus();
         if (setup.needsSetup) {
-          router.replace("/onboarding");
-          setChecking(false);
+          navigate("/onboarding");
           return;
         }
       } catch {}
 
       const token = getToken();
       if (!token) {
-        router.replace("/login");
-        setChecking(false);
+        navigate("/login");
         return;
       }
 
       const ok = await checkAuth();
       if (!ok) {
-        router.replace("/login");
+        navigate("/login");
+        return;
       }
-      setChecking(false);
+      setReady(true);
     };
     verify();
-  }, [pathname, navState?.key]);
+  }, []);
 
-  if (checking && !PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
+  if (!ready && !PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
     return (
       <View style={styles.loading}>
         <ActivityIndicator size="large" color="#1a1a2e" />
