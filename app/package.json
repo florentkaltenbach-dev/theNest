@@ -12,14 +12,12 @@
   "dependencies": {
     "expo": "~52.0.0",
     "expo-router": "~4.0.0",
-    "expo-status-bar": "~2.0.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "react-native": "0.76.9",
     "react-native-web": "~0.19.13",
     "react-native-safe-area-context": "~5.1.0",
     "react-native-screens": "~4.4.0",
-    "@expo/vector-icons": "^14.0.0",
     "zustand": "^5.0.0",
     "@tanstack/react-query": "^5.75.0"
   },
