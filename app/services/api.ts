@@ -93,3 +93,42 @@ export async function getServer(id: number): Promise<{ server: Server; metrics: 
 export async function getHealth() {
   return fetchAPI<{ status: string; version: string; uptime: number }>("/health");
 }
+
+export interface Script {
+  path: string;
+  name: string;
+}
+
+export async function getScripts(): Promise<Script[]> {
+  const data = await fetchAPI<{ scripts: Script[] }>("/scripts");
+  return data.scripts;
+}
+
+export async function runScript(script: string, serverIp: string): Promise<{ id: string }> {
+  return fetchAPI("/scripts/run", {
+    method: "POST",
+    body: JSON.stringify({ script, serverIp }),
+  });
+}
+
+export interface ScriptRun {
+  id: string;
+  script: string;
+  server: string;
+  status: "running" | "completed" | "failed";
+  output: string[];
+  outputOffset: number;
+  totalLines: number;
+  startedAt: number;
+  finishedAt?: number;
+  exitCode?: number;
+}
+
+export async function getScriptRun(id: string, since = 0): Promise<ScriptRun> {
+  return fetchAPI(`/scripts/runs/${id}?since=${since}`);
+}
+
+export async function getScriptRuns(): Promise<any[]> {
+  const data = await fetchAPI<{ runs: any[] }>("/scripts/runs");
+  return data.runs;
+}

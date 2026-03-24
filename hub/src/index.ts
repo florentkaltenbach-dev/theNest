@@ -10,6 +10,7 @@ import { existsSync } from "fs";
 import { healthRoutes } from "./routes/health.js";
 import { serverRoutes } from "./routes/servers.js";
 import { authRoutes } from "./routes/auth.js";
+import { scriptRoutes } from "./routes/scripts.js";
 import { agentWsRoutes, getAgentData } from "./ws/agentHandler.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -42,6 +43,7 @@ app.addHook("onRequest", async (req, reply) => {
 // Protected API routes
 await app.register(healthRoutes, { prefix: "/api" });
 await app.register(serverRoutes, { prefix: "/api" });
+await app.register(scriptRoutes, { prefix: "/api" });
 
 // Agent data API (REST fallback for live metrics)
 app.get("/api/agents", async () => ({ agents: getAgentData() }));
