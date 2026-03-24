@@ -91,7 +91,23 @@ if [[ -z "${CONFIG_FILE}" || ! -f "${CONFIG_FILE}" ]]; then
     fi
   done
 
-  prompt_var "ANTHROPIC_API_KEY" "Anthropic API Key" "" true
+  # ── Claude Code auth method ──────────────────────────
+  echo "  How do you want to authenticate Claude Code?"
+  echo "    1) API Key  — set ANTHROPIC_API_KEY (works headlessly)"
+  echo "    2) OAuth    — run 'claude login' on server (opens URL to paste back)"
+  echo ""
+  read -rp "  Choose [1/2] (default: 1): " auth_choice
+  auth_choice="${auth_choice:-1}"
+
+  CLAUDE_AUTH_MODE="apikey"
+  ANTHROPIC_API_KEY=""
+  if [[ "${auth_choice}" == "2" ]]; then
+    CLAUDE_AUTH_MODE="oauth"
+    echo "  → OAuth selected. You'll log in on the server after install."
+  else
+    prompt_var "ANTHROPIC_API_KEY" "Anthropic API Key" "" true
+  fi
+
   prompt_var "GITHUB_TOKEN" "GitHub Token" "" true
   prompt_var "SSH_KEY_PATH" "SSH Key Path" "${SSH_KEY_DEFAULT}" false
   prompt_var "NEST_REPO" "Nest Repo URL" "https://github.com/florentkaltenbach-dev/theNest.git" false
@@ -102,6 +118,7 @@ if [[ -z "${CONFIG_FILE}" || ! -f "${CONFIG_FILE}" ]]; then
 # ── theNest Configuration (generated $(date +%Y-%m-%d)) ──
 # NEVER commit this file — it contains secrets.
 
+CLAUDE_AUTH_MODE=${CLAUDE_AUTH_MODE}
 ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
 GITHUB_TOKEN=${GITHUB_TOKEN}
 SSH_KEY_PATH=${SSH_KEY_PATH}
@@ -424,6 +441,12 @@ fi
 INNER
 fi
 BASHRC_EOF
+
+  # If OAuth mode, run interactive login on the server
+  if [[ "${CLAUDE_AUTH_MODE:-apikey}" == "oauth" ]]; then
+    info "Opening Claude Code login on server (follow the URL prompt)..."
+    ssh -t $(ssh_opts) "claude@${SERVER_IP}" "claude login"
+  fi
 
   success "Claude Code installed and configured"
   mark_done "setup-claude-code"
