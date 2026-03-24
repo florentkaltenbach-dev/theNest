@@ -310,17 +310,18 @@ Unattended-Upgrade::Automatic-Reboot "true";
 Unattended-Upgrade::Automatic-Reboot-Time "03:00";
 UU
 
-# ── Create /opt/nest ──────────────────────────────────
+# ── Create /opt/nest and write state ──────────────────
 mkdir -p /opt/nest
 chown claude:claude /opt/nest
+echo "harden" > /opt/nest/.bootstrap-state
+chown claude:claude /opt/nest/.bootstrap-state
+
+# Reboot at end of hardening
+reboot
 
 HARDEN_EOF
 
     success "Server hardened"
-    mark_done "harden"
-
-    info "Rebooting server..."
-    ssh "${SSH_OPTS[@]}" "root@${SERVER_IP}" "reboot" 2>/dev/null || true
     sleep 10
 
     # Switch to claude user after reboot
@@ -509,10 +510,9 @@ INNER
 fi
 BASHRC_EOF
 
-  # If OAuth mode, run interactive login on the server
+  # If OAuth mode, defer login to user's first SSH session
   if [[ "${CLAUDE_AUTH_MODE:-apikey}" == "oauth" ]]; then
-    info "Opening Claude Code login on server (follow the URL prompt)..."
-    ssh -t "${SSH_OPTS[@]}" "claude@${SERVER_IP}" "claude login"
+    warn "OAuth mode: run 'claude login' after SSHing into the server"
   fi
 
   success "Claude Code installed and configured"
@@ -610,7 +610,11 @@ check "Git installed"               "git --version"
 check "gh CLI installed"            "gh --version"
 check "tmux installed"              "tmux -V"
 check "Claude Code installed"       "which claude"
-check "ANTHROPIC_API_KEY set"       "source /opt/nest/config.env && test -n \"\${ANTHROPIC_API_KEY:-}\""
+if [[ "${CLAUDE_AUTH_MODE:-apikey}" == "apikey" ]]; then
+  check "ANTHROPIC_API_KEY set"     "source /opt/nest/config.env && test -n \"\${ANTHROPIC_API_KEY:-}\""
+else
+  check "OAuth mode (login later)"  "true"
+fi
 check "Repo cloned at /opt/nest"    "test -f /opt/nest/Nest.md"
 check "UFW active"                  "sudo ufw status | grep -q active"
 check "fail2ban running"            "sudo systemctl is-active fail2ban"
