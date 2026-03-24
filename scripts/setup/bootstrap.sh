@@ -82,11 +82,11 @@ if [[ -z "${CONFIG_FILE}" || ! -f "${CONFIG_FILE}" ]]; then
     eval "${var_name}='${value}'"
   }
 
-  # Auto-detect SSH key
+  # Auto-detect SSH key (resolve to absolute path to avoid ~ issues across shells)
   SSH_KEY_DEFAULT=""
-  for candidate in ~/.ssh/id_ed25519_hetzner ~/.ssh/id_ed25519 ~/.ssh/id_rsa; do
+  for candidate in "${HOME}/.ssh/id_ed25519_hetzner" "${HOME}/.ssh/id_ed25519" "${HOME}/.ssh/id_rsa"; do
     if [[ -f "${candidate}" ]]; then
-      SSH_KEY_DEFAULT="${candidate}"
+      SSH_KEY_DEFAULT="$(cd "$(dirname "${candidate}")" && pwd)/$(basename "${candidate}")"
       break
     fi
   done
@@ -176,7 +176,7 @@ set +a
 # ── Resolve SSH Key ────────────────────────────────────
 SSH_KEY="${SSH_KEY_PATH:-}"
 if [[ -z "${SSH_KEY}" ]]; then
-  for candidate in ~/.ssh/id_ed25519_hetzner ~/.ssh/id_ed25519 ~/.ssh/id_rsa; do
+  for candidate in "${HOME}/.ssh/id_ed25519_hetzner" "${HOME}/.ssh/id_ed25519" "${HOME}/.ssh/id_rsa"; do
     if [[ -f "${candidate}" ]]; then
       SSH_KEY="${candidate}"
       break
