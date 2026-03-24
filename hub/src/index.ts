@@ -11,6 +11,9 @@ import { healthRoutes } from "./routes/health.js";
 import { serverRoutes } from "./routes/servers.js";
 import { authRoutes } from "./routes/auth.js";
 import { scriptRoutes } from "./routes/scripts.js";
+import { chatRoutes } from "./routes/chat.js";
+import { secretRoutes } from "./routes/secrets.js";
+import { appendageRoutes } from "./routes/appendages.js";
 import { agentWsRoutes, getAgentData } from "./ws/agentHandler.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -44,6 +47,9 @@ app.addHook("onRequest", async (req, reply) => {
 await app.register(healthRoutes, { prefix: "/api" });
 await app.register(serverRoutes, { prefix: "/api" });
 await app.register(scriptRoutes, { prefix: "/api" });
+await app.register(chatRoutes, { prefix: "/api" });
+await app.register(secretRoutes, { prefix: "/api" });
+await app.register(appendageRoutes, { prefix: "/api" });
 
 // Agent data API (REST fallback for live metrics)
 app.get("/api/agents", async () => ({ agents: getAgentData() }));

@@ -15,27 +15,35 @@ export default function TabLayout() {
         name="index"
         options={{
           title: "Servers",
-          tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 20, color }}>⬡</Text>
-          ),
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 18, color }}>⬡</Text>,
         }}
       />
       <Tabs.Screen
         name="scripts"
         options={{
           title: "Scripts",
-          tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 20, color }}>▷</Text>
-          ),
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 18, color }}>▷</Text>,
+        }}
+      />
+      <Tabs.Screen
+        name="claw"
+        options={{
+          title: "Claw",
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 18, color }}>💬</Text>,
+        }}
+      />
+      <Tabs.Screen
+        name="secrets"
+        options={{
+          title: "Secrets",
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 18, color }}>🔑</Text>,
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
           title: "Settings",
-          tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 20, color }}>⚙</Text>
-          ),
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 18, color }}>⚙</Text>,
         }}
       />
     </Tabs>
