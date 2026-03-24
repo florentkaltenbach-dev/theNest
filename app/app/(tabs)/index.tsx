@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   View,
   Text,
@@ -12,23 +12,49 @@ import { router } from "expo-router";
 import { getServers, Server } from "../../services/api";
 import { connectWs, onWsMessage } from "../../services/ws";
 
+const HISTORY_SIZE = 30;
+
+function barColor(percent: number): string {
+  if (percent > 80) return "#ef4444";
+  if (percent > 60) return "#eab308";
+  return "#22c55e";
+}
+
 function StatusDot({ status }: { status: string }) {
   const color = status === "running" ? "#22c55e" : status === "off" ? "#ef4444" : "#eab308";
   return <View style={[styles.dot, { backgroundColor: color }]} />;
 }
 
-function GaugeBar({ label, percent, detail }: { label: string; percent: number; detail?: string }) {
-  const color = percent > 80 ? "#ef4444" : percent > 60 ? "#eab308" : "#22c55e";
+function Histogram({ label, current, history, detail }: {
+  label: string;
+  current: number;
+  history: number[];
+  detail?: string;
+}) {
+  const bars = history.length > 0 ? history : [0];
   return (
-    <View style={styles.gauge}>
-      <View style={styles.gaugeHeader}>
-        <Text style={styles.gaugeLabel}>{label}</Text>
-        <Text style={styles.gaugePercent}>{percent}%</Text>
+    <View style={styles.histogram}>
+      <View style={styles.histHeader}>
+        <Text style={styles.histLabel}>{label}</Text>
+        <Text style={[styles.histValue, { color: barColor(current) }]}>{current}%</Text>
       </View>
-      <View style={styles.gaugeTrack}>
-        <View style={[styles.gaugeFill, { width: `${Math.min(percent, 100)}%`, backgroundColor: color }]} />
+      <View style={styles.histBars}>
+        {bars.map((val, i) => (
+          <View key={i} style={styles.histBarSlot}>
+            <View
+              style={[
+                styles.histBar,
+                {
+                  height: `${Math.max(val, 2)}%`,
+                  backgroundColor: barColor(val),
+                  opacity: 0.4 + (i / bars.length) * 0.6,
+                },
+              ]}
+            />
+          </View>
+        ))}
       </View>
-      {detail && <Text style={styles.gaugeDetail}>{detail}</Text>}
+      {detail && <Text style={styles.histDetail}>{detail}</Text>}
     </View>
   );
 }
@@ -41,7 +67,17 @@ interface AgentMetrics {
   uptime_seconds: number;
 }
 
-function ServerCard({ server, metrics }: { server: Server; metrics?: AgentMetrics }) {
+interface MetricsHistory {
+  cpu: number[];
+  ram: number[];
+  disk: number[];
+}
+
+function ServerCard({ server, metrics, history }: { server: Server; metrics?: AgentMetrics; history?: MetricsHistory }) {
+  const cpuHistory = history?.cpu || [];
+  const ramHistory = history?.ram || [];
+  const diskHistory = history?.disk || [];
+
   return (
     <Pressable style={styles.card} onPress={() => router.push(`/server/${server.id}`)}>
       <View style={styles.cardHeader}>
@@ -54,24 +90,26 @@ function ServerCard({ server, metrics }: { server: Server; metrics?: AgentMetric
       </View>
 
       {metrics ? (
-        <View style={styles.gauges}>
-          <GaugeBar label="CPU" percent={metrics.cpu.percent} />
-          <GaugeBar
+        <View style={styles.histograms}>
+          <Histogram label="CPU" current={metrics.cpu.percent} history={cpuHistory} />
+          <Histogram
             label="RAM"
-            percent={metrics.memory.percent}
+            current={metrics.memory.percent}
+            history={ramHistory}
             detail={`${metrics.memory.used_mb}MB / ${metrics.memory.total_mb}MB`}
           />
-          <GaugeBar
+          <Histogram
             label="Disk"
-            percent={metrics.disk.percent}
+            current={metrics.disk.percent}
+            history={diskHistory}
             detail={`${metrics.disk.used_gb}GB / ${metrics.disk.total_gb}GB`}
           />
         </View>
       ) : (
-        <View style={styles.gauges}>
-          <GaugeBar label="CPU" percent={0} detail={`${server.cores} cores`} />
-          <GaugeBar label="RAM" percent={0} detail={`${server.memory} GB`} />
-          <GaugeBar label="Disk" percent={0} detail={`${server.disk} GB`} />
+        <View style={styles.histograms}>
+          <Histogram label="CPU" current={0} history={[]} detail={`${server.cores} cores`} />
+          <Histogram label="RAM" current={0} history={[]} detail={`${server.memory} GB`} />
+          <Histogram label="Disk" current={0} history={[]} detail={`${server.disk} GB`} />
         </View>
       )}
 
@@ -91,6 +129,8 @@ export default function ServersScreen() {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [agentMetrics, setAgentMetrics] = useState<Record<string, AgentMetrics>>({});
+  const historyRef = useRef<Record<string, MetricsHistory>>({});
+  const [historyState, setHistoryState] = useState<Record<string, MetricsHistory>>({});
 
   const load = async () => {
     try {
@@ -111,14 +151,34 @@ export default function ServersScreen() {
     connectWs();
     return onWsMessage((msg) => {
       if (msg.type === "metrics" && msg.hostname) {
-        setAgentMetrics((prev) => ({ ...prev, [msg.hostname]: msg.data }));
+        const m = msg.data;
+        setAgentMetrics((prev) => ({ ...prev, [msg.hostname]: m }));
+
+        // Append to history
+        const h = historyRef.current[msg.hostname] || { cpu: [], ram: [], disk: [] };
+        h.cpu = [...h.cpu.slice(-(HISTORY_SIZE - 1)), m.cpu.percent];
+        h.ram = [...h.ram.slice(-(HISTORY_SIZE - 1)), m.memory.percent];
+        h.disk = [...h.disk.slice(-(HISTORY_SIZE - 1)), m.disk.percent];
+        historyRef.current[msg.hostname] = h;
+        setHistoryState({ ...historyRef.current });
       }
       if (msg.type === "agents" && Array.isArray(msg.data)) {
         const map: Record<string, AgentMetrics> = {};
         for (const a of msg.data) {
-          if (a.metrics) map[a.hostname] = a.metrics;
+          if (a.metrics) {
+            map[a.hostname] = a.metrics;
+            // Seed history with initial value
+            if (!historyRef.current[a.hostname]) {
+              historyRef.current[a.hostname] = {
+                cpu: [a.metrics.cpu.percent],
+                ram: [a.metrics.memory.percent],
+                disk: [a.metrics.disk.percent],
+              };
+            }
+          }
         }
         setAgentMetrics(map);
+        setHistoryState({ ...historyRef.current });
       }
     });
   }, []);
@@ -146,7 +206,7 @@ export default function ServersScreen() {
     >
       <Text style={styles.heading}>{servers.length} Server{servers.length !== 1 ? "s" : ""}</Text>
       {servers.map((s) => (
-        <ServerCard key={s.id} server={s} metrics={agentMetrics[s.name]} />
+        <ServerCard key={s.id} server={s} metrics={agentMetrics[s.name]} history={historyState[s.name]} />
       ))}
     </ScrollView>
   );
@@ -174,14 +234,15 @@ const styles = StyleSheet.create({
   cardSub: { fontSize: 12, color: "#999", marginTop: 2 },
   cardType: { fontSize: 12, color: "#999", backgroundColor: "#f0f0f0", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4, overflow: "hidden", textTransform: "uppercase", fontWeight: "500" },
   dot: { width: 10, height: 10, borderRadius: 5 },
-  gauges: { gap: 10 },
-  gauge: {},
-  gaugeHeader: { flexDirection: "row", justifyContent: "space-between", marginBottom: 3 },
-  gaugeLabel: { fontSize: 11, color: "#999", textTransform: "uppercase", letterSpacing: 0.5 },
-  gaugePercent: { fontSize: 11, fontWeight: "600", color: "#1a1a2e" },
-  gaugeTrack: { height: 6, backgroundColor: "#f0f0f0", borderRadius: 3, overflow: "hidden" },
-  gaugeFill: { height: "100%", borderRadius: 3 },
-  gaugeDetail: { fontSize: 10, color: "#bbb", marginTop: 2 },
+  histograms: { gap: 12 },
+  histogram: {},
+  histHeader: { flexDirection: "row", justifyContent: "space-between", marginBottom: 4 },
+  histLabel: { fontSize: 11, color: "#999", textTransform: "uppercase", letterSpacing: 0.5 },
+  histValue: { fontSize: 12, fontWeight: "700" },
+  histBars: { flexDirection: "row", height: 32, alignItems: "flex-end", gap: 1, backgroundColor: "#f8f9fa", borderRadius: 4, overflow: "hidden", padding: 2 },
+  histBarSlot: { flex: 1, height: "100%", justifyContent: "flex-end" },
+  histBar: { width: "100%", borderRadius: 1, minHeight: 1 },
+  histDetail: { fontSize: 10, color: "#bbb", marginTop: 2 },
   cardFooter: { flexDirection: "row", justifyContent: "space-between", marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: "#f0f0f0" },
   footerText: { fontSize: 11, color: "#999" },
 });
