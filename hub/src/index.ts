@@ -1,11 +1,14 @@
 import Fastify from "fastify";
 import fastifyStatic from "@fastify/static";
 import fastifyCors from "@fastify/cors";
+import fastifyJwt from "@fastify/jwt";
+import { randomBytes } from "crypto";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { existsSync } from "fs";
 import { healthRoutes } from "./routes/health.js";
 import { serverRoutes } from "./routes/servers.js";
+import { authRoutes } from "./routes/auth.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -13,7 +16,24 @@ const app = Fastify({ logger: true });
 
 await app.register(fastifyCors, { origin: true });
 
-// API routes
+// JWT — use secret from env or generate a random one
+const jwtSecret = process.env.NEST_JWT_SECRET || randomBytes(32).toString("hex");
+await app.register(fastifyJwt, { secret: jwtSecret });
+
+// Auth routes (public — no JWT required)
+await app.register(authRoutes, { prefix: "/api" });
+
+// Auth middleware for all other /api routes
+app.addHook("onRequest", async (req, reply) => {
+  if (!req.url.startsWith("/api/") || req.url.startsWith("/api/auth/")) return;
+  try {
+    await req.jwtVerify();
+  } catch {
+    reply.code(401).send({ error: "Unauthorized" });
+  }
+});
+
+// Protected API routes
 await app.register(healthRoutes, { prefix: "/api" });
 await app.register(serverRoutes, { prefix: "/api" });
 
