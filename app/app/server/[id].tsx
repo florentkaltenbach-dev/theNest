@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Pressable } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import { getServer, Server } from "../../services/api";
+import { connectWs, onWsMessage } from "../../services/ws";
 
 function formatBytes(bytes: number | null): string {
   if (!bytes) return "0 B";
@@ -42,6 +43,8 @@ export default function ServerDetailScreen() {
   const [server, setServer] = useState<Server | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [liveMetrics, setLiveMetrics] = useState<any>(null);
+  const [liveContainers, setLiveContainers] = useState<any[]>([]);
 
   useEffect(() => {
     if (!id) return;
@@ -50,6 +53,19 @@ export default function ServerDetailScreen() {
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [id]);
+
+  useEffect(() => {
+    connectWs();
+    const unsub = onWsMessage((msg) => {
+      if (msg.type === "metrics") setLiveMetrics(msg.data);
+      if (msg.type === "containers") setLiveContainers(msg.data);
+      if (msg.type === "agents" && Array.isArray(msg.data) && msg.data.length > 0) {
+        setLiveMetrics(msg.data[0].metrics);
+        setLiveContainers(msg.data[0].containers || []);
+      }
+    });
+    return unsub;
+  }, []);
 
   if (loading) {
     return (
@@ -107,6 +123,46 @@ export default function ServerDetailScreen() {
         </View>
       </View>
 
+      {liveMetrics && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Live Metrics</Text>
+          <View style={styles.resourceGrid}>
+            <View style={styles.resourceCard}>
+              <Text style={styles.resourceValue}>{liveMetrics.cpu.percent}%</Text>
+              <Text style={styles.resourceLabel}>CPU</Text>
+            </View>
+            <View style={styles.resourceCard}>
+              <Text style={styles.resourceValue}>{liveMetrics.memory.percent}%</Text>
+              <Text style={styles.resourceLabel}>RAM ({liveMetrics.memory.used_mb}MB)</Text>
+            </View>
+            <View style={styles.resourceCard}>
+              <Text style={styles.resourceValue}>{liveMetrics.disk.percent}%</Text>
+              <Text style={styles.resourceLabel}>Disk ({liveMetrics.disk.used_gb}GB)</Text>
+            </View>
+          </View>
+          <View style={{ marginTop: 8 }}>
+            <InfoRow label="Load (1m / 5m / 15m)" value={`${liveMetrics.load["1m"]} / ${liveMetrics.load["5m"]} / ${liveMetrics.load["15m"]}`} />
+            <InfoRow label="Uptime" value={`${Math.floor(liveMetrics.uptime_seconds / 3600)}h ${Math.floor((liveMetrics.uptime_seconds % 3600) / 60)}m`} />
+          </View>
+        </View>
+      )}
+
+      {liveContainers.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Containers ({liveContainers.length})</Text>
+          {liveContainers.map((c: any) => (
+            <View key={c.id} style={styles.containerRow}>
+              <View style={[styles.badgeDot, { backgroundColor: c.status === "running" ? "#22c55e" : "#ef4444" }]} />
+              <Text style={styles.containerName}>{c.name}</Text>
+              <Text style={styles.containerImage}>{c.image}</Text>
+              {c.cpu_percent !== undefined && (
+                <Text style={styles.containerStat}>{c.cpu_percent}% / {c.memory_mb}MB</Text>
+              )}
+            </View>
+          ))}
+        </View>
+      )}
+
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Traffic</Text>
         <InfoRow label="Inbound" value={formatBytes(server.inTraffic)} />
@@ -143,4 +199,8 @@ const styles = StyleSheet.create({
   resourceCard: { flex: 1, backgroundColor: "#f8f9fa", borderRadius: 8, padding: 16, alignItems: "center" },
   resourceValue: { fontSize: 28, fontWeight: "700", color: "#1a1a2e" },
   resourceLabel: { fontSize: 12, color: "#999", marginTop: 4 },
+  containerRow: { flexDirection: "row", alignItems: "center", paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "#f0f0f0", gap: 8 },
+  containerName: { fontSize: 14, fontWeight: "500", color: "#1a1a2e", flex: 1 },
+  containerImage: { fontSize: 12, color: "#999" },
+  containerStat: { fontSize: 12, color: "#666", minWidth: 80, textAlign: "right" },
 });

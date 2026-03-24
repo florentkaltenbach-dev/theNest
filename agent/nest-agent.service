@@ -1,0 +1,18 @@
+[Unit]
+Description=Nest Agent
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=claude
+Group=claude
+WorkingDirectory=/opt/nest/agent
+EnvironmentFile=/opt/nest/config.env
+Environment=NEST_HUB_URL=ws://localhost:3000/ws/agent
+ExecStart=/usr/bin/python3 -m nest_agent.main
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
