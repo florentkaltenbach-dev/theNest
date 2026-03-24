@@ -108,7 +108,43 @@ if [[ -z "${CONFIG_FILE}" || ! -f "${CONFIG_FILE}" ]]; then
     prompt_var "ANTHROPIC_API_KEY" "Anthropic API Key" "" true
   fi
 
-  prompt_var "GITHUB_TOKEN" "GitHub Token" "" true
+  # ── Repo access method ───────────────────────────────
+  echo ""
+  echo "  How should the server access the GitHub repo?"
+  echo "    1) Deploy Key — generate an SSH key pair (recommended)"
+  echo "    2) Token      — use a GitHub personal access token"
+  echo ""
+  read -rp "  Choose [1/2] (default: 1): " repo_choice
+  repo_choice="${repo_choice:-1}"
+
+  REPO_AUTH_MODE="deploykey"
+  GITHUB_TOKEN=""
+  DEPLOY_KEY_PATH=""
+  if [[ "${repo_choice}" == "2" ]]; then
+    REPO_AUTH_MODE="token"
+    prompt_var "GITHUB_TOKEN" "GitHub Token" "" true
+  else
+    DEPLOY_KEY_PATH="${SCRIPT_DIR}/../../.deploy-key"
+    if [[ ! -f "${DEPLOY_KEY_PATH}" ]]; then
+      echo ""
+      echo "  Generating deploy key pair..."
+      ssh-keygen -t ed25519 -C "theNest-deploy" -f "${DEPLOY_KEY_PATH}" -N "" -q
+      echo ""
+      echo "  ┌──────────────────────────────────────────────────┐"
+      echo "  │  Add this PUBLIC KEY as a deploy key on GitHub:  │"
+      echo "  │                                                  │"
+      echo "  │  Repo → Settings → Deploy keys → Add deploy key │"
+      echo "  └──────────────────────────────────────────────────┘"
+      echo ""
+      echo "  $(cat "${DEPLOY_KEY_PATH}.pub")"
+      echo ""
+      read -rp "  Press Enter after you've added the deploy key on GitHub... "
+    else
+      echo "  → Using existing deploy key: ${DEPLOY_KEY_PATH}"
+      echo "  Public key: $(cat "${DEPLOY_KEY_PATH}.pub")"
+    fi
+  fi
+
   prompt_var "SSH_KEY_PATH" "SSH Key Path" "${SSH_KEY_DEFAULT}" false
   prompt_var "NEST_REPO" "Nest Repo URL" "https://github.com/florentkaltenbach-dev/theNest.git" false
   prompt_var "NEST_BRANCH" "Nest Branch" "main" false
@@ -120,6 +156,7 @@ if [[ -z "${CONFIG_FILE}" || ! -f "${CONFIG_FILE}" ]]; then
 
 CLAUDE_AUTH_MODE=${CLAUDE_AUTH_MODE}
 ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+REPO_AUTH_MODE=${REPO_AUTH_MODE}
 GITHUB_TOKEN=${GITHUB_TOKEN}
 SSH_KEY_PATH=${SSH_KEY_PATH}
 NEST_REPO=${NEST_REPO}
@@ -377,10 +414,39 @@ if ! phase_done "clone-repo"; then
   NEST_REPO="${NEST_REPO:-https://github.com/florentkaltenbach-dev/theNest.git}"
   NEST_BRANCH="${NEST_BRANCH:-main}"
 
-  # Build authenticated URL if GITHUB_TOKEN is set
-  CLONE_URL="${NEST_REPO}"
-  if [[ -n "${GITHUB_TOKEN:-}" ]]; then
-    CLONE_URL=$(echo "${NEST_REPO}" | sed "s|https://|https://${GITHUB_TOKEN}@|")
+  if [[ "${REPO_AUTH_MODE:-token}" == "deploykey" ]]; then
+    # Upload deploy key to server
+    DEPLOY_KEY_LOCAL="${SCRIPT_DIR}/../../.deploy-key"
+    if [[ -f "${DEPLOY_KEY_LOCAL}" ]]; then
+      info "Uploading deploy key to server..."
+      upload_file "${DEPLOY_KEY_LOCAL}" "/tmp/nest-deploy-key"
+      ssh $(ssh_opts) "claude@${SERVER_IP}" "bash -s" <<'DKSETUP_EOF'
+mkdir -p ~/.ssh
+mv /tmp/nest-deploy-key ~/.ssh/nest-deploy-key
+chmod 600 ~/.ssh/nest-deploy-key
+# Configure SSH to use deploy key for github.com
+if ! grep -q "nest-deploy-key" ~/.ssh/config 2>/dev/null; then
+  cat >> ~/.ssh/config <<'SSHCFG'
+
+Host github.com
+  HostName github.com
+  User git
+  IdentityFile ~/.ssh/nest-deploy-key
+  StrictHostKeyChecking accept-new
+SSHCFG
+  chmod 600 ~/.ssh/config
+fi
+DKSETUP_EOF
+    fi
+
+    # Convert HTTPS URL to SSH URL for git clone
+    CLONE_URL=$(echo "${NEST_REPO}" | sed 's|https://github.com/|git@github.com:|')
+  else
+    # Token-based HTTPS clone
+    CLONE_URL="${NEST_REPO}"
+    if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+      CLONE_URL=$(echo "${NEST_REPO}" | sed "s|https://|https://${GITHUB_TOKEN}@|")
+    fi
   fi
 
   ssh $(ssh_opts) "claude@${SERVER_IP}" "bash -s" <<CLONE_EOF

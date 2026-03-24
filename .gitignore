@@ -1,3 +1,5 @@
 config.env
+.deploy-key
+.deploy-key.pub
 .bootstrap-state
 *.log
