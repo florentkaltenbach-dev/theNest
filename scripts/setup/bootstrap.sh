@@ -154,13 +154,13 @@ if [[ -z "${CONFIG_FILE}" || ! -f "${CONFIG_FILE}" ]]; then
 # ── theNest Configuration (generated $(date +%Y-%m-%d)) ──
 # NEVER commit this file — it contains secrets.
 
-CLAUDE_AUTH_MODE=${CLAUDE_AUTH_MODE}
-ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-REPO_AUTH_MODE=${REPO_AUTH_MODE}
-GITHUB_TOKEN=${GITHUB_TOKEN}
-SSH_KEY_PATH=${SSH_KEY_PATH}
-NEST_REPO=${NEST_REPO}
-NEST_BRANCH=${NEST_BRANCH}
+CLAUDE_AUTH_MODE="${CLAUDE_AUTH_MODE}"
+ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY}"
+REPO_AUTH_MODE="${REPO_AUTH_MODE}"
+GITHUB_TOKEN="${GITHUB_TOKEN}"
+SSH_KEY_PATH="${SSH_KEY_PATH}"
+NEST_REPO="${NEST_REPO}"
+NEST_BRANCH="${NEST_BRANCH}"
 ENVEOF
 
   chmod 600 "${CONFIG_FILE}" 2>/dev/null || true
@@ -193,6 +193,7 @@ export SERVER_IP SSH_KEY
 
 # ── Source Common Functions ────────────────────────────
 source "${SCRIPT_DIR}/lib/common.sh"
+build_ssh_opts
 
 # ── Detect SSH User ────────────────────────────────────
 info "Probing SSH access to ${SERVER_IP}..."
@@ -218,7 +219,7 @@ if ! phase_done "harden"; then
   if [[ "${SSH_USER}" == "root" ]]; then
     info "Phase 1: Hardening server..."
 
-    ssh $(ssh_opts) "root@${SERVER_IP}" "bash -s" <<'HARDEN_EOF'
+    ssh "${SSH_OPTS[@]}" "root@${SERVER_IP}" "bash -s" <<'HARDEN_EOF'
 set -Eeuo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
@@ -247,7 +248,7 @@ grep -q "^PubkeyAuthentication" /etc/ssh/sshd_config \
   && sed -i 's/^PubkeyAuthentication.*/PubkeyAuthentication yes/' /etc/ssh/sshd_config \
   || echo "PubkeyAuthentication yes" >> /etc/ssh/sshd_config
 
-systemctl restart sshd
+systemctl restart ssh
 
 # ── UFW Firewall ───────────────────────────────────────
 apt-get update -qq
@@ -319,7 +320,7 @@ HARDEN_EOF
     mark_done "harden"
 
     info "Rebooting server..."
-    ssh $(ssh_opts) "root@${SERVER_IP}" "reboot" 2>/dev/null || true
+    ssh "${SSH_OPTS[@]}" "root@${SERVER_IP}" "reboot" 2>/dev/null || true
     sleep 10
 
     # Switch to claude user after reboot
@@ -347,7 +348,7 @@ fi
 if ! phase_done "install-deps"; then
   info "Phase 2: Installing dependencies..."
 
-  ssh $(ssh_opts) "claude@${SERVER_IP}" "sudo bash -s" <<'DEPS_EOF'
+  ssh "${SSH_OPTS[@]}" "claude@${SERVER_IP}" "sudo bash -s" <<'DEPS_EOF'
 set -Eeuo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
@@ -420,7 +421,7 @@ if ! phase_done "clone-repo"; then
     if [[ -f "${DEPLOY_KEY_LOCAL}" ]]; then
       info "Uploading deploy key to server..."
       upload_file "${DEPLOY_KEY_LOCAL}" "/tmp/nest-deploy-key"
-      ssh $(ssh_opts) "claude@${SERVER_IP}" "bash -s" <<'DKSETUP_EOF'
+      ssh "${SSH_OPTS[@]}" "claude@${SERVER_IP}" "bash -s" <<'DKSETUP_EOF'
 mkdir -p ~/.ssh
 mv /tmp/nest-deploy-key ~/.ssh/nest-deploy-key
 chmod 600 ~/.ssh/nest-deploy-key
@@ -449,7 +450,7 @@ DKSETUP_EOF
     fi
   fi
 
-  ssh $(ssh_opts) "claude@${SERVER_IP}" "bash -s" <<CLONE_EOF
+  ssh "${SSH_OPTS[@]}" "claude@${SERVER_IP}" "bash -s" <<CLONE_EOF
 set -Eeuo pipefail
 
 if [[ -d /opt/nest/.git ]]; then
@@ -481,7 +482,7 @@ if ! phase_done "setup-claude-code"; then
   # Upload config.env to server
   upload_file "${CONFIG_FILE}" "/tmp/nest-config.env"
 
-  ssh $(ssh_opts) "claude@${SERVER_IP}" "sudo bash -s" <<'CLAUDE_EOF'
+  ssh "${SSH_OPTS[@]}" "claude@${SERVER_IP}" "sudo bash -s" <<'CLAUDE_EOF'
 set -Eeuo pipefail
 
 # ── Install Claude Code ────────────────────────────────
@@ -495,7 +496,7 @@ chmod 0600 /opt/nest/config.env
 CLAUDE_EOF
 
   # Source config.env in bashrc (as claude user, not sudo)
-  ssh $(ssh_opts) "claude@${SERVER_IP}" "bash -s" <<'BASHRC_EOF'
+  ssh "${SSH_OPTS[@]}" "claude@${SERVER_IP}" "bash -s" <<'BASHRC_EOF'
 # Add env sourcing to .bashrc if not already present
 if ! grep -q "nest/config.env" ~/.bashrc 2>/dev/null; then
   cat >> ~/.bashrc <<'INNER'
@@ -511,7 +512,7 @@ BASHRC_EOF
   # If OAuth mode, run interactive login on the server
   if [[ "${CLAUDE_AUTH_MODE:-apikey}" == "oauth" ]]; then
     info "Opening Claude Code login on server (follow the URL prompt)..."
-    ssh -t $(ssh_opts) "claude@${SERVER_IP}" "claude login"
+    ssh -t "${SSH_OPTS[@]}" "claude@${SERVER_IP}" "claude login"
   fi
 
   success "Claude Code installed and configured"
@@ -526,7 +527,7 @@ fi
 if ! phase_done "setup-claude-code-service"; then
   info "Phase 5: Setting up Claude Code service and tmux helper..."
 
-  ssh $(ssh_opts) "claude@${SERVER_IP}" "sudo bash -s" <<'SERVICE_EOF'
+  ssh "${SSH_OPTS[@]}" "claude@${SERVER_IP}" "sudo bash -s" <<'SERVICE_EOF'
 set -Eeuo pipefail
 
 # ── Systemd service for headless mode ──────────────────

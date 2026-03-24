@@ -37,40 +37,43 @@ mark_done() {
 }
 
 # ── SSH ────────────────────────────────────────────────
-# SSH_USER and SSH_KEY are set by bootstrap.sh before sourcing this file.
+# SSH_USER, SSH_KEY, and SERVER_IP are set by bootstrap.sh before sourcing.
+# SSH_OPTS is built as an array to handle paths with spaces.
 
-ssh_opts() {
-  echo -o StrictHostKeyChecking=accept-new \
-       -o UserKnownHostsFile=/dev/null \
-       -o LogLevel=ERROR \
-       -o ConnectTimeout=10 \
-       -i "${SSH_KEY}"
+build_ssh_opts() {
+  SSH_OPTS=(
+    -o StrictHostKeyChecking=accept-new
+    -o UserKnownHostsFile=/dev/null
+    -o LogLevel=ERROR
+    -o ConnectTimeout=10
+    -i "${SSH_KEY}"
+  )
 }
 
 run_remote() {
   local cmd="$1"
-  ssh $(ssh_opts) "${SSH_USER}@${SERVER_IP}" "bash -lc '${cmd}'"
+  ssh "${SSH_OPTS[@]}" "${SSH_USER}@${SERVER_IP}" "bash -lc '${cmd}'"
 }
 
 run_remote_sudo() {
   local cmd="$1"
-  ssh $(ssh_opts) "${SSH_USER}@${SERVER_IP}" "sudo bash -c '${cmd}'"
+  ssh "${SSH_OPTS[@]}" "${SSH_USER}@${SERVER_IP}" "sudo bash -c '${cmd}'"
 }
 
 upload_file() {
   local src="$1" dest="$2"
-  scp $(ssh_opts) "${src}" "${SSH_USER}@${SERVER_IP}:${dest}"
+  scp "${SSH_OPTS[@]}" "${src}" "${SSH_USER}@${SERVER_IP}:${dest}"
 }
 
 run_remote_script() {
   local script="$1"
-  ssh $(ssh_opts) "${SSH_USER}@${SERVER_IP}" "sudo bash -s" < "${script}"
+  ssh "${SSH_OPTS[@]}" "${SSH_USER}@${SERVER_IP}" "sudo bash -s" < "${script}"
 }
 
 detect_ssh_user() {
-  if ssh $(ssh_opts) "claude@${SERVER_IP}" "true" 2>/dev/null; then
+  if ssh "${SSH_OPTS[@]}" "claude@${SERVER_IP}" "true" 2>/dev/null; then
     echo "claude"
-  elif ssh $(ssh_opts) "root@${SERVER_IP}" "true" 2>/dev/null; then
+  elif ssh "${SSH_OPTS[@]}" "root@${SERVER_IP}" "true" 2>/dev/null; then
     echo "root"
   else
     echo ""
@@ -84,7 +87,7 @@ wait_for_ssh() {
 
   info "Waiting for SSH as '${user}'..."
   while [ $attempt -lt $max_attempts ]; do
-    if ssh $(ssh_opts) "${user}@${SERVER_IP}" "true" 2>/dev/null; then
+    if ssh "${SSH_OPTS[@]}" "${user}@${SERVER_IP}" "true" 2>/dev/null; then
       success "SSH connection established as '${user}'"
       return 0
     fi
