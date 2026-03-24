@@ -79,7 +79,7 @@ if [[ -z "${CONFIG_FILE}" || ! -f "${CONFIG_FILE}" ]]; then
       prompt_var "$@"
       return
     fi
-    eval "${var_name}='${value}'"
+    printf -v "${var_name}" '%s' "${value}"
   }
 
   # Auto-detect SSH key (resolve to absolute path to avoid ~ issues across shells)
@@ -447,15 +447,27 @@ DKSETUP_EOF
     # Convert HTTPS URL to SSH URL for git clone
     CLONE_URL=$(echo "${NEST_REPO}" | sed 's|https://github.com/|git@github.com:|')
   else
-    # Token-based HTTPS clone
+    # Token-based HTTPS clone via GIT_ASKPASS (avoids token in URL)
     CLONE_URL="${NEST_REPO}"
+    USE_GIT_ASKPASS=""
     if [[ -n "${GITHUB_TOKEN:-}" ]]; then
-      CLONE_URL=$(echo "${NEST_REPO}" | sed "s|https://|https://${GITHUB_TOKEN}@|")
+      USE_GIT_ASKPASS="1"
     fi
   fi
 
   ssh "${SSH_OPTS[@]}" "claude@${SERVER_IP}" "bash -s" <<CLONE_EOF
 set -Eeuo pipefail
+
+# Set up GIT_ASKPASS if using token auth
+if [[ -n "${USE_GIT_ASKPASS:-}" ]]; then
+  ASKPASS_SCRIPT=\$(mktemp)
+  cat > "\${ASKPASS_SCRIPT}" <<'ASKPASS'
+#!/bin/sh
+echo "${GITHUB_TOKEN}"
+ASKPASS
+  chmod +x "\${ASKPASS_SCRIPT}"
+  export GIT_ASKPASS="\${ASKPASS_SCRIPT}"
+fi
 
 if [[ -d /opt/nest/.git ]]; then
   cd /opt/nest
@@ -469,6 +481,9 @@ else
   mv "\${TMP_DIR}"/* /opt/nest/
   rmdir "\${TMP_DIR}"
 fi
+
+# Clean up askpass script
+rm -f "\${ASKPASS_SCRIPT:-}" 2>/dev/null || true
 CLONE_EOF
 
   success "Repo cloned to /opt/nest"
