@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Slot, router, usePathname } from "expo-router";
+import { Slot, router, usePathname, useRootNavigationState } from "expo-router";
 import { View, ActivityIndicator, StyleSheet } from "react-native";
 import { checkAuth, getToken, getSetupStatus } from "../services/api";
 
@@ -8,15 +8,18 @@ const PUBLIC_PATHS = ["/login", "/onboarding", "/invite"];
 export default function RootLayout() {
   const [checking, setChecking] = useState(true);
   const pathname = usePathname();
+  const navState = useRootNavigationState();
 
   useEffect(() => {
-    const verify = async () => {
-      if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
-        setChecking(false);
-        return;
-      }
+    // Wait until navigation is ready before redirecting
+    if (!navState?.key) return;
 
-      // Check if setup is needed
+    if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
+      setChecking(false);
+      return;
+    }
+
+    const verify = async () => {
       try {
         const setup = await getSetupStatus();
         if (setup.needsSetup) {
@@ -40,7 +43,7 @@ export default function RootLayout() {
       setChecking(false);
     };
     verify();
-  }, [pathname]);
+  }, [pathname, navState?.key]);
 
   if (checking && !PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
     return (
