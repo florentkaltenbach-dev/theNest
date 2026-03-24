@@ -1,37 +1,48 @@
 import { useEffect, useState } from "react";
 import { Slot, router, usePathname } from "expo-router";
 import { View, ActivityIndicator, StyleSheet } from "react-native";
-import { checkAuth, getToken } from "../services/api";
+import { checkAuth, getToken, getSetupStatus } from "../services/api";
+
+const PUBLIC_PATHS = ["/login", "/onboarding", "/invite"];
 
 export default function RootLayout() {
   const [checking, setChecking] = useState(true);
-  const [authed, setAuthed] = useState(false);
   const pathname = usePathname();
 
   useEffect(() => {
     const verify = async () => {
-      if (pathname === "/login") {
+      if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
         setChecking(false);
         return;
       }
+
+      // Check if setup is needed
+      try {
+        const setup = await getSetupStatus();
+        if (setup.needsSetup) {
+          router.replace("/onboarding");
+          setChecking(false);
+          return;
+        }
+      } catch {}
+
       const token = getToken();
       if (!token) {
         router.replace("/login");
         setChecking(false);
         return;
       }
+
       const ok = await checkAuth();
       if (!ok) {
         router.replace("/login");
-      } else {
-        setAuthed(true);
       }
       setChecking(false);
     };
     verify();
   }, [pathname]);
 
-  if (checking && pathname !== "/login") {
+  if (checking && !PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
     return (
       <View style={styles.loading}>
         <ActivityIndicator size="large" color="#1a1a2e" />

@@ -112,7 +112,33 @@ export async function authRoutes(app: FastifyInstance) {
     });
     await saveUsers(users);
 
-    return { id, name, role: "user" };
+    // Generate invite token (JWT with user ID, valid 7 days)
+    const inviteToken = app.jwt.sign({ inviteFor: id, name }, { expiresIn: "7d" });
+
+    return { id, name, role: "user", inviteToken };
+  });
+
+  // Accept invitation — user sets their own password via invite token
+  app.post<{ Body: { token: string; password: string } }>("/auth/accept-invite", async (req, reply) => {
+    const { token, password } = req.body;
+    if (!token || !password) return reply.code(400).send({ error: "token and password required" });
+
+    try {
+      const decoded = app.jwt.verify(token) as any;
+      if (!decoded.inviteFor) return reply.code(400).send({ error: "Invalid invite token" });
+
+      const users = await loadUsers();
+      const user = users.find((u) => u.id === decoded.inviteFor);
+      if (!user) return reply.code(404).send({ error: "User not found" });
+
+      user.passwordHash = hashPassword(password);
+      await saveUsers(users);
+
+      const loginToken = app.jwt.sign({ id: user.id, role: user.role, name: user.name }, { expiresIn: "7d" });
+      return { token: loginToken, role: user.role, name: user.name };
+    } catch {
+      return reply.code(400).send({ error: "Invalid or expired invite token" });
+    }
   });
 
   // List users (admin only)

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Pressable } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
-import { getServer, Server } from "../../services/api";
+import { getServer, Server, serverAction } from "../../services/api";
 import { connectWs, onWsMessage, sendWsCommand } from "../../services/ws";
 
 function formatBytes(bytes: number | null): string {
@@ -45,6 +45,8 @@ export default function ServerDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   const [liveMetrics, setLiveMetrics] = useState<any>(null);
   const [liveContainers, setLiveContainers] = useState<any[]>([]);
+  const [containerLogs, setContainerLogs] = useState<{ name: string; lines: string[] } | null>(null);
+  const [actionLoading, setActionLoading] = useState("");
 
   useEffect(() => {
     if (!id) return;
@@ -59,6 +61,7 @@ export default function ServerDetailScreen() {
     const unsub = onWsMessage((msg) => {
       if (msg.type === "metrics") setLiveMetrics(msg.data);
       if (msg.type === "containers") setLiveContainers(msg.data);
+      if (msg.type === "container_logs") setContainerLogs(msg.data);
       if (msg.type === "agents" && Array.isArray(msg.data) && msg.data.length > 0) {
         setLiveMetrics(msg.data[0].metrics);
         setLiveContainers(msg.data[0].containers || []);
@@ -169,6 +172,9 @@ export default function ServerDetailScreen() {
                     <Pressable style={styles.actionBtn} onPress={() => sendWsCommand(server!.name, "container_action", { container_id: c.name, action: "restart" })}>
                       <Text style={styles.actionBtnText}>Restart</Text>
                     </Pressable>
+                    <Pressable style={[styles.actionBtn, { borderColor: "#3b82f6" }]} onPress={() => sendWsCommand(server!.name, "container_logs", { container_id: c.name, tail: 50 })}>
+                      <Text style={[styles.actionBtnText, { color: "#3b82f6" }]}>Logs</Text>
+                    </Pressable>
                   </>
                 ) : (
                   <Pressable style={[styles.actionBtn, { borderColor: "#22c55e" }]} onPress={() => sendWsCommand(server!.name, "container_action", { container_id: c.name, action: "start" })}>
@@ -188,10 +194,50 @@ export default function ServerDetailScreen() {
         <InfoRow label="Included" value={formatBytes(server.includedTraffic)} />
       </View>
 
-      <View style={[styles.section, { marginBottom: 32 }]}>
+      <View style={styles.section}>
         <Text style={styles.sectionTitle}>Features</Text>
         <InfoRow label="Backups" value={server.backups ? "Enabled" : "Disabled"} />
         <InfoRow label="Rescue Mode" value={server.rescue ? "Active" : "Off"} />
+      </View>
+
+      {containerLogs && (
+        <View style={styles.section}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+            <Text style={styles.sectionTitle}>Logs: {containerLogs.name}</Text>
+            <Pressable onPress={() => setContainerLogs(null)}>
+              <Text style={{ color: "#999", fontSize: 12 }}>Close</Text>
+            </Pressable>
+          </View>
+          <ScrollView style={styles.logTerminal} nestedScrollEnabled>
+            {containerLogs.lines.filter(Boolean).map((line, i) => (
+              <Text key={i} style={styles.logLine}>{line}</Text>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
+      <View style={[styles.section, { marginBottom: 32 }]}>
+        <Text style={styles.sectionTitle}>Server Actions</Text>
+        <View style={styles.containerActions}>
+          <Pressable
+            style={[styles.actionBtn, { borderColor: "#eab308" }]}
+            onPress={async () => { setActionLoading("reboot"); await serverAction(server.id, "reboot"); setActionLoading(""); }}
+          >
+            <Text style={[styles.actionBtnText, { color: "#eab308" }]}>{actionLoading === "reboot" ? "..." : "Reboot"}</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.actionBtn, { borderColor: "#ef4444" }]}
+            onPress={async () => { setActionLoading("shutdown"); await serverAction(server.id, "shutdown"); setActionLoading(""); }}
+          >
+            <Text style={styles.actionBtnText}>{actionLoading === "shutdown" ? "..." : "Shutdown"}</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.actionBtn, { borderColor: "#22c55e" }]}
+            onPress={async () => { setActionLoading("poweron"); await serverAction(server.id, "poweron"); setActionLoading(""); }}
+          >
+            <Text style={[styles.actionBtnText, { color: "#22c55e" }]}>{actionLoading === "poweron" ? "..." : "Power On"}</Text>
+          </Pressable>
+        </View>
       </View>
     </ScrollView>
   );
@@ -222,6 +268,8 @@ const styles = StyleSheet.create({
   containerName: { fontSize: 14, fontWeight: "600", color: "#1a1a2e", flex: 1 },
   containerImage: { fontSize: 12, color: "#999" },
   containerStat: { fontSize: 12, color: "#666", marginTop: 4 },
+  logTerminal: { backgroundColor: "#1a1a2e", borderRadius: 8, padding: 10, maxHeight: 300 },
+  logLine: { fontSize: 11, color: "#d4d4d4", fontFamily: "monospace", lineHeight: 16 },
   containerActions: { flexDirection: "row", gap: 8, marginTop: 8 },
   actionBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: "#ef4444" },
   actionBtnText: { fontSize: 12, fontWeight: "600", color: "#ef4444" },

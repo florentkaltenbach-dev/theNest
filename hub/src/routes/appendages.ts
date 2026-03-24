@@ -1,5 +1,5 @@
 import { FastifyInstance } from "fastify";
-import { getAgentData } from "../ws/agentHandler.js";
+import { getAgentData, sendToAgent } from "../ws/agentHandler.js";
 
 interface AppendageDef {
   id: string;
@@ -7,14 +7,13 @@ interface AppendageDef {
   description: string;
   category: "service" | "tooling" | "model";
   image: string;
-  ports?: string[];
+  ports?: Record<string, string>;
   minRamMb: number;
   minCpuCores: number;
   installed?: boolean;
   status?: string;
 }
 
-// Built-in appendage catalog
 const CATALOG: AppendageDef[] = [
   {
     id: "nginx",
@@ -22,18 +21,9 @@ const CATALOG: AppendageDef[] = [
     description: "High-performance web server and reverse proxy",
     category: "service",
     image: "nginx:alpine",
-    ports: ["80:80"],
+    ports: { "8080/tcp": "8080" },
     minRamMb: 64,
     minCpuCores: 0.25,
-  },
-  {
-    id: "claude-code",
-    name: "Claude Code",
-    description: "AI coding assistant with full filesystem access",
-    category: "tooling",
-    image: "anthropic/claude-code:latest",
-    minRamMb: 512,
-    minCpuCores: 1,
   },
   {
     id: "uptime-kuma",
@@ -41,7 +31,7 @@ const CATALOG: AppendageDef[] = [
     description: "Self-hosted monitoring tool",
     category: "tooling",
     image: "louislam/uptime-kuma:1",
-    ports: ["3001:3001"],
+    ports: { "3001/tcp": "3001" },
     minRamMb: 128,
     minCpuCores: 0.25,
   },
@@ -51,7 +41,7 @@ const CATALOG: AppendageDef[] = [
     description: "Lightweight self-hosted Git service",
     category: "tooling",
     image: "gitea/gitea:latest",
-    ports: ["3002:3000"],
+    ports: { "3002/tcp": "3000" },
     minRamMb: 256,
     minCpuCores: 0.5,
   },
@@ -61,7 +51,7 @@ const CATALOG: AppendageDef[] = [
     description: "Docker management UI",
     category: "tooling",
     image: "portainer/portainer-ce:latest",
-    ports: ["9443:9443"],
+    ports: { "9443/tcp": "9443" },
     minRamMb: 128,
     minCpuCores: 0.25,
   },
@@ -71,7 +61,7 @@ const CATALOG: AppendageDef[] = [
     description: "Run local LLMs (Llama, Mistral, etc.)",
     category: "model",
     image: "ollama/ollama:latest",
-    ports: ["11434:11434"],
+    ports: { "11434/tcp": "11434" },
     minRamMb: 4096,
     minCpuCores: 2,
   },
@@ -102,22 +92,23 @@ export async function appendageRoutes(app: FastifyInstance) {
     return { catalog: CATALOG };
   });
 
-  // Install an appendage (sends command to agent)
   app.post<{ Body: { appendageId: string; hostname: string } }>("/appendages/install", async (req, reply) => {
     const { appendageId, hostname } = req.body;
     const def = CATALOG.find((a) => a.id === appendageId);
     if (!def) return reply.code(404).send({ error: "Appendage not found in catalog" });
 
-    const agents = getAgentData() as any[];
-    const agent = agents.find((a: any) => a.hostname === hostname);
-    if (!agent) return reply.code(404).send({ error: "Agent not connected" });
+    const sent = sendToAgent(hostname, {
+      command: "install_appendage",
+      image: def.image,
+      name: def.id,
+      ports: def.ports || {},
+    });
 
-    // For now, we execute docker run via the agent's command channel
-    // In the future, this would go through the appendage lifecycle manager
+    if (!sent) return reply.code(404).send({ error: "Agent not connected" });
+
     return {
       success: true,
-      message: `Installation of ${def.name} queued on ${hostname}. Use the container management to verify.`,
-      dockerCommand: `docker run -d --name ${def.id} ${(def.ports || []).map(p => `-p ${p}`).join(" ")} ${def.image}`,
+      message: `Installing ${def.name} on ${hostname}...`,
     };
   });
 }

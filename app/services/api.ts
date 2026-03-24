@@ -185,3 +185,31 @@ export async function inviteUser(name: string, password: string) {
 export async function deleteUser(id: string) {
   return fetchAPI(`/auth/users/${id}`, { method: "DELETE" });
 }
+
+// Setup / Onboarding
+export async function getSetupStatus() {
+  return fetchAPI<{ needsSetup: boolean }>("/setup/status");
+}
+
+export async function completeSetup(hetznerToken: string, adminPassword: string) {
+  return fetchAPI<{ success: boolean }>("/setup/complete", {
+    method: "POST",
+    body: JSON.stringify({ hetznerToken, adminPassword }),
+  });
+}
+
+// Server actions
+export async function serverAction(serverId: number, action: string) {
+  return fetchAPI<any>(`/servers/${serverId}/action`, {
+    method: "POST",
+    body: JSON.stringify({ action }),
+  });
+}
+
+// Accept invite
+export async function acceptInvite(token: string, password: string) {
+  return fetchAPI<{ token: string; role: string; name: string }>("/auth/accept-invite", {
+    method: "POST",
+    body: JSON.stringify({ token, password }),
+  });
+}

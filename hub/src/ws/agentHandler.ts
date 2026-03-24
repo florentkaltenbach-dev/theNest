@@ -14,6 +14,13 @@ const agents = new Map<string, AgentConnection>();
 // Store: client WebSockets subscribed to live updates
 const clientSubs = new Set<WebSocket>();
 
+export function sendToAgent(hostname: string, message: object): boolean {
+  const agent = agents.get(hostname);
+  if (!agent || agent.ws.readyState !== WebSocket.OPEN) return false;
+  agent.ws.send(JSON.stringify(message));
+  return true;
+}
+
 export function getAgentData(hostname?: string) {
   if (hostname) {
     const agent = agents.get(hostname);
@@ -86,6 +93,10 @@ export async function agentWsRoutes(app: FastifyInstance) {
 
         if (msg.type === "command_result") {
           broadcastToClients({ type: "command_result", hostname, data: msg });
+        }
+
+        if (msg.type === "container_logs") {
+          broadcastToClients({ type: "container_logs", hostname, data: msg.data });
         }
       } catch (e) {
         app.log.error(`Agent message parse error: ${e}`);

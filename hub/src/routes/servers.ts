@@ -93,4 +93,31 @@ export async function serverRoutes(app: FastifyInstance) {
 
     return { server, metrics };
   });
+
+  // Server actions (reboot, shutdown, power on)
+  app.post<{ Params: { id: string }; Body: { action: string } }>("/servers/:id/action", async (req, reply) => {
+    if (!process.env.HETZNER_API_TOKEN) {
+      return reply.code(500).send({ error: "HETZNER_API_TOKEN not configured" });
+    }
+
+    const { id } = req.params;
+    const { action } = req.body;
+    const allowed = ["reboot", "shutdown", "poweron", "reset"];
+    if (!allowed.includes(action)) {
+      return reply.code(400).send({ error: `Invalid action. Allowed: ${allowed.join(", ")}` });
+    }
+
+    const res = await fetch(`${HETZNER_API}/servers/${id}/actions/${action}`, {
+      method: "POST",
+      headers: hetznerHeaders(),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return reply.code(res.status).send({ error: "Hetzner API error", details: err });
+    }
+
+    const data = await res.json();
+    return { success: true, action: data.action };
+  });
 }

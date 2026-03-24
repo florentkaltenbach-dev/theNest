@@ -60,6 +60,40 @@ async def handle_commands(ws):
                     "container_id": msg["container_id"],
                     "action": action,
                 }))
+            elif cmd == "container_logs":
+                import docker
+                client = docker.from_env()
+                container = client.containers.get(msg["container_id"])
+                lines = container.logs(tail=msg.get("tail", 100), timestamps=True).decode("utf-8", errors="replace")
+                await ws.send(json.dumps({
+                    "type": "container_logs",
+                    "data": {
+                        "container_id": msg["container_id"],
+                        "lines": lines.split("\n"),
+                    },
+                }))
+            elif cmd == "install_appendage":
+                import docker
+                client = docker.from_env()
+                image = msg["image"]
+                name = msg["name"]
+                ports = msg.get("ports", {})
+                log.info("Installing appendage: %s (%s)", name, image)
+                client.images.pull(image)
+                container = client.containers.run(
+                    image,
+                    name=name,
+                    detach=True,
+                    ports=ports,
+                    restart_policy={"Name": "unless-stopped"},
+                )
+                await ws.send(json.dumps({
+                    "type": "command_result",
+                    "command": cmd,
+                    "success": True,
+                    "container_id": container.short_id,
+                    "name": name,
+                }))
             elif cmd == "ping":
                 await ws.send(json.dumps({"type": "pong"}))
         except Exception as e:

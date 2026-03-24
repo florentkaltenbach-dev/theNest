@@ -14,6 +14,7 @@ import { scriptRoutes } from "./routes/scripts.js";
 import { chatRoutes } from "./routes/chat.js";
 import { secretRoutes } from "./routes/secrets.js";
 import { appendageRoutes } from "./routes/appendages.js";
+import { setupRoutes } from "./routes/setup.js";
 import { agentWsRoutes, getAgentData } from "./ws/agentHandler.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -30,12 +31,13 @@ await app.register(fastifyJwt, { secret: jwtSecret });
 // WebSocket routes (agent + client) — no JWT on WebSocket for now
 await app.register(agentWsRoutes);
 
-// Auth routes (public — no JWT required)
+// Public routes (no JWT required)
 await app.register(authRoutes, { prefix: "/api" });
+await app.register(setupRoutes, { prefix: "/api" });
 
 // Auth middleware for all other /api routes
 app.addHook("onRequest", async (req, reply) => {
-  if (!req.url.startsWith("/api/") || req.url.startsWith("/api/auth/")) return;
+  if (!req.url.startsWith("/api/") || req.url.startsWith("/api/auth/") || req.url.startsWith("/api/setup/")) return;
   try {
     await req.jwtVerify();
   } catch {
