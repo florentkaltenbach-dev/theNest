@@ -15,7 +15,10 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG_FILE="${SCRIPT_DIR}/../../bootstrap-$(date +%Y%m%d-%H%M%S).log"
 
-exec > >(tee -a "${LOG_FILE}") 2>&1
+# Log to file if process substitution works (Linux/macOS), skip on Windows Git Bash
+if [[ "$(uname -o 2>/dev/null)" != "Msys" ]] && [[ "$(uname -o 2>/dev/null)" != "Cygwin" ]]; then
+  exec > >(tee -a "${LOG_FILE}") 2>&1
+fi
 
 # ── Parse Arguments ────────────────────────────────────
 CONFIG_FILE=""
