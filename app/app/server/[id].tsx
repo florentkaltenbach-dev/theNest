@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Pressable } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import { getServer, Server } from "../../services/api";
-import { connectWs, onWsMessage } from "../../services/ws";
+import { connectWs, onWsMessage, sendWsCommand } from "../../services/ws";
 
 function formatBytes(bytes: number | null): string {
   if (!bytes) return "0 B";
@@ -151,13 +151,31 @@ export default function ServerDetailScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Containers ({liveContainers.length})</Text>
           {liveContainers.map((c: any) => (
-            <View key={c.id} style={styles.containerRow}>
-              <View style={[styles.badgeDot, { backgroundColor: c.status === "running" ? "#22c55e" : "#ef4444" }]} />
-              <Text style={styles.containerName}>{c.name}</Text>
-              <Text style={styles.containerImage}>{c.image}</Text>
+            <View key={c.id} style={styles.containerCard}>
+              <View style={styles.containerRow}>
+                <View style={[styles.badgeDot, { backgroundColor: c.status === "running" ? "#22c55e" : "#ef4444" }]} />
+                <Text style={styles.containerName}>{c.name}</Text>
+                <Text style={styles.containerImage}>{c.image}</Text>
+              </View>
               {c.cpu_percent !== undefined && (
-                <Text style={styles.containerStat}>{c.cpu_percent}% / {c.memory_mb}MB</Text>
+                <Text style={styles.containerStat}>CPU {c.cpu_percent}% · RAM {c.memory_mb}MB</Text>
               )}
+              <View style={styles.containerActions}>
+                {c.status === "running" ? (
+                  <>
+                    <Pressable style={styles.actionBtn} onPress={() => sendWsCommand(server!.name, "container_action", { container_id: c.name, action: "stop" })}>
+                      <Text style={styles.actionBtnText}>Stop</Text>
+                    </Pressable>
+                    <Pressable style={styles.actionBtn} onPress={() => sendWsCommand(server!.name, "container_action", { container_id: c.name, action: "restart" })}>
+                      <Text style={styles.actionBtnText}>Restart</Text>
+                    </Pressable>
+                  </>
+                ) : (
+                  <Pressable style={[styles.actionBtn, { borderColor: "#22c55e" }]} onPress={() => sendWsCommand(server!.name, "container_action", { container_id: c.name, action: "start" })}>
+                    <Text style={[styles.actionBtnText, { color: "#22c55e" }]}>Start</Text>
+                  </Pressable>
+                )}
+              </View>
             </View>
           ))}
         </View>
@@ -199,8 +217,12 @@ const styles = StyleSheet.create({
   resourceCard: { flex: 1, backgroundColor: "#f8f9fa", borderRadius: 8, padding: 16, alignItems: "center" },
   resourceValue: { fontSize: 28, fontWeight: "700", color: "#1a1a2e" },
   resourceLabel: { fontSize: 12, color: "#999", marginTop: 4 },
-  containerRow: { flexDirection: "row", alignItems: "center", paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "#f0f0f0", gap: 8 },
-  containerName: { fontSize: 14, fontWeight: "500", color: "#1a1a2e", flex: 1 },
+  containerCard: { backgroundColor: "#f8f9fa", borderRadius: 8, padding: 12, marginBottom: 8 },
+  containerRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  containerName: { fontSize: 14, fontWeight: "600", color: "#1a1a2e", flex: 1 },
   containerImage: { fontSize: 12, color: "#999" },
-  containerStat: { fontSize: 12, color: "#666", minWidth: 80, textAlign: "right" },
+  containerStat: { fontSize: 12, color: "#666", marginTop: 4 },
+  containerActions: { flexDirection: "row", gap: 8, marginTop: 8 },
+  actionBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: "#ef4444" },
+  actionBtnText: { fontSize: 12, fontWeight: "600", color: "#ef4444" },
 });
