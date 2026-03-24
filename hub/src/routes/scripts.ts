@@ -148,7 +148,7 @@ async function executeScript(run: RunningScript, scriptContent: string, serverIp
       },
     });
 
-    run.exitCode = result.code;
+    run.exitCode = result.code ?? undefined;
     run.status = result.code === 0 ? "completed" : "failed";
     run.output.push("---");
     run.output.push(`[INFO] Exit code: ${result.code}`);
