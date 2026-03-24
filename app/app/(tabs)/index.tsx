@@ -32,6 +32,15 @@ function Histogram({ label, current, history, detail }: {
   detail?: string;
 }) {
   const bars = history.length > 0 ? history : [0];
+  // Auto-scale: find min/max and add headroom so low values still show variation
+  const minVal = Math.min(...bars);
+  const maxVal = Math.max(...bars);
+  const range = maxVal - minVal;
+  // Floor at 0, ceiling at max + headroom (at least 10% range)
+  const scaleMin = Math.max(0, minVal - Math.max(range * 0.3, 2));
+  const scaleMax = maxVal + Math.max(range * 0.3, 5);
+  const scaleRange = scaleMax - scaleMin || 1;
+
   return (
     <View style={styles.histogram}>
       <View style={styles.histHeader}>
@@ -39,20 +48,23 @@ function Histogram({ label, current, history, detail }: {
         <Text style={[styles.histValue, { color: barColor(current) }]}>{current}%</Text>
       </View>
       <View style={styles.histBars}>
-        {bars.map((val, i) => (
+        {bars.map((val, i) => {
+          const scaled = ((val - scaleMin) / scaleRange) * 100;
+          return (
           <View key={i} style={styles.histBarSlot}>
             <View
               style={[
                 styles.histBar,
                 {
-                  height: `${Math.max(val, 2)}%`,
+                  height: `${Math.max(scaled, 3)}%`,
                   backgroundColor: barColor(val),
-                  opacity: 0.4 + (i / bars.length) * 0.6,
+                  opacity: 0.5 + (i / bars.length) * 0.5,
                 },
               ]}
             />
           </View>
-        ))}
+          );
+        })}
       </View>
       {detail && <Text style={styles.histDetail}>{detail}</Text>}
     </View>
@@ -239,7 +251,7 @@ const styles = StyleSheet.create({
   histHeader: { flexDirection: "row", justifyContent: "space-between", marginBottom: 4 },
   histLabel: { fontSize: 11, color: "#999", textTransform: "uppercase", letterSpacing: 0.5 },
   histValue: { fontSize: 12, fontWeight: "700" },
-  histBars: { flexDirection: "row", height: 32, alignItems: "flex-end", gap: 1, backgroundColor: "#f8f9fa", borderRadius: 4, overflow: "hidden", padding: 2 },
+  histBars: { flexDirection: "row", height: 40, alignItems: "flex-end", gap: 1, backgroundColor: "#f8f9fa", borderRadius: 4, overflow: "hidden", padding: 2 },
   histBarSlot: { flex: 1, height: "100%", justifyContent: "flex-end" },
   histBar: { width: "100%", borderRadius: 1, minHeight: 1 },
   histDetail: { fontSize: 10, color: "#bbb", marginTop: 2 },
