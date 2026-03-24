@@ -6,7 +6,9 @@ import {
   ScrollView,
   ActivityIndicator,
   RefreshControl,
+  Pressable,
 } from "react-native";
+import { router } from "expo-router";
 import { getServers, Server } from "../../services/api";
 
 function StatusDot({ status }: { status: string }) {
@@ -16,7 +18,7 @@ function StatusDot({ status }: { status: string }) {
 
 function ServerCard({ server }: { server: Server }) {
   return (
-    <View style={styles.card}>
+    <Pressable style={styles.card} onPress={() => router.push(`/server/${server.id}`)}>
       <View style={styles.cardHeader}>
         <StatusDot status={server.status} />
         <Text style={styles.cardTitle}>{server.name}</Text>
@@ -48,7 +50,7 @@ function ServerCard({ server }: { server: Server }) {
           <Text style={styles.statValue}>{server.location}</Text>
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 

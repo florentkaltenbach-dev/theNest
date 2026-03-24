@@ -63,18 +63,31 @@ export interface Server {
   name: string;
   status: string;
   ip: string;
+  ipv6: string;
   type: string;
+  typeDescription: string;
   cores: number;
   memory: number;
   disk: number;
   location: string;
+  datacenter: string;
   image: string;
   created: string;
+  inTraffic: number | null;
+  outTraffic: number | null;
+  includedTraffic: number;
+  rescue: boolean;
+  backups: boolean;
+  labels: Record<string, string>;
 }
 
 export async function getServers(): Promise<Server[]> {
   const data = await fetchAPI<{ servers: Server[] }>("/servers");
   return data.servers;
+}
+
+export async function getServer(id: number): Promise<{ server: Server; metrics: any }> {
+  return fetchAPI(`/servers/${id}`);
 }
 
 export async function getHealth() {
