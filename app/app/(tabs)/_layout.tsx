@@ -56,6 +56,13 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="commands"
+        options={{
+          title: "Commands",
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 18, color }}>⌘</Text>,
+        }}
+      />
+      <Tabs.Screen
         name="secrets"
         options={{
           title: "Secrets",

@@ -18,6 +18,7 @@ import { setupRoutes } from "./routes/setup.js";
 import { roadmapRoutes } from "./routes/roadmap.js";
 import { enhanceRoutes } from "./routes/enhance.js";
 import { agentWsRoutes, getAgentData } from "./ws/agentHandler.js";
+import { terminalWsRoutes } from "./ws/terminal.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -32,6 +33,7 @@ await app.register(fastifyJwt, { secret: jwtSecret });
 
 // WebSocket routes (agent + client) — no JWT on WebSocket for now
 await app.register(agentWsRoutes);
+await app.register(terminalWsRoutes);
 
 // Public routes (no JWT required)
 await app.register(authRoutes, { prefix: "/api" });
