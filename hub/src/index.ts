@@ -16,6 +16,7 @@ import { secretRoutes } from "./routes/secrets.js";
 import { appendageRoutes } from "./routes/appendages.js";
 import { setupRoutes } from "./routes/setup.js";
 import { roadmapRoutes } from "./routes/roadmap.js";
+import { enhanceRoutes } from "./routes/enhance.js";
 import { agentWsRoutes, getAgentData } from "./ws/agentHandler.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -54,6 +55,7 @@ await app.register(scriptRoutes, { prefix: "/api" });
 await app.register(chatRoutes, { prefix: "/api" });
 await app.register(secretRoutes, { prefix: "/api" });
 await app.register(appendageRoutes, { prefix: "/api" });
+await app.register(enhanceRoutes, { prefix: "/api" });
 
 // Agent data API (REST fallback for live metrics)
 app.get("/api/agents", async () => ({ agents: getAgentData() }));

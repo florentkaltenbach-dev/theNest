@@ -59,6 +59,7 @@ async def handle_commands(ws):
                     "success": True,
                     "container_id": msg["container_id"],
                     "action": action,
+                    "requestId": msg.get("requestId"),
                 }))
             elif cmd == "container_logs":
                 import docker
@@ -93,12 +94,76 @@ async def handle_commands(ws):
                     "success": True,
                     "container_id": container.short_id,
                     "name": name,
+                    "requestId": msg.get("requestId"),
                 }))
+            elif cmd == "enhance":
+                import subprocess
+                action = msg.get("action")
+                request_id = msg.get("requestId")
+                result = {"type": "command_result", "command": cmd, "success": False}
+                if request_id:
+                    result["requestId"] = request_id
+
+                if action == "add-dependency":
+                    target = msg.get("target", "hub")
+                    packages = msg.get("packages", [])
+                    if not packages:
+                        result["error"] = "No packages specified"
+                    else:
+                        target_dir = f"/opt/nest/{target}"
+                        proc = subprocess.run(
+                            ["npm", "install", "--save"] + packages,
+                            cwd=target_dir,
+                            capture_output=True, text=True, timeout=120,
+                        )
+                        result["success"] = proc.returncode == 0
+                        result["stdout"] = proc.stdout[-500:] if proc.stdout else ""
+                        result["stderr"] = proc.stderr[-500:] if proc.stderr else ""
+
+                elif action == "rebuild":
+                    target = msg.get("target", "hub")
+                    if target == "all":
+                        targets = ["hub", "app"]
+                    else:
+                        targets = [target]
+                    outputs = []
+                    for t in targets:
+                        if t == "hub":
+                            proc = subprocess.run(
+                                ["npm", "run", "build"],
+                                cwd="/opt/nest/hub",
+                                capture_output=True, text=True, timeout=120,
+                            )
+                        elif t == "app":
+                            proc = subprocess.run(
+                                ["npx", "expo", "export", "--platform", "web"],
+                                cwd="/opt/nest/app",
+                                capture_output=True, text=True, timeout=120,
+                            )
+                        else:
+                            continue
+                        outputs.append({"target": t, "success": proc.returncode == 0, "output": proc.stdout[-300:] + proc.stderr[-300:]})
+                    result["success"] = all(o["success"] for o in outputs)
+                    result["outputs"] = outputs
+
+                elif action == "restart":
+                    services = msg.get("services", ["nest-hub"])
+                    proc = subprocess.run(
+                        ["sudo", "systemctl", "restart"] + services,
+                        capture_output=True, text=True, timeout=30,
+                    )
+                    result["success"] = proc.returncode == 0
+                    result["stderr"] = proc.stderr[-300:] if proc.stderr else ""
+
+                else:
+                    result["error"] = f"Unknown enhance action: {action}"
+
+                await ws.send(json.dumps(result))
             elif cmd == "ping":
                 await ws.send(json.dumps({"type": "pong"}))
         except Exception as e:
             log.error("Error handling command: %s", e)
-            await ws.send(json.dumps({"type": "command_result", "success": False, "error": str(e)}))
+            await ws.send(json.dumps({"type": "command_result", "success": False, "error": str(e), "requestId": msg.get("requestId", "")}))
 
 
 async def connect():
