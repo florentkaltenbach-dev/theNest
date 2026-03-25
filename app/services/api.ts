@@ -236,3 +236,21 @@ export async function deleteToken(id: string) {
     method: "DELETE",
   });
 }
+
+// Projects
+export async function getProjects() {
+  return fetchAPI<{ projects: any[] }>("/projects");
+}
+
+export async function discoverProjects() {
+  return fetchAPI<{ status: string; agentsSent: number }>("/projects/discover", {
+    method: "POST",
+  });
+}
+
+export async function registerProject(host: string, path: string, branch?: string, commit?: string) {
+  return fetchAPI<{ success: boolean }>("/projects/register", {
+    method: "POST",
+    body: JSON.stringify({ host, path, branch, commit }),
+  });
+}

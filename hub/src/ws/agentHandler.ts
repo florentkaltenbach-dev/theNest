@@ -6,6 +6,7 @@ interface AgentConnection {
   hostname: string;
   lastMetrics: any;
   lastContainers: any[];
+  discoveredRepos: any[];
   connectedAt: number;
 }
 
@@ -29,6 +30,7 @@ export function getAgentData(hostname?: string) {
       hostname: agent.hostname,
       metrics: agent.lastMetrics,
       containers: agent.lastContainers,
+      discoveredRepos: agent.discoveredRepos || [],
       connectedAt: agent.connectedAt,
     };
   }
@@ -36,6 +38,7 @@ export function getAgentData(hostname?: string) {
     hostname: a.hostname,
     metrics: a.lastMetrics,
     containers: a.lastContainers,
+    discoveredRepos: a.discoveredRepos || [],
     connectedAt: a.connectedAt,
   }));
 }
@@ -73,6 +76,7 @@ export async function agentWsRoutes(app: FastifyInstance) {
             hostname,
             lastMetrics: null,
             lastContainers: [],
+            discoveredRepos: [],
             connectedAt: Date.now(),
           });
           app.log.info(`Agent connected: ${hostname}`);
@@ -93,6 +97,11 @@ export async function agentWsRoutes(app: FastifyInstance) {
 
         if (msg.type === "command_result") {
           broadcastToClients({ type: "command_result", hostname, data: msg });
+        }
+
+        if (msg.type === "command_result" && msg.command === "discover" && msg.repos) {
+          const agent = agents.get(hostname);
+          if (agent) agent.discoveredRepos = msg.repos;
         }
 
         if (msg.type === "container_logs") {

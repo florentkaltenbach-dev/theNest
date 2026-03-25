@@ -26,6 +26,13 @@ const commands: CommandCard[] = [
     onPress: () => router.push("/terminal?cmd=claude"),
   },
   {
+    id: "projects",
+    icon: "{}",
+    title: "Projects",
+    subtitle: "View all repos, instances, and agents",
+    onPress: () => router.push("/projects"),
+  },
+  {
     id: "openclaw",
     icon: "OC",
     title: "OpenClaw",

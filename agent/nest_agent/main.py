@@ -159,6 +159,19 @@ async def handle_commands(ws):
                     result["error"] = f"Unknown enhance action: {action}"
 
                 await ws.send(json.dumps(result))
+            elif cmd == "discover":
+                from .discovery import find_git_repos
+                request_id = msg.get("requestId")
+                repos = await asyncio.get_event_loop().run_in_executor(None, find_git_repos)
+                result = {
+                    "type": "command_result",
+                    "command": cmd,
+                    "success": True,
+                    "repos": repos,
+                }
+                if request_id:
+                    result["requestId"] = request_id
+                await ws.send(json.dumps(result))
             elif cmd == "ping":
                 await ws.send(json.dumps({"type": "pong"}))
         except Exception as e:
