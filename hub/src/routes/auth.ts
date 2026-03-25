@@ -14,7 +14,7 @@ interface User {
   createdBy?: string;
 }
 
-function hashPassword(password: string): string {
+export function hashPassword(password: string): string {
   return createHash("sha256").update(password).digest("hex");
 }
 
@@ -29,6 +29,30 @@ async function loadUsers(): Promise<User[]> {
 
 async function saveUsers(users: User[]): Promise<void> {
   await writeFile(USERS_FILE, JSON.stringify(users, null, 2), "utf-8");
+}
+
+const TOKENS_FILE = process.env.NEST_TOKENS_FILE || "/opt/nest/tokens.json";
+
+interface ApiToken {
+  id: string;
+  name: string;
+  tokenHash: string;
+  role: "admin" | "user";
+  createdAt: number;
+  lastUsed?: number;
+}
+
+export async function loadTokens(): Promise<ApiToken[]> {
+  try {
+    if (existsSync(TOKENS_FILE)) {
+      return JSON.parse(await readFile(TOKENS_FILE, "utf-8"));
+    }
+  } catch {}
+  return [];
+}
+
+export async function saveTokens(tokens: ApiToken[]): Promise<void> {
+  await writeFile(TOKENS_FILE, JSON.stringify(tokens, null, 2), "utf-8");
 }
 
 async function ensureAdminExists(): Promise<void> {
@@ -175,6 +199,65 @@ export async function authRoutes(app: FastifyInstance) {
     if (idx === -1) return reply.code(404).send({ error: "User not found" });
     users.splice(idx, 1);
     await saveUsers(users);
+    return { success: true };
+  });
+
+  // Create API token (admin only)
+  app.post<{ Body: { name: string } }>("/auth/tokens", async (req, reply) => {
+    try { await req.jwtVerify(); } catch {
+      return reply.code(401).send({ error: "Unauthorized" });
+    }
+    const { role } = req.user as any;
+    if (role !== "admin") return reply.code(403).send({ error: "Admin only" });
+
+    const { name } = req.body;
+    if (!name) return reply.code(400).send({ error: "name required" });
+
+    // Generate a random token: nest_<64 hex chars>
+    const rawToken = `nest_${randomBytes(32).toString("hex")}`;
+    const id = `tok-${randomBytes(4).toString("hex")}`;
+
+    const tokens = await loadTokens();
+    tokens.push({
+      id,
+      name,
+      tokenHash: hashPassword(rawToken),
+      role: "admin",
+      createdAt: Date.now(),
+    });
+    await saveTokens(tokens);
+
+    // Return the raw token ONCE — it's never stored/shown again
+    return { id, name, token: rawToken };
+  });
+
+  // List API tokens (admin only) — never returns the token itself
+  app.get("/auth/tokens", async (req, reply) => {
+    try { await req.jwtVerify(); } catch {
+      return reply.code(401).send({ error: "Unauthorized" });
+    }
+    const { role } = req.user as any;
+    if (role !== "admin") return reply.code(403).send({ error: "Admin only" });
+
+    const tokens = await loadTokens();
+    return {
+      tokens: tokens.map(({ tokenHash, ...rest }) => rest),
+    };
+  });
+
+  // Delete API token (admin only)
+  app.delete<{ Params: { id: string } }>("/auth/tokens/:id", async (req, reply) => {
+    try { await req.jwtVerify(); } catch {
+      return reply.code(401).send({ error: "Unauthorized" });
+    }
+    const { role } = req.user as any;
+    if (role !== "admin") return reply.code(403).send({ error: "Admin only" });
+
+    const tokens = await loadTokens();
+    const idx = tokens.findIndex((t) => t.id === req.params.id);
+    if (idx === -1) return reply.code(404).send({ error: "Token not found" });
+    tokens.splice(idx, 1);
+    await saveTokens(tokens);
     return { success: true };
   });
 }

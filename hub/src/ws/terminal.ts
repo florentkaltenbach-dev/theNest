@@ -5,14 +5,32 @@ import * as pty from "node-pty";
 let active: { ws: WebSocket; proc: pty.IPty } | null = null;
 
 export async function terminalWsRoutes(app: FastifyInstance) {
-  app.get("/ws/terminal", { websocket: true }, (socket, req) => {
+  app.get("/ws/terminal", { websocket: true }, async (socket, req) => {
     const token = (req.query as Record<string, string>).token;
     if (!token) { socket.close(4001, "Missing token"); return; }
 
+    let decoded: any = null;
     try {
-      app.jwt.verify(token);
+      decoded = app.jwt.verify(token) as any;
     } catch {
-      socket.close(4003, "Invalid token");
+      // JWT failed, try API token
+      if (token.startsWith("nest_")) {
+        const { loadTokens, hashPassword } = await import("../routes/auth.js");
+        const tokens = await loadTokens();
+        const tokenHash = hashPassword(token);
+        const matched = tokens.find((t) => t.tokenHash === tokenHash);
+        if (matched) {
+          decoded = { id: matched.id, role: matched.role, name: matched.name };
+        }
+      }
+      if (!decoded) {
+        socket.close(4003, "Invalid token");
+        return;
+      }
+    }
+
+    if (decoded.role !== "admin") {
+      socket.close(4003, "Admin only");
       return;
     }
 

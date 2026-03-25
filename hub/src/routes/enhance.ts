@@ -10,6 +10,9 @@ interface EnhanceBody {
 
 export async function enhanceRoutes(app: FastifyInstance) {
   app.post<{ Body: EnhanceBody }>("/nest/enhance", async (req, reply) => {
+    const { role } = req.user as any;
+    if (role !== "admin") return reply.code(403).send({ error: "Admin only" });
+
     const { action, target, packages, services } = req.body;
 
     if (!action) return reply.code(400).send({ error: "action required" });

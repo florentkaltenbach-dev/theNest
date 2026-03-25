@@ -43,11 +43,43 @@ await app.register(roadmapRoutes, { prefix: "/api" });
 // Auth middleware for all other /api routes
 app.addHook("onRequest", async (req, reply) => {
   if (!req.url.startsWith("/api/") || req.url.startsWith("/api/auth/") || req.url.startsWith("/api/setup/") || req.url.startsWith("/api/health") || req.url.startsWith("/api/roadmap")) return;
+
   try {
     await req.jwtVerify();
+    return; // JWT valid
   } catch {
-    reply.code(401).send({ error: "Unauthorized" });
+    // JWT failed, try API token
   }
+
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith("Bearer ")) {
+    reply.code(401).send({ error: "Unauthorized" });
+    return;
+  }
+
+  const bearerToken = authHeader.slice(7);
+  if (!bearerToken.startsWith("nest_")) {
+    reply.code(401).send({ error: "Unauthorized" });
+    return;
+  }
+
+  // Check against stored API tokens
+  const { loadTokens, saveTokens, hashPassword } = await import("./routes/auth.js");
+  const tokens = await loadTokens();
+  const tokenHash = hashPassword(bearerToken);
+  const matched = tokens.find((t) => t.tokenHash === tokenHash);
+
+  if (!matched) {
+    reply.code(401).send({ error: "Unauthorized" });
+    return;
+  }
+
+  // Set user context from token
+  (req as any).user = { id: matched.id, role: matched.role, name: matched.name };
+
+  // Update lastUsed (fire and forget)
+  matched.lastUsed = Date.now();
+  saveTokens(tokens).catch(() => {});
 });
 
 // Protected API routes

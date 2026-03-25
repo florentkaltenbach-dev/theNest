@@ -218,3 +218,21 @@ export async function acceptInvite(token: string, password: string) {
     body: JSON.stringify({ token, password }),
   });
 }
+
+// API Tokens
+export async function getTokens() {
+  return fetchAPI<{ tokens: any[] }>("/auth/tokens");
+}
+
+export async function createToken(name: string) {
+  return fetchAPI<{ id: string; name: string; token: string }>("/auth/tokens", {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+}
+
+export async function deleteToken(id: string) {
+  return fetchAPI<{ success: boolean }>(`/auth/tokens/${id}`, {
+    method: "DELETE",
+  });
+}
