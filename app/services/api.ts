@@ -254,3 +254,33 @@ export async function registerProject(host: string, path: string, branch?: strin
     body: JSON.stringify({ host, path, branch, commit }),
   });
 }
+
+// Sessions
+export async function getSessions() {
+  return fetchAPI<{ sessions: any[] }>("/sessions");
+}
+
+export async function createSession(name: string, cmd?: string) {
+  return fetchAPI<{ name: string; status: string }>("/sessions", {
+    method: "POST",
+    body: JSON.stringify({ name, cmd }),
+  });
+}
+
+export async function deleteSession(name: string) {
+  return fetchAPI<{ success: boolean }>(`/sessions/${name}`, {
+    method: "DELETE",
+  });
+}
+
+// Tasks
+export async function getTasks() {
+  return fetchAPI<{ tasks: any[] }>("/tasks");
+}
+
+export async function dispatchTask(prompt: string, project?: string) {
+  return fetchAPI<{ id: string; status: string }>("/tasks", {
+    method: "POST",
+    body: JSON.stringify({ prompt, project }),
+  });
+}

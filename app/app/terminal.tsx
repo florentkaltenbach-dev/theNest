@@ -3,9 +3,16 @@ import { View, Text, Pressable, Platform } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 
 export default function TerminalScreen() {
-  const params = useLocalSearchParams<{ cmd?: string }>();
+  const params = useLocalSearchParams<{ cmd?: string; session?: string }>();
   const cmd = params.cmd || "";
-  const title = cmd === "claude" ? "Claude Code" : "Terminal";
+  const session = params.session || "";
+  const title = session && session.startsWith("claude")
+    ? "Claude Code"
+    : session
+      ? session
+      : cmd === "claude"
+        ? "Claude Code"
+        : "Terminal";
   const termRef = useRef<HTMLDivElement | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const termInstanceRef = useRef<any>(null);
@@ -115,7 +122,11 @@ export default function TerminalScreen() {
       }
 
       const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const wsUrl = `${proto}//${window.location.host}/ws/terminal?cmd=${encodeURIComponent(cmd)}&token=${encodeURIComponent(token)}`;
+      const sessionParam = session || (!cmd ? "nest-terminal" : "");
+      let wsUrl = `${proto}//${window.location.host}/ws/terminal?cmd=${encodeURIComponent(cmd)}&token=${encodeURIComponent(token)}`;
+      if (sessionParam) {
+        wsUrl += `&session=${encodeURIComponent(sessionParam)}`;
+      }
       ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
@@ -192,7 +203,7 @@ export default function TerminalScreen() {
         termInstanceRef.current = null;
       }
     };
-  }, [cmd]);
+  }, [cmd, session]);
 
   if (Platform.OS !== "web") {
     return (
