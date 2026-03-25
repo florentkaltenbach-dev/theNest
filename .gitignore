@@ -3,3 +3,5 @@ config.env
 .deploy-key.pub
 .bootstrap-state
 *.log
+CLAUDE.md
+node_modules/

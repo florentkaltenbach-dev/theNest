@@ -98,8 +98,11 @@ export default function SettingsScreen() {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>About</Text>
-        <Text style={styles.item}>Nest v0.1.0</Text>
+        <Text style={styles.item}>Nest v0.2.0</Text>
         <Text style={styles.itemSub}>Self-hosted platform manager</Text>
+        <Pressable style={{ marginTop: 12, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: "#1a1a2e", borderRadius: 6, alignSelf: "flex-start" }} onPress={() => router.push("/roadmap")}>
+          <Text style={{ color: "#7eb8ff", fontSize: 13, fontWeight: "600" }}>View Roadmap</Text>
+        </Pressable>
       </View>
 
       <Pressable style={styles.logoutButton} onPress={handleLogout}>

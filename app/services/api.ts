@@ -206,6 +206,11 @@ export async function serverAction(serverId: number, action: string) {
   });
 }
 
+// Roadmap
+export async function getRoadmap() {
+  return fetchAPI<{ content: string }>('/roadmap');
+}
+
 // Accept invite
 export async function acceptInvite(token: string, password: string) {
   return fetchAPI<{ token: string; role: string; name: string }>("/auth/accept-invite", {
