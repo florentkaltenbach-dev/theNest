@@ -43,7 +43,7 @@ mark_done() {
 build_ssh_opts() {
   SSH_OPTS=(
     -o StrictHostKeyChecking=accept-new
-    -o UserKnownHostsFile=/dev/null
+    -o UserKnownHostsFile="${HOME}/.ssh/nest_known_hosts"
     -o LogLevel=ERROR
     -o ConnectTimeout=10
     -i "${SSH_KEY}"

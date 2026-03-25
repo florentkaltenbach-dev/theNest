@@ -170,8 +170,10 @@ export async function authRoutes(app: FastifyInstance) {
     if (role !== "admin") return reply.code(403).send({ error: "Admin only" });
     if (req.params.id === "admin") return reply.code(400).send({ error: "Cannot delete admin" });
 
-    let users = await loadUsers();
-    users = users.filter((u) => u.id !== req.params.id);
+    const users = await loadUsers();
+    const idx = users.findIndex((u) => u.id === req.params.id);
+    if (idx === -1) return reply.code(404).send({ error: "User not found" });
+    users.splice(idx, 1);
     await saveUsers(users);
     return { success: true };
   });

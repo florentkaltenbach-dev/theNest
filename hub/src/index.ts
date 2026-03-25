@@ -37,7 +37,7 @@ await app.register(setupRoutes, { prefix: "/api" });
 
 // Auth middleware for all other /api routes
 app.addHook("onRequest", async (req, reply) => {
-  if (!req.url.startsWith("/api/") || req.url.startsWith("/api/auth/") || req.url.startsWith("/api/setup/")) return;
+  if (!req.url.startsWith("/api/") || req.url.startsWith("/api/auth/") || req.url.startsWith("/api/setup/") || req.url.startsWith("/api/health")) return;
   try {
     await req.jwtVerify();
   } catch {
@@ -73,6 +73,8 @@ if (existsSync(clientDist)) {
   // SPA fallback — serve index.html for all non-API routes
   app.setNotFoundHandler((req, reply) => {
     if (req.url.startsWith("/api/")) {
+      reply.code(404).send({ error: "Not found" });
+    } else if (/\/\./.test(req.url)) {
       reply.code(404).send({ error: "Not found" });
     } else {
       reply.sendFile("index.html");
