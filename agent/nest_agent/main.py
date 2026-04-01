@@ -184,6 +184,39 @@ async def handle_commands(ws):
                     result["error"] = f"Unknown enhance action: {action}"
 
                 await ws.send(json.dumps(result))
+            elif cmd == "clone_repo":
+                import subprocess
+                request_id = msg.get("requestId")
+                repo_url = msg.get("url")
+                name = msg.get("name")
+                repos_dir = msg.get("reposDir", "/opt/repos")
+                result = {"type": "command_result", "command": cmd, "success": False}
+                if request_id:
+                    result["requestId"] = request_id
+
+                if not repo_url or not name:
+                    result["error"] = "url and name required"
+                else:
+                    target = os.path.join(repos_dir, name)
+                    if os.path.isdir(target):
+                        proc = subprocess.run(
+                            ["git", "-C", target, "pull", "--ff-only"],
+                            capture_output=True, text=True, timeout=60,
+                        )
+                        result["action"] = "pull"
+                    else:
+                        os.makedirs(repos_dir, exist_ok=True)
+                        proc = subprocess.run(
+                            ["git", "clone", "--depth", "1", repo_url, target],
+                            capture_output=True, text=True, timeout=120,
+                        )
+                        result["action"] = "clone"
+                    result["success"] = proc.returncode == 0
+                    result["stdout"] = proc.stdout[-500:] if proc.stdout else ""
+                    result["stderr"] = proc.stderr[-500:] if proc.stderr else ""
+                    result["path"] = target
+
+                await ws.send(json.dumps(result))
             elif cmd == "discover":
                 from .discovery import find_git_repos
                 request_id = msg.get("requestId")

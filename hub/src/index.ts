@@ -19,6 +19,7 @@ import { roadmapRoutes } from "./routes/roadmap.js";
 import { enhanceRoutes } from "./routes/enhance.js";
 import { sessionRoutes } from "./routes/sessions.js";
 import { projectRoutes } from "./routes/projects.js";
+import { tokenRoutes } from "./routes/tokens.js";
 import { agentWsRoutes, getAgentData } from "./ws/agentHandler.js";
 import { terminalWsRoutes } from "./ws/terminal.js";
 
@@ -94,6 +95,7 @@ await app.register(appendageRoutes, { prefix: "/api" });
 await app.register(enhanceRoutes, { prefix: "/api" });
 await app.register(sessionRoutes, { prefix: "/api" });
 await app.register(projectRoutes, { prefix: "/api" });
+await app.register(tokenRoutes, { prefix: "/api" });
 
 // Agent data API (REST fallback for live metrics)
 app.get("/api/agents", async () => ({ agents: getAgentData() }));
