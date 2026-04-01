@@ -144,6 +144,14 @@ export default function ServersScreen() {
   const [agentMetrics, setAgentMetrics] = useState<Record<string, AgentMetrics>>({});
   const historyRef = useRef<Record<string, MetricsHistory>>({});
   const [historyState, setHistoryState] = useState<Record<string, MetricsHistory>>({});
+  const [showCreate, setShowCreate] = useState(false);
+  const [createName, setCreateName] = useState("");
+  const [createType, setCreateType] = useState("");
+  const [createImage, setCreateImage] = useState("");
+  const [createLocation, setCreateLocation] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [serverTypes, setServerTypes] = useState<any[]>([]);
+  const [images, setImages] = useState<any[]>([]);
 
   const load = async () => {
     try {
@@ -211,15 +219,6 @@ export default function ServersScreen() {
       </View>
     );
   }
-
-  const [showCreate, setShowCreate] = useState(false);
-  const [createName, setCreateName] = useState("");
-  const [createType, setCreateType] = useState("");
-  const [createImage, setCreateImage] = useState("");
-  const [createLocation, setCreateLocation] = useState("");
-  const [creating, setCreating] = useState(false);
-  const [serverTypes, setServerTypes] = useState<any[]>([]);
-  const [images, setImages] = useState<any[]>([]);
 
   const openCreate = async () => {
     setShowCreate(true);
