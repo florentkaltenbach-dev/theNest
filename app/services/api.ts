@@ -22,6 +22,15 @@ export function clearToken() {
   setToken(null);
 }
 
+async function readErrorMessage(res: Response): Promise<string> {
+  try {
+    const data = await res.json();
+    if (typeof data?.error === "string") return data.error;
+    if (typeof data?.detail === "string") return data.detail;
+  } catch {}
+  return `API error: ${res.status}`;
+}
+
 export async function fetchAPI<T>(path: string, opts?: RequestInit): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
@@ -36,17 +45,26 @@ export async function fetchAPI<T>(path: string, opts?: RequestInit): Promise<T> 
     if (typeof window !== "undefined") window.location.href = "/login";
     throw new Error("Unauthorized");
   }
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  if (!res.ok) throw new Error(await readErrorMessage(res));
   return res.json();
 }
 
 export async function login(password: string): Promise<boolean> {
-  const data = await fetchAPI<{ token: string }>("/auth/login", {
+  const res = await fetch(`${API_BASE}/auth/login`, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ password }),
   });
+  if (!res.ok) throw new Error(await readErrorMessage(res));
+  const data = await res.json() as { token: string };
   setToken(data.token);
   return true;
+}
+
+export async function getPublicHealth() {
+  const res = await fetch(`${API_BASE}/health`);
+  if (!res.ok) throw new Error(await readErrorMessage(res));
+  return res.json() as Promise<{ status: string; version: string; uptime: number }>;
 }
 
 export async function checkAuth(): Promise<boolean> {
@@ -206,10 +224,10 @@ export async function getSetupStatus() {
   return fetchAPI<{ needsSetup: boolean }>("/setup/status");
 }
 
-export async function completeSetup(hetznerToken: string, adminPassword: string) {
+export async function completeSetup(hetznerToken: string, adminPassword: string, gitName?: string, gitEmail?: string) {
   return fetchAPI<{ success: boolean }>("/setup/complete", {
     method: "POST",
-    body: JSON.stringify({ hetznerToken, adminPassword }),
+    body: JSON.stringify({ hetznerToken, adminPassword, gitName: gitName || undefined, gitEmail: gitEmail || undefined }),
   });
 }
 
@@ -224,6 +242,34 @@ export async function serverAction(serverId: number, action: string) {
 // Roadmap
 export async function getRoadmap() {
   return fetchAPI<{ content: string }>('/roadmap');
+}
+
+export interface ArtifactEntry {
+  path: string;
+  name: string;
+  ext: string;
+  kind: "text" | "image";
+  size: number;
+  modified: string;
+}
+
+export interface ArtifactView {
+  path: string;
+  kind: "text" | "image";
+  ext: string;
+  size: number;
+  modified: string;
+  content?: string;
+  mime?: string;
+  contentBase64?: string;
+}
+
+export async function getArtifacts() {
+  return fetchAPI<{ root: string; artifacts: ArtifactEntry[] }>("/artifacts");
+}
+
+export async function getArtifactContent(path: string) {
+  return fetchAPI<ArtifactView>(`/artifacts/view/${path}`);
 }
 
 // Accept invite
@@ -259,6 +305,10 @@ export async function getTokenLimits() {
 
 export async function getTokenWaste() {
   return fetchAPI<any>("/tokens/waste");
+}
+
+export async function getCodexStatus() {
+  return fetchAPI<any>("/tokens/codex/status");
 }
 
 // Projects
@@ -313,5 +363,170 @@ export async function dispatchTask(prompt: string, project?: string) {
   return fetchAPI<{ id: string; status: string }>("/tasks", {
     method: "POST",
     body: JSON.stringify({ prompt, project }),
+  });
+}
+
+// Server metrics with period
+export async function getServerMetrics(id: number, type = "cpu,disk,network", period = "1h") {
+  return fetchAPI<any>(`/servers/${id}/metrics?type=${type}&period=${period}`);
+}
+
+// Console (VNC)
+export async function requestConsole(id: number) {
+  return fetchAPI<{ wss_url: string; password: string }>(`/servers/${id}/console`, { method: "POST" });
+}
+
+// Rescue mode
+export async function enableRescue(id: number) {
+  return fetchAPI<{ root_password: string }>(`/servers/${id}/rescue`, { method: "POST" });
+}
+
+export async function disableRescue(id: number) {
+  return fetchAPI<any>(`/servers/${id}/rescue`, { method: "DELETE" });
+}
+
+// Rebuild
+export async function rebuildServer(id: number, image: string) {
+  return fetchAPI<{ root_password: string }>(`/servers/${id}/rebuild`, {
+    method: "POST",
+    body: JSON.stringify({ image }),
+  });
+}
+
+// Resize
+export async function resizeServer(id: number, serverType: string, upgradeDisk = true) {
+  return fetchAPI<any>(`/servers/${id}/resize`, {
+    method: "PUT",
+    body: JSON.stringify({ server_type: serverType, upgrade_disk: upgradeDisk }),
+  });
+}
+
+// Reverse DNS
+export async function setReverseDNS(id: number, ip: string, dnsPtr: string) {
+  return fetchAPI<any>(`/servers/${id}/rdns`, {
+    method: "PUT",
+    body: JSON.stringify({ ip, dns_ptr: dnsPtr }),
+  });
+}
+
+// Backups
+export async function enableBackups(id: number) {
+  return fetchAPI<any>(`/servers/${id}/backups`, { method: "POST" });
+}
+
+export async function disableBackups(id: number) {
+  return fetchAPI<any>(`/servers/${id}/backups`, { method: "DELETE" });
+}
+
+// ISO
+export async function attachISO(id: number, iso: string) {
+  return fetchAPI<any>(`/servers/${id}/iso`, { method: "POST", body: JSON.stringify({ iso }) });
+}
+
+export async function detachISO(id: number) {
+  return fetchAPI<any>(`/servers/${id}/iso`, { method: "DELETE" });
+}
+
+// Snapshots
+export async function getServerSnapshots(id: number) {
+  return fetchAPI<{ snapshots: any[] }>(`/servers/${id}/snapshots`);
+}
+
+export async function createSnapshot(id: number, description: string) {
+  return fetchAPI<any>(`/servers/${id}/snapshot`, {
+    method: "POST",
+    body: JSON.stringify({ description }),
+  });
+}
+
+export async function deleteSnapshot(id: number) {
+  return fetchAPI<any>(`/snapshots/${id}`, { method: "DELETE" });
+}
+
+// Firewalls
+export async function getFirewalls() {
+  return fetchAPI<{ firewalls: any[] }>("/firewalls");
+}
+
+export async function applyFirewall(serverId: number, firewallId: number) {
+  return fetchAPI<any>(`/servers/${serverId}/firewall`, {
+    method: "POST",
+    body: JSON.stringify({ firewall_id: firewallId }),
+  });
+}
+
+export async function removeFirewall(serverId: number, firewallId: number) {
+  return fetchAPI<any>(`/servers/${serverId}/firewall/${firewallId}`, { method: "DELETE" });
+}
+
+// Volumes
+export async function getVolumes() {
+  return fetchAPI<{ volumes: any[] }>("/volumes");
+}
+
+export async function attachVolume(serverId: number, volumeId: number) {
+  return fetchAPI<any>(`/servers/${serverId}/volume/attach`, {
+    method: "POST",
+    body: JSON.stringify({ volume_id: volumeId }),
+  });
+}
+
+export async function detachVolume(volumeId: number) {
+  return fetchAPI<any>(`/volumes/${volumeId}/detach`, { method: "POST" });
+}
+
+export async function resizeVolume(volumeId: number, size: number) {
+  return fetchAPI<any>(`/volumes/${volumeId}/resize`, {
+    method: "POST",
+    body: JSON.stringify({ size }),
+  });
+}
+
+// Server types (for resize)
+export async function getServerTypes() {
+  return fetchAPI<{ server_types: any[] }>("/server-types");
+}
+
+// Images (for rebuild)
+export async function getImages() {
+  return fetchAPI<{ images: any[] }>("/images");
+}
+
+// ISOs
+export async function getISOs() {
+  return fetchAPI<{ isos: any[] }>("/isos");
+}
+
+// Update server (name, labels)
+export async function updateServer(id: number, data: { name?: string; labels?: Record<string, string> }) {
+  return fetchAPI<any>(`/servers/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+// Delete server
+export async function deleteServer(id: number) {
+  return fetchAPI<any>(`/servers/${id}`, { method: "DELETE" });
+}
+
+// Create server
+export async function createServer(data: {
+  name: string;
+  server_type: string;
+  image: string;
+  location?: string;
+  ssh_keys?: number[];
+  user_data?: string;
+  labels?: Record<string, string>;
+}) {
+  return fetchAPI<any>("/servers", { method: "POST", body: JSON.stringify(data) });
+}
+
+// Protection
+export async function setProtection(id: number, deleteProtect: boolean, rebuildProtect: boolean) {
+  return fetchAPI<any>(`/servers/${id}/protection`, {
+    method: "PUT",
+    body: JSON.stringify({ delete: deleteProtect, rebuild: rebuildProtect }),
   });
 }

@@ -9,6 +9,8 @@ export default function OnboardingScreen() {
   const [step, setStep] = useState<Step>("welcome");
   const [hetznerToken, setHetznerToken] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
+  const [gitName, setGitName] = useState("");
+  const [gitEmail, setGitEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -20,7 +22,7 @@ export default function OnboardingScreen() {
     setLoading(true);
     setError("");
     try {
-      await completeSetup(hetznerToken.trim(), adminPassword.trim());
+      await completeSetup(hetznerToken.trim(), adminPassword.trim(), gitName.trim() || undefined, gitEmail.trim() || undefined);
       await login(adminPassword.trim());
       setStep("done");
       setTimeout(() => router.replace("/"), 1500);
@@ -78,6 +80,22 @@ export default function OnboardingScreen() {
               onChangeText={setAdminPassword}
               secureTextEntry
               autoFocus
+            />
+            <Text style={[styles.hint, { marginTop: 8 }]}>Git identity (optional — defaults to "nest")</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Git Name"
+              placeholderTextColor="#999"
+              value={gitName}
+              onChangeText={setGitName}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Git Email"
+              placeholderTextColor="#999"
+              value={gitEmail}
+              onChangeText={setGitEmail}
+              keyboardType="email-address"
             />
             {error ? <Text style={styles.error}>{error}</Text> : null}
             <Pressable style={[styles.button, loading && { opacity: 0.5 }]} onPress={handleComplete} disabled={loading}>

@@ -1,6 +1,7 @@
 import { FastifyInstance } from "fastify";
 import { existsSync } from "fs";
 import { readFile, writeFile } from "fs/promises";
+import { execSync } from "child_process";
 
 const SETUP_FILE = "/opt/nest/setup.json";
 
@@ -31,8 +32,8 @@ export async function setupRoutes(app: FastifyInstance) {
   });
 
   // Save provider token during onboarding
-  app.post<{ Body: { hetznerToken: string; adminPassword: string } }>("/setup/complete", async (req, reply) => {
-    const { hetznerToken, adminPassword } = req.body;
+  app.post<{ Body: { hetznerToken: string; adminPassword: string; gitName?: string; gitEmail?: string } }>("/setup/complete", async (req, reply) => {
+    const { hetznerToken, adminPassword, gitName, gitEmail } = req.body;
     if (!hetznerToken || !adminPassword) {
       return reply.code(400).send({ error: "hetznerToken and adminPassword required" });
     }
@@ -49,6 +50,8 @@ export async function setupRoutes(app: FastifyInstance) {
       HETZNER_API_TOKEN: hetznerToken,
       NEST_ADMIN_PASSWORD: adminPassword,
     };
+    if (gitName) updates.GIT_USER_NAME = gitName;
+    if (gitEmail) updates.GIT_USER_EMAIL = gitEmail;
 
     for (const [key, value] of Object.entries(updates)) {
       const regex = new RegExp(`^${key}=.*$`, "m");
@@ -64,6 +67,14 @@ export async function setupRoutes(app: FastifyInstance) {
     // Update process env so hub picks it up immediately
     process.env.HETZNER_API_TOKEN = hetznerToken;
     process.env.NEST_ADMIN_PASSWORD = adminPassword;
+
+    // Configure git identity
+    const gName = gitName || "nest";
+    const gEmail = gitEmail || `nest@${require("os").hostname()}`;
+    try {
+      execSync(`git config --global user.name ${JSON.stringify(gName)}`);
+      execSync(`git config --global user.email ${JSON.stringify(gEmail)}`);
+    } catch {}
 
     // Mark setup as completed
     await saveSetup({ completed: true, completedAt: Date.now() });

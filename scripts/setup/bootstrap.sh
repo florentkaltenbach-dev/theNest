@@ -89,6 +89,15 @@ PKG
 
 success "Packages done"
 
+# ── Git identity (so commits work out of the box) ────
+if ! run "git config --global user.name" &>/dev/null; then
+  info "Setting default git identity..."
+  run "git config --global user.name 'nest'"
+  REMOTE_HOST=$(run "hostname")
+  run "git config --global user.email 'nest@${REMOTE_HOST}'"
+  success "Git identity set"
+fi
+
 # ══════════════════════════════════════════════════════
 # 2. CLAUDE CODE (native install as claude user)
 # ══════════════════════════════════════════════════════

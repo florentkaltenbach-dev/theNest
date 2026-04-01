@@ -7,9 +7,10 @@ import {
   ActivityIndicator,
   RefreshControl,
   Pressable,
+  TextInput,
 } from "react-native";
 import { router } from "expo-router";
-import { getServers, Server } from "../../services/api";
+import { getServers, Server, createServer, getServerTypes, getImages } from "../../services/api";
 import { connectWs, onWsMessage } from "../../services/ws";
 
 const HISTORY_SIZE = 30;
@@ -211,12 +212,85 @@ export default function ServersScreen() {
     );
   }
 
+  const [showCreate, setShowCreate] = useState(false);
+  const [createName, setCreateName] = useState("");
+  const [createType, setCreateType] = useState("");
+  const [createImage, setCreateImage] = useState("");
+  const [createLocation, setCreateLocation] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [serverTypes, setServerTypes] = useState<any[]>([]);
+  const [images, setImages] = useState<any[]>([]);
+
+  const openCreate = async () => {
+    setShowCreate(true);
+    try {
+      const [t, i] = await Promise.all([getServerTypes(), getImages()]);
+      setServerTypes(t.server_types || []);
+      setImages(i.images || []);
+    } catch {}
+  };
+
+  const doCreate = async () => {
+    if (!createName || !createType || !createImage) return;
+    setCreating(true);
+    try {
+      await createServer({
+        name: createName,
+        server_type: createType,
+        image: createImage,
+        location: createLocation || undefined,
+      });
+      setShowCreate(false);
+      setCreateName(""); setCreateType(""); setCreateImage(""); setCreateLocation("");
+      load();
+    } catch {}
+    setCreating(false);
+  };
+
   return (
     <ScrollView
       style={styles.container}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
     >
-      <Text style={styles.heading}>{servers.length} Server{servers.length !== 1 ? "s" : ""}</Text>
+      <View style={styles.headingRow}>
+        <Text style={styles.heading}>{servers.length} Server{servers.length !== 1 ? "s" : ""}</Text>
+        <Pressable style={styles.createBtn} onPress={openCreate}>
+          <Text style={styles.createBtnText}>+ Create</Text>
+        </Pressable>
+      </View>
+
+      {showCreate && (
+        <View style={styles.createPanel}>
+          <Text style={styles.createTitle}>New Server</Text>
+          <TextInput style={styles.createInput} placeholder="Server name" placeholderTextColor="#999" value={createName} onChangeText={setCreateName} />
+          <Text style={styles.createLabel}>Type</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
+            {serverTypes.slice(0, 20).map((t: any) => (
+              <Pressable key={t.name} style={[styles.chip, createType === t.name && styles.chipActive]} onPress={() => setCreateType(t.name)}>
+                <Text style={[styles.chipText, createType === t.name && styles.chipTextActive]}>{t.name} ({t.cores}c/{t.memory}GB)</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+          <Text style={styles.createLabel}>Image</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
+            {images.map((img: any) => (
+              <Pressable key={img.id} style={[styles.chip, createImage === img.id.toString() && styles.chipActive]} onPress={() => setCreateImage(img.id.toString())}>
+                <Text style={[styles.chipText, createImage === img.id.toString() && styles.chipTextActive]}>{img.description || img.name}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+          <TextInput style={styles.createInput} placeholder="Location (e.g. fsn1, nbg1, hel1)" placeholderTextColor="#999" value={createLocation} onChangeText={setCreateLocation} />
+          <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
+            <Pressable style={[styles.createBtn, { backgroundColor: "#22c55e", flex: 1, opacity: (!createName || !createType || !createImage) ? 0.4 : 1 }]} onPress={doCreate}>
+              <Text style={[styles.createBtnText, { color: "#fff" }]}>{creating ? "Creating..." : "Create Server"}</Text>
+            </Pressable>
+            <Pressable style={[styles.createBtn, { backgroundColor: "#f0f0f0" }]} onPress={() => setShowCreate(false)}>
+              <Text style={styles.createBtnText}>Cancel</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+
       {servers.map((s) => (
         <ServerCard key={s.id} server={s} metrics={agentMetrics[s.name]} history={historyState[s.name]} />
       ))}
@@ -227,7 +301,7 @@ export default function ServersScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f5f5f5", padding: 16 },
   center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#f5f5f5" },
-  heading: { fontSize: 24, fontWeight: "700", color: "#1a1a2e", marginBottom: 16 },
+  heading: { fontSize: 24, fontWeight: "700", color: "#1a1a2e" },
   error: { color: "#ef4444", fontSize: 16 },
   card: {
     backgroundColor: "#fff",
@@ -257,4 +331,15 @@ const styles = StyleSheet.create({
   histDetail: { fontSize: 10, color: "#bbb", marginTop: 2 },
   cardFooter: { flexDirection: "row", justifyContent: "space-between", marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: "#f0f0f0" },
   footerText: { fontSize: 11, color: "#999" },
+  headingRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
+  createBtn: { backgroundColor: "#1a1a2e", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
+  createBtnText: { color: "#fff", fontSize: 13, fontWeight: "600" },
+  createPanel: { backgroundColor: "#fff", borderRadius: 12, padding: 16, marginBottom: 12, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
+  createTitle: { fontSize: 18, fontWeight: "700", color: "#1a1a2e", marginBottom: 12 },
+  createInput: { borderWidth: 1, borderColor: "#e0e0e0", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, fontSize: 14, color: "#1a1a2e", backgroundColor: "#fafafa", marginBottom: 8 },
+  createLabel: { fontSize: 11, color: "#999", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4, marginTop: 4 },
+  chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: "#f0f0f0", marginRight: 6 },
+  chipActive: { backgroundColor: "#1a1a2e" },
+  chipText: { fontSize: 12, fontWeight: "500", color: "#666" },
+  chipTextActive: { color: "#fff" },
 });
