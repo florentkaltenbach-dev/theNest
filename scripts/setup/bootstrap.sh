@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # ── theNest Bootstrap ──────────────────────────────────
-# One-click setup: fresh Hetzner Ubuntu 24.04 → hardened server with Claude Code.
+# Post-cloud-init setup: clone repo, configure Claude Code, create services.
+#
+# Prerequisites: Server provisioned with cloud-config.yaml (handles hardening,
+# packages, Docker, Node.js, Claude Code install).
 #
 # Usage:
 #   ./scripts/setup/bootstrap.sh <server-ip>
 #   ./scripts/setup/bootstrap.sh --config ./config.env <server-ip>
 #   ./scripts/setup/bootstrap.sh --reset <server-ip>
-#
-# Today you run this from your laptop. Tomorrow the Nest app
-# triggers it via IScriptRunner. Same script, different trigger.
 
 set -Eeuo pipefail
 
@@ -82,9 +82,9 @@ if [[ -z "${CONFIG_FILE}" || ! -f "${CONFIG_FILE}" ]]; then
     printf -v "${var_name}" '%s' "${value}"
   }
 
-  # Auto-detect SSH key (resolve to absolute path to avoid ~ issues across shells)
+  # Auto-detect SSH key (resolve to absolute path)
   SSH_KEY_DEFAULT=""
-  for candidate in "${HOME}/.ssh/id_ed25519_hetzner" "${HOME}/.ssh/id_ed25519" "${HOME}/.ssh/id_rsa"; do
+  for candidate in "${HOME}/.ssh/id_ed25519_nest" "${HOME}/.ssh/id_ed25519_hetzner" "${HOME}/.ssh/id_ed25519" "${HOME}/.ssh/id_rsa"; do
     if [[ -f "${candidate}" ]]; then
       SSH_KEY_DEFAULT="$(cd "$(dirname "${candidate}")" && pwd)/$(basename "${candidate}")"
       break
@@ -176,7 +176,7 @@ set +a
 # ── Resolve SSH Key ────────────────────────────────────
 SSH_KEY="${SSH_KEY_PATH:-}"
 if [[ -z "${SSH_KEY}" ]]; then
-  for candidate in "${HOME}/.ssh/id_ed25519_hetzner" "${HOME}/.ssh/id_ed25519" "${HOME}/.ssh/id_rsa"; do
+  for candidate in "${HOME}/.ssh/id_ed25519_nest" "${HOME}/.ssh/id_ed25519_hetzner" "${HOME}/.ssh/id_ed25519" "${HOME}/.ssh/id_rsa"; do
     if [[ -f "${candidate}" ]]; then
       SSH_KEY="${candidate}"
       break
@@ -196,14 +196,30 @@ source "${SCRIPT_DIR}/lib/common.sh"
 build_ssh_opts
 
 # ── Clear stale host keys (servers get rebuilt) ───────
-ssh-keygen -R "${SERVER_IP}" 2>/dev/null || true
+ssh-keygen -R "$(keygen_host "${SERVER_IP}")" 2>/dev/null || true
 
-# ── Detect SSH User ────────────────────────────────────
-info "Probing SSH access to ${SERVER_IP}..."
-SSH_USER=$(detect_ssh_user)
-[[ -z "${SSH_USER}" ]] && die "Cannot connect to ${SERVER_IP} via SSH"
+# ── Wait for cloud-init ───────────────────────────────
+SSH_USER="claude"
 export SSH_USER
-info "Connected as '${SSH_USER}'"
+
+info "Waiting for cloud-init to complete on ${SERVER_IP}..."
+WAIT_MAX=60
+WAIT_COUNT=0
+while [ $WAIT_COUNT -lt $WAIT_MAX ]; do
+  if ssh "${SSH_OPTS[@]}" "claude@${SERVER_IP}" "test -f /opt/nest/.cloud-init-done" 2>/dev/null; then
+    success "Cloud-init complete"
+    break
+  fi
+  WAIT_COUNT=$((WAIT_COUNT + 1))
+  if [ $((WAIT_COUNT % 6)) -eq 0 ]; then
+    info "Still waiting... (${WAIT_COUNT}/${WAIT_MAX}, $((WAIT_COUNT * 10))s elapsed)"
+  fi
+  sleep 10
+done
+
+if [ $WAIT_COUNT -eq $WAIT_MAX ]; then
+  die "Cloud-init did not complete within $((WAIT_MAX * 10)) seconds. Check server console."
+fi
 
 # ── Reset State (if requested) ─────────────────────────
 if [[ "${RESET}" == true ]]; then
@@ -216,205 +232,10 @@ fi
 run_remote_sudo "mkdir -p /opt/nest && chown claude:claude /opt/nest 2>/dev/null || mkdir -p /opt/nest"
 
 # ════════════════════════════════════════════════════════
-# PHASE 1: HARDEN
-# ════════════════════════════════════════════════════════
-if ! phase_done "harden"; then
-  if [[ "${SSH_USER}" == "root" ]]; then
-    info "Phase 1: Hardening server..."
-
-    ssh "${SSH_OPTS[@]}" "root@${SERVER_IP}" "bash -s" <<'HARDEN_EOF'
-set -Eeuo pipefail
-
-export DEBIAN_FRONTEND=noninteractive
-
-# ── Create claude user ─────────────────────────────────
-if ! id claude &>/dev/null; then
-  useradd -m -s /bin/bash -U -u 1001 claude
-  echo "claude ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/claude
-  chmod 0440 /etc/sudoers.d/claude
-
-  mkdir -p /home/claude/.ssh
-  cp /root/.ssh/authorized_keys /home/claude/.ssh/authorized_keys
-  chown -R claude:claude /home/claude/.ssh
-  chmod 700 /home/claude/.ssh
-  chmod 600 /home/claude/.ssh/authorized_keys
-fi
-
-# ── Harden SSH ─────────────────────────────────────────
-sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
-sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config
-sed -i 's/^#\?MaxAuthTries.*/MaxAuthTries 3/' /etc/ssh/sshd_config
-sed -i 's/^#\?MaxSessions.*/MaxSessions 5/' /etc/ssh/sshd_config
-
-# Ensure pubkey auth is enabled
-grep -q "^PubkeyAuthentication" /etc/ssh/sshd_config \
-  && sed -i 's/^PubkeyAuthentication.*/PubkeyAuthentication yes/' /etc/ssh/sshd_config \
-  || echo "PubkeyAuthentication yes" >> /etc/ssh/sshd_config
-
-systemctl restart ssh
-
-# ── UFW Firewall ───────────────────────────────────────
-apt-get update -qq
-apt-get install -y -qq ufw fail2ban > /dev/null
-
-ufw default deny incoming
-ufw default allow outgoing
-ufw allow 22/tcp
-ufw allow 80/tcp
-ufw allow 443/tcp
-echo "y" | ufw enable
-
-# ── fail2ban ───────────────────────────────────────────
-cat > /etc/fail2ban/jail.local <<'F2B'
-[sshd]
-enabled  = true
-port     = ssh
-filter   = sshd
-maxretry = 5
-bantime  = 3600
-findtime = 600
-F2B
-systemctl enable fail2ban
-systemctl restart fail2ban
-
-# ── sysctl hardening ──────────────────────────────────
-cat > /etc/sysctl.d/99-nest-hardening.conf <<'SYSCTL'
-net.ipv4.conf.all.rp_filter = 1
-net.ipv4.conf.default.rp_filter = 1
-net.ipv4.tcp_syncookies = 1
-net.ipv4.conf.all.accept_redirects = 0
-net.ipv4.conf.default.accept_redirects = 0
-net.ipv4.conf.all.send_redirects = 0
-net.ipv4.conf.default.send_redirects = 0
-net.ipv4.icmp_echo_ignore_broadcasts = 1
-kernel.randomize_va_space = 2
-SYSCTL
-sysctl --system > /dev/null 2>&1
-
-# ── Swap ───────────────────────────────────────────────
-if [[ ! -f /swapfile ]]; then
-  fallocate -l 2G /swapfile
-  chmod 600 /swapfile
-  mkswap /swapfile > /dev/null
-  swapon /swapfile
-  echo '/swapfile none swap sw 0 0' >> /etc/fstab
-  echo 'vm.swappiness = 10' >> /etc/sysctl.d/99-nest-hardening.conf
-  sysctl vm.swappiness=10
-fi
-
-# ── Unattended Upgrades ───────────────────────────────
-apt-get install -y -qq unattended-upgrades > /dev/null
-cat > /etc/apt/apt.conf.d/50unattended-upgrades <<'UU'
-Unattended-Upgrade::Allowed-Origins {
-    "${distro_id}:${distro_codename}-security";
-    "${distro_id}ESMApps:${distro_codename}-apps-security";
-};
-Unattended-Upgrade::Automatic-Reboot "true";
-Unattended-Upgrade::Automatic-Reboot-Time "03:00";
-UU
-
-# ── Create /opt/nest and write state ──────────────────
-mkdir -p /opt/nest
-chown claude:claude /opt/nest
-echo "harden" > /opt/nest/.bootstrap-state
-chown claude:claude /opt/nest/.bootstrap-state
-
-# Reboot at end of hardening
-reboot
-
-HARDEN_EOF
-
-    success "Server hardened"
-    sleep 10
-
-    # Switch to claude user after reboot
-    SSH_USER="claude"
-    export SSH_USER
-    wait_for_ssh "claude"
-  else
-    info "Phase 1: Already hardened (connected as '${SSH_USER}'), skipping"
-    # Still mark done if connecting as claude means hardening already happened
-    run_remote_sudo "mkdir -p /opt/nest && chown claude:claude /opt/nest"
-    mark_done "harden"
-  fi
-else
-  info "Phase 1: harden — already done, skipping"
-  # Ensure we're connecting as claude
-  if [[ "${SSH_USER}" == "root" ]]; then
-    SSH_USER="claude"
-    export SSH_USER
-  fi
-fi
-
-# ════════════════════════════════════════════════════════
-# PHASE 2: INSTALL DEPENDENCIES
-# ════════════════════════════════════════════════════════
-if ! phase_done "install-deps"; then
-  info "Phase 2: Installing dependencies..."
-
-  ssh "${SSH_OPTS[@]}" "claude@${SERVER_IP}" "sudo bash -s" <<'DEPS_EOF'
-set -Eeuo pipefail
-
-export DEBIAN_FRONTEND=noninteractive
-
-apt-get update -qq
-
-# ── Build essentials ───────────────────────────────────
-apt-get install -y -qq \
-  build-essential curl jq tmux git unzip rsync \
-  ca-certificates gnupg lsb-release > /dev/null
-
-# ── Node.js 22 LTS (NodeSource) ───────────────────────
-if ! command -v node &>/dev/null; then
-  curl -fsSL https://deb.nodesource.com/setup_22.x | bash - > /dev/null 2>&1
-  apt-get install -y -qq nodejs > /dev/null
-fi
-
-# ── Python 3 + pip + venv ─────────────────────────────
-apt-get install -y -qq python3 python3-pip python3-venv > /dev/null
-
-# ── Docker CE + Compose ───────────────────────────────
-if ! command -v docker &>/dev/null; then
-  install -m 0755 -d /etc/apt/keyrings
-  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
-    gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-  chmod a+r /etc/apt/keyrings/docker.gpg
-
-  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-    https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
-    > /etc/apt/sources.list.d/docker.list
-
-  apt-get update -qq
-  apt-get install -y -qq docker-ce docker-ce-cli containerd.io \
-    docker-buildx-plugin docker-compose-plugin > /dev/null
-fi
-
-usermod -aG docker claude
-
-# ── GitHub CLI ─────────────────────────────────────────
-if ! command -v gh &>/dev/null; then
-  curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
-    | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg 2>/dev/null
-  echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] \
-    https://cli.github.com/packages stable main" \
-    > /etc/apt/sources.list.d/github-cli.list
-  apt-get update -qq
-  apt-get install -y -qq gh > /dev/null
-fi
-
-DEPS_EOF
-
-  success "Dependencies installed"
-  mark_done "install-deps"
-else
-  info "Phase 2: install-deps — already done, skipping"
-fi
-
-# ════════════════════════════════════════════════════════
-# PHASE 3: CLONE REPO
+# PHASE 1: CLONE REPO
 # ════════════════════════════════════════════════════════
 if ! phase_done "clone-repo"; then
-  info "Phase 3: Cloning theNest repo..."
+  info "Phase 1: Cloning theNest repo..."
 
   NEST_REPO="${NEST_REPO:-https://github.com/florentkaltenbach-dev/theNest.git}"
   NEST_BRANCH="${NEST_BRANCH:-main}"
@@ -489,23 +310,20 @@ CLONE_EOF
   success "Repo cloned to /opt/nest"
   mark_done "clone-repo"
 else
-  info "Phase 3: clone-repo — already done, skipping"
+  info "Phase 1: clone-repo — already done, skipping"
 fi
 
 # ════════════════════════════════════════════════════════
-# PHASE 4: SETUP CLAUDE CODE
+# PHASE 2: CONFIGURE CLAUDE CODE
 # ════════════════════════════════════════════════════════
 if ! phase_done "setup-claude-code"; then
-  info "Phase 4: Setting up Claude Code..."
+  info "Phase 2: Configuring Claude Code..."
 
   # Upload config.env to server
   upload_file "${CONFIG_FILE}" "/tmp/nest-config.env"
 
   ssh "${SSH_OPTS[@]}" "claude@${SERVER_IP}" "sudo bash -s" <<'CLAUDE_EOF'
 set -Eeuo pipefail
-
-# ── Install Claude Code ────────────────────────────────
-npm install -g @anthropic-ai/claude-code
 
 # ── Place config.env ───────────────────────────────────
 mv /tmp/nest-config.env /opt/nest/config.env
@@ -533,17 +351,17 @@ BASHRC_EOF
     warn "OAuth mode: run 'claude login' after SSHing into the server"
   fi
 
-  success "Claude Code installed and configured"
+  success "Claude Code configured"
   mark_done "setup-claude-code"
 else
-  info "Phase 4: setup-claude-code — already done, skipping"
+  info "Phase 2: setup-claude-code — already done, skipping"
 fi
 
 # ════════════════════════════════════════════════════════
-# PHASE 5: SETUP CLAUDE CODE SERVICE
+# PHASE 3: SETUP CLAUDE CODE SERVICE
 # ════════════════════════════════════════════════════════
 if ! phase_done "setup-claude-code-service"; then
-  info "Phase 5: Setting up Claude Code service and tmux helper..."
+  info "Phase 3: Setting up Claude Code service and tmux helper..."
 
   ssh "${SSH_OPTS[@]}" "claude@${SERVER_IP}" "sudo bash -s" <<'SERVICE_EOF'
 set -Eeuo pipefail
@@ -561,7 +379,8 @@ User=claude
 Group=claude
 WorkingDirectory=/opt/nest
 EnvironmentFile=/opt/nest/config.env
-ExecStart=/usr/bin/claude --dangerously-skip-permissions
+Environment=PATH=/home/claude/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=/home/claude/.local/bin/claude --dangerously-skip-permissions
 Restart=on-failure
 RestartSec=10
 
@@ -591,13 +410,13 @@ SERVICE_EOF
   success "Claude Code service and tmux helper created"
   mark_done "setup-claude-code-service"
 else
-  info "Phase 5: setup-claude-code-service — already done, skipping"
+  info "Phase 3: setup-claude-code-service — already done, skipping"
 fi
 
 # ════════════════════════════════════════════════════════
-# PHASE 6: VERIFY
+# PHASE 4: VERIFY
 # ════════════════════════════════════════════════════════
-info "Phase 6: Verifying setup..."
+info "Phase 4: Verifying setup..."
 
 CHECKS_PASSED=0
 CHECKS_TOTAL=0
@@ -627,7 +446,7 @@ check "Docker installed"            "docker --version"
 check "Git installed"               "git --version"
 check "gh CLI installed"            "gh --version"
 check "tmux installed"              "tmux -V"
-check "Claude Code installed"       "which claude"
+check "Claude Code installed"       "command -v claude"
 if [[ "${CLAUDE_AUTH_MODE:-apikey}" == "apikey" ]]; then
   check "ANTHROPIC_API_KEY set"     "source /opt/nest/config.env && test -n \"\${ANTHROPIC_API_KEY:-}\""
 else
