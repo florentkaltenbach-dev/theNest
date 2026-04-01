@@ -37,7 +37,7 @@ interface RunningScript {
 const runs = new Map<string, RunningScript>();
 let runCounter = 0;
 
-function parseScriptTags(content: string, filename: string): Omit<ScriptMeta, "path" | "lines" | "modified" | "sources" | "hasArgs"> {
+function parseScriptTags(content: string, filename: string): Omit<ScriptMeta, "path" | "lines" | "modified" | "sources" | "hasArgs" | "repo"> {
   const lines = content.split("\n").slice(0, 20);
   const tags: Record<string, string> = {};
   for (const line of lines) {
