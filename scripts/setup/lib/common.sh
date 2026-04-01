@@ -19,6 +19,34 @@ success() { echo -e "${GREEN}[OK]${NC}    $(date +%H:%M:%S)  $*"; }
 
 die() { error "$@"; exit 1; }
 
+# ── IPv6 Helpers ──────────────────────────────────────
+# scp and ssh-keygen -R need brackets around IPv6 addresses.
+# ssh does NOT want brackets. These helpers handle the difference.
+
+is_ipv6() {
+  [[ "$1" == *:* ]]
+}
+
+# For scp destinations: [::1] syntax
+scp_host() {
+  local user="$1" host="$2"
+  if is_ipv6 "${host}"; then
+    echo "${user}@[${host}]"
+  else
+    echo "${user}@${host}"
+  fi
+}
+
+# For ssh-keygen -R: needs brackets for IPv6
+keygen_host() {
+  local host="$1"
+  if is_ipv6 "${host}"; then
+    echo "[${host}]"
+  else
+    echo "${host}"
+  fi
+}
+
 # ── State Tracking ─────────────────────────────────────
 # Phases are tracked in /opt/nest/.bootstrap-state on the server.
 # Each completed phase is one line in the file.
@@ -62,7 +90,7 @@ run_remote_sudo() {
 
 upload_file() {
   local src="$1" dest="$2"
-  scp "${SSH_OPTS[@]}" "${src}" "${SSH_USER}@${SERVER_IP}:${dest}"
+  scp "${SSH_OPTS[@]}" "${src}" "$(scp_host "${SSH_USER}" "${SERVER_IP}"):${dest}"
 }
 
 run_remote_script() {
