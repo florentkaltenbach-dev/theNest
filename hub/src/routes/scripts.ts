@@ -1,11 +1,27 @@
 import { FastifyInstance } from "fastify";
 import { NodeSSH } from "node-ssh";
 import { readdir, readFile, stat } from "fs/promises";
-import { join, dirname } from "path";
+import { join, dirname, basename, resolve } from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SCRIPTS_DIR = join(__dirname, "../../../scripts");
+const REPOS_DIR = process.env.NEST_REPOS_DIR || "/opt/repos";
+
+interface ScriptMeta {
+  path: string;
+  name: string;
+  description: string | null;
+  author: string | null;
+  target: "remote" | "local" | "any";
+  args: string | null;
+  dangerous: boolean;
+  lines: number;
+  modified: string;
+  sources: string[];
+  hasArgs: boolean;
+  repo: string | null;
+}
 
 interface RunningScript {
   id: string;
@@ -21,8 +37,61 @@ interface RunningScript {
 const runs = new Map<string, RunningScript>();
 let runCounter = 0;
 
-async function listScriptsRecursive(dir: string, prefix = ""): Promise<{ path: string; name: string }[]> {
-  const result: { path: string; name: string }[] = [];
+function parseScriptTags(content: string, filename: string): Omit<ScriptMeta, "path" | "lines" | "modified" | "sources" | "hasArgs"> {
+  const lines = content.split("\n").slice(0, 20);
+  const tags: Record<string, string> = {};
+  for (const line of lines) {
+    const m = line.match(/^#\s*@(\w+)\s+(.+)$/);
+    if (m) tags[m[1]] = m[2].trim();
+  }
+  return {
+    name: tags.name || basename(filename, ".sh"),
+    description: tags.description || null,
+    author: tags.author || null,
+    target: (tags.target as "remote" | "local" | "any") || "any",
+    args: tags.args || null,
+    dangerous: tags.dangerous === "true",
+  };
+}
+
+function findSources(content: string): string[] {
+  const sources: string[] = [];
+  const re = /(?:source|\.)\s+"([^"]+)"/g;
+  let m;
+  while ((m = re.exec(content)) !== null) {
+    // Extract just the relative filename portion
+    let src = m[1];
+    // Strip variable prefixes like ${SCRIPT_DIR}/
+    src = src.replace(/\$\{[^}]+\}\//g, "").replace(/\$[A-Za-z_]+\//g, "");
+    if (src) sources.push(src);
+  }
+  return sources;
+}
+
+function hasPositionalArgs(content: string): boolean {
+  return /\$[1-9]|\$\{[1-9]/.test(content);
+}
+
+async function enrichScript(dir: string, relPath: string, repo: string | null = null): Promise<ScriptMeta> {
+  const fullPath = join(dir, relPath);
+  const [content, fstat] = await Promise.all([
+    readFile(fullPath, "utf-8"),
+    stat(fullPath),
+  ]);
+  const tags = parseScriptTags(content, basename(relPath));
+  return {
+    path: relPath,
+    ...tags,
+    lines: content.split("\n").length,
+    modified: fstat.mtime.toISOString(),
+    sources: findSources(content),
+    hasArgs: hasPositionalArgs(content),
+    repo,
+  };
+}
+
+async function listScriptsRecursive(dir: string, prefix = ""): Promise<string[]> {
+  const result: string[] = [];
   try {
     const entries = await readdir(dir, { withFileTypes: true });
     for (const entry of entries) {
@@ -31,7 +100,7 @@ async function listScriptsRecursive(dir: string, prefix = ""): Promise<{ path: s
       if (entry.isDirectory()) {
         result.push(...await listScriptsRecursive(fullPath, relPath));
       } else if (entry.name.endsWith(".sh")) {
-        result.push({ path: relPath, name: entry.name });
+        result.push(relPath);
       }
     }
   } catch {}
@@ -39,32 +108,69 @@ async function listScriptsRecursive(dir: string, prefix = ""): Promise<{ path: s
 }
 
 export async function scriptRoutes(app: FastifyInstance) {
-  // List available scripts
+  // List available scripts with enriched metadata
   app.get("/scripts", async () => {
-    const scripts = await listScriptsRecursive(SCRIPTS_DIR);
-    return { scripts };
+    // Built-in scripts
+    const builtinPaths = await listScriptsRecursive(SCRIPTS_DIR);
+    const builtinScripts = await Promise.all(
+      builtinPaths.map((p) => enrichScript(SCRIPTS_DIR, p, null))
+    );
+
+    // Repo scripts from /opt/repos/*/
+    const repoScripts: ScriptMeta[] = [];
+    try {
+      const repos = await readdir(REPOS_DIR, { withFileTypes: true });
+      for (const repo of repos) {
+        if (!repo.isDirectory()) continue;
+        const repoDir = join(REPOS_DIR, repo.name);
+        const paths = await listScriptsRecursive(repoDir);
+        const scripts = await Promise.all(
+          paths.map((p) => enrichScript(repoDir, p, repo.name))
+        );
+        repoScripts.push(...scripts);
+      }
+    } catch {
+      // /opt/repos/ doesn't exist yet — that's fine
+    }
+
+    return { scripts: [...builtinScripts, ...repoScripts] };
   });
 
   // Read script content
-  app.get<{ Params: { path: string } }>("/scripts/view/*", async (req, reply) => {
+  app.get<{ Params: { path: string }; Querystring: { repo?: string } }>("/scripts/view/*", async (req, reply) => {
     const scriptPath = (req.params as any)["*"];
-    const fullPath = join(SCRIPTS_DIR, scriptPath);
+    const repo = req.query.repo || null;
+    if (!scriptPath || scriptPath.includes("..")) {
+      return reply.code(400).send({ error: "Invalid path" });
+    }
+    if (repo && !/^[a-zA-Z0-9_-]+$/.test(repo)) {
+      return reply.code(400).send({ error: "Invalid repo name" });
+    }
+    const baseDir = repo ? join(REPOS_DIR, repo) : SCRIPTS_DIR;
+    const fullPath = resolve(baseDir, scriptPath);
+    if (!fullPath.startsWith(resolve(baseDir))) {
+      return reply.code(400).send({ error: "Invalid path" });
+    }
     try {
       const content = await readFile(fullPath, "utf-8");
-      return { path: scriptPath, content };
+      return { path: scriptPath, content, repo };
     } catch {
       return reply.code(404).send({ error: "Script not found" });
     }
   });
 
   // Run a script on a server
-  app.post<{ Body: { script: string; serverIp: string } }>("/scripts/run", async (req, reply) => {
-    const { script, serverIp } = req.body;
+  app.post<{ Body: { script: string; serverIp: string; repo?: string } }>("/scripts/run", async (req, reply) => {
+    const { script, serverIp, repo } = req.body;
     if (!script || !serverIp) {
       return reply.code(400).send({ error: "script and serverIp required" });
     }
+    if (repo && !/^[a-zA-Z0-9_-]+$/.test(repo)) {
+      return reply.code(400).send({ error: "Invalid repo name" });
+    }
 
-    const scriptContent = await readFile(join(SCRIPTS_DIR, script), "utf-8").catch(() => null);
+    const baseDir = repo ? join(REPOS_DIR, repo) : SCRIPTS_DIR;
+    const scriptContent = await readFile(join(baseDir, script), "utf-8").catch(() => null);
     if (!scriptContent) {
       return reply.code(404).send({ error: "Script not found" });
     }

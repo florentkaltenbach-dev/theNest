@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { View, Text, ScrollView, ActivityIndicator, Pressable } from "react-native";
 import { router } from "expo-router";
-import { getProjects, discoverProjects } from "../services/api";
+import { getProjects, discoverProjects, cloneRepo } from "../services/api";
 
 const statusStyles: Record<string, { bg: string; color: string }> = {
   active: { bg: "#22c55e20", color: "#22c55e" },
@@ -15,6 +15,7 @@ export default function ProjectsScreen() {
   const [loading, setLoading] = useState(true);
   const [discovering, setDiscovering] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cloning, setCloning] = useState<string | null>(null);
 
   const fetchProjects = () => {
     setLoading(true);
@@ -46,6 +47,25 @@ export default function ProjectsScreen() {
       .finally(() => {
         setDiscovering(false);
       });
+  };
+
+  const handleClone = async (project: any) => {
+    const url = project.github?.url
+      ? project.github.url + ".git"
+      : `https://github.com/${project.github?.fullName}.git`;
+    setCloning(project.name);
+    try {
+      await cloneRepo(url, project.name);
+      setError(null);
+      // Refresh after a short delay for agent to finish
+      setTimeout(() => {
+        handleDiscover();
+        setCloning(null);
+      }, 3000);
+    } catch (err: any) {
+      setError(err.message || "Clone failed");
+      setCloning(null);
+    }
   };
 
   return (
@@ -135,10 +155,30 @@ export default function ProjectsScreen() {
                   </View>
                 </View>
 
-                {project.repoFullName && (
+                {project.github?.fullName && (
                   <Text style={{ color: "#6b7280", fontSize: 13, marginBottom: 10 }}>
-                    {project.repoFullName}
+                    {project.github.fullName}
                   </Text>
+                )}
+
+                {project.github && project.instances.length === 0 && (
+                  <Pressable
+                    onPress={() => handleClone(project)}
+                    disabled={cloning === project.name}
+                    style={{
+                      paddingVertical: 6,
+                      paddingHorizontal: 14,
+                      backgroundColor: cloning === project.name ? "#333" : "#7eb8ff",
+                      borderRadius: 6,
+                      marginBottom: 10,
+                      alignSelf: "flex-start",
+                      opacity: cloning === project.name ? 0.6 : 1,
+                    }}
+                  >
+                    <Text style={{ color: cloning === project.name ? "#999" : "#1a1a2e", fontSize: 13, fontWeight: "600" }}>
+                      {cloning === project.name ? "Cloning..." : "Clone to Server"}
+                    </Text>
+                  </Pressable>
                 )}
 
                 {project.instances && project.instances.length > 0 && (

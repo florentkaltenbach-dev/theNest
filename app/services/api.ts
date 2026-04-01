@@ -97,6 +97,16 @@ export async function getHealth() {
 export interface Script {
   path: string;
   name: string;
+  description: string | null;
+  author: string | null;
+  target: "remote" | "local" | "any";
+  args: string | null;
+  dangerous: boolean;
+  lines: number;
+  modified: string;
+  sources: string[];
+  hasArgs: boolean;
+  repo: string | null;
 }
 
 export async function getScripts(): Promise<Script[]> {
@@ -104,10 +114,15 @@ export async function getScripts(): Promise<Script[]> {
   return data.scripts;
 }
 
-export async function runScript(script: string, serverIp: string): Promise<{ id: string }> {
+export async function getScriptContent(path: string, repo?: string | null) {
+  const qs = repo ? `?repo=${encodeURIComponent(repo)}` : "";
+  return fetchAPI<{ path: string; content: string; repo: string | null }>(`/scripts/view/${path}${qs}`);
+}
+
+export async function runScript(script: string, serverIp: string, repo?: string | null): Promise<{ id: string }> {
   return fetchAPI("/scripts/run", {
     method: "POST",
-    body: JSON.stringify({ script, serverIp }),
+    body: JSON.stringify({ script, serverIp, repo: repo || undefined }),
   });
 }
 
@@ -237,6 +252,15 @@ export async function deleteToken(id: string) {
   });
 }
 
+// Token Limits
+export async function getTokenLimits() {
+  return fetchAPI<any>("/tokens/limits");
+}
+
+export async function getTokenWaste() {
+  return fetchAPI<any>("/tokens/waste");
+}
+
 // Projects
 export async function getProjects() {
   return fetchAPI<{ projects: any[] }>("/projects");
@@ -245,6 +269,13 @@ export async function getProjects() {
 export async function discoverProjects() {
   return fetchAPI<{ status: string; agentsSent: number }>("/projects/discover", {
     method: "POST",
+  });
+}
+
+export async function cloneRepo(url: string, name: string, hostname?: string) {
+  return fetchAPI<{ status: string; requestId: string; hostname: string }>("/projects/clone", {
+    method: "POST",
+    body: JSON.stringify({ url, name, hostname }),
   });
 }
 

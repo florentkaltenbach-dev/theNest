@@ -10,6 +10,7 @@ import {
 import {
   getScripts,
   getServers,
+  getScriptContent,
   runScript,
   getScriptRun,
   Script,
@@ -17,16 +18,75 @@ import {
   ScriptRun,
 } from "../../services/api";
 
-function ScriptItem({ script, onRun }: { script: Script; onRun: (path: string) => void }) {
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
+function Badge({ label, color }: { label: string; color: string }) {
   return (
-    <Pressable style={styles.scriptItem} onPress={() => onRun(script.path)}>
-      <Text style={styles.scriptIcon}>📄</Text>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.scriptName}>{script.name}</Text>
-        <Text style={styles.scriptPath}>{script.path}</Text>
+    <View style={[styles.badge, { backgroundColor: color }]}>
+      <Text style={styles.badgeText}>{label}</Text>
+    </View>
+  );
+}
+
+function ScriptCard({
+  script,
+  onRun,
+  onView,
+}: {
+  script: Script;
+  onRun: (path: string, repo: string | null) => void;
+  onView: (path: string, repo: string | null) => void;
+}) {
+  const targetColors: Record<string, string> = {
+    remote: "#3b82f6",
+    local: "#8b5cf6",
+    any: "#6b7280",
+  };
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardTitle}>{script.name}</Text>
+        <View style={styles.badgeRow}>
+          {script.repo && <Badge label={script.repo} color="#7c3aed" />}
+          {script.dangerous && <Badge label="dangerous" color="#ef4444" />}
+          <Badge label={script.target === "local" ? "library" : script.target} color={targetColors[script.target] || "#6b7280"} />
+        </View>
       </View>
-      <Text style={styles.runArrow}>▶</Text>
-    </Pressable>
+      <Text style={styles.cardPath}>{script.path}</Text>
+      {script.description && (
+        <Text style={styles.cardDesc}>{script.description}</Text>
+      )}
+      <View style={styles.cardMeta}>
+        <Text style={styles.metaText}>{script.lines} lines</Text>
+        <Text style={styles.metaDot}>{" \u00b7 "}</Text>
+        <Text style={styles.metaText}>{timeAgo(script.modified)}</Text>
+      </View>
+      {script.args && (
+        <Text style={styles.metaLine}>Args: {script.args}</Text>
+      )}
+      {script.sources.length > 0 && (
+        <Text style={styles.metaLine}>Sources: {script.sources.join(", ")}</Text>
+      )}
+      <View style={styles.cardActions}>
+        <Pressable style={styles.btnView} onPress={() => onView(script.path, script.repo)}>
+          <Text style={styles.btnViewText}>View</Text>
+        </Pressable>
+        {script.target !== "local" && (
+          <Pressable style={styles.btnRun} onPress={() => onRun(script.path, script.repo)}>
+            <Text style={styles.btnRunText}>Run</Text>
+          </Pressable>
+        )}
+      </View>
+    </View>
   );
 }
 
@@ -36,7 +96,9 @@ export default function ScriptsScreen() {
   const [loading, setLoading] = useState(true);
   const [activeRun, setActiveRun] = useState<ScriptRun | null>(null);
   const [selectedServer, setSelectedServer] = useState<Server | null>(null);
-  const [showServerPicker, setShowServerPicker] = useState<string | null>(null);
+  const [showServerPicker, setShowServerPicker] = useState<{ path: string; repo: string | null } | null>(null);
+  const [viewContent, setViewContent] = useState<{ path: string; content: string; repo?: string | null } | null>(null);
+  const [viewLoading, setViewLoading] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const scrollRef = useRef<ScrollView>(null);
 
@@ -50,25 +112,37 @@ export default function ScriptsScreen() {
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, []);
 
-  const handleRun = async (scriptPath: string) => {
+  const handleRun = async (scriptPath: string, repo: string | null = null) => {
     if (!selectedServer) {
-      setShowServerPicker(scriptPath);
+      setShowServerPicker({ path: scriptPath, repo });
       return;
     }
     if (servers.length > 1 && !showServerPicker) {
-      setShowServerPicker(scriptPath);
+      setShowServerPicker({ path: scriptPath, repo });
       return;
     }
-    await executeRun(scriptPath, selectedServer.ip);
+    await executeRun(scriptPath, selectedServer.ip, repo);
   };
 
-  const executeRun = async (scriptPath: string, serverIp: string) => {
-    setShowServerPicker(null);
+  const handleView = async (scriptPath: string, repo: string | null = null) => {
+    setViewLoading(true);
     try {
-      const { id } = await runScript(scriptPath, serverIp);
+      const data = await getScriptContent(scriptPath, repo);
+      setViewContent(data);
+    } catch (e: any) {
+      setViewContent({ path: scriptPath, content: `Error loading script: ${e.message}`, repo });
+    } finally {
+      setViewLoading(false);
+    }
+  };
+
+  const executeRun = async (scriptPath: string, serverIp: string, repo: string | null = null) => {
+    setShowServerPicker(null);
+    setViewContent(null);
+    try {
+      const { id } = await runScript(scriptPath, serverIp, repo);
       setActiveRun({ id, script: scriptPath, server: serverIp, status: "running", output: [], outputOffset: 0, totalLines: 0, startedAt: Date.now() });
 
-      // Poll for output
       let offset = 0;
       pollRef.current = setInterval(async () => {
         try {
@@ -93,7 +167,31 @@ export default function ScriptsScreen() {
     return <View style={styles.center}><ActivityIndicator size="large" color="#1a1a2e" /></View>;
   }
 
-  // Show output view if a run is active
+  // Script content viewer
+  if (viewContent) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.outputHeader}>
+          <Pressable onPress={() => setViewContent(null)}>
+            <Text style={styles.backText}>← Back</Text>
+          </Pressable>
+          <Text style={styles.outputTitle} numberOfLines={1}>{viewContent.path}</Text>
+          <Pressable style={styles.btnRun} onPress={() => { setViewContent(null); handleRun(viewContent.path, viewContent.repo); }}>
+            <Text style={styles.btnRunText}>Run</Text>
+          </Pressable>
+        </View>
+        {viewLoading ? (
+          <ActivityIndicator size="large" color="#1a1a2e" style={{ marginTop: 32 }} />
+        ) : (
+          <ScrollView style={styles.terminal}>
+            <Text style={styles.termLine} selectable>{viewContent.content}</Text>
+          </ScrollView>
+        )}
+      </View>
+    );
+  }
+
+  // Run output view
   if (activeRun) {
     return (
       <View style={styles.container}>
@@ -119,7 +217,7 @@ export default function ScriptsScreen() {
             ]}>{line}</Text>
           ))}
           {activeRun.status === "running" && (
-            <Text style={styles.termCursor}>▊</Text>
+            <Text style={styles.termCursor}>{"\u2588"}</Text>
           )}
         </ScrollView>
       </View>
@@ -134,7 +232,7 @@ export default function ScriptsScreen() {
         <View style={styles.pickerSection}>
           <Text style={styles.pickerTitle}>Run on which server?</Text>
           {servers.map((srv) => (
-            <Pressable key={srv.id} style={styles.pickerItem} onPress={() => executeRun(showServerPicker, srv.ip)}>
+            <Pressable key={srv.id} style={styles.pickerItem} onPress={() => executeRun(showServerPicker.path, srv.ip, showServerPicker.repo)}>
               <Text style={styles.pickerName}>{srv.name}</Text>
               <Text style={styles.pickerIp}>{srv.ip}</Text>
             </Pressable>
@@ -150,7 +248,7 @@ export default function ScriptsScreen() {
       ) : (
         <View style={styles.section}>
           {scripts.map((s) => (
-            <ScriptItem key={s.path} script={s} onRun={handleRun} />
+            <ScriptCard key={s.path} script={s} onRun={handleRun} onView={handleView} />
           ))}
         </View>
       )}
@@ -163,19 +261,33 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#f5f5f5" },
   heading: { fontSize: 24, fontWeight: "700", color: "#1a1a2e", marginBottom: 16 },
   empty: { fontSize: 14, color: "#999", textAlign: "center", marginTop: 32 },
-  section: { backgroundColor: "#fff", borderRadius: 12, overflow: "hidden" },
-  scriptItem: { flexDirection: "row", alignItems: "center", padding: 14, borderBottomWidth: 1, borderBottomColor: "#f0f0f0", gap: 10 },
-  scriptIcon: { fontSize: 18 },
-  scriptName: { fontSize: 14, fontWeight: "500", color: "#1a1a2e" },
-  scriptPath: { fontSize: 11, color: "#999" },
-  runArrow: { fontSize: 12, color: "#22c55e" },
+  section: { gap: 12 },
+  // Card
+  card: { backgroundColor: "#fff", borderRadius: 12, padding: 14, gap: 6 },
+  cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  cardTitle: { fontSize: 15, fontWeight: "600", color: "#1a1a2e", flex: 1 },
+  cardPath: { fontSize: 11, color: "#999" },
+  cardDesc: { fontSize: 13, color: "#555", marginTop: 2 },
+  cardMeta: { flexDirection: "row", alignItems: "center", marginTop: 2 },
+  metaText: { fontSize: 11, color: "#999" },
+  metaDot: { fontSize: 11, color: "#ccc" },
+  metaLine: { fontSize: 11, color: "#999" },
+  badgeRow: { flexDirection: "row", gap: 4 },
+  badge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  badgeText: { fontSize: 10, color: "#fff", fontWeight: "600", textTransform: "uppercase" },
+  cardActions: { flexDirection: "row", gap: 8, marginTop: 6 },
+  btnView: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 6, backgroundColor: "#f0f0f0" },
+  btnViewText: { fontSize: 13, fontWeight: "500", color: "#1a1a2e" },
+  btnRun: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 6, backgroundColor: "#22c55e" },
+  btnRunText: { fontSize: 13, fontWeight: "600", color: "#fff" },
+  // Pickers
   pickerSection: { backgroundColor: "#fff", borderRadius: 12, padding: 16, marginBottom: 16 },
   pickerTitle: { fontSize: 14, fontWeight: "600", color: "#1a1a2e", marginBottom: 12 },
   pickerItem: { flexDirection: "row", justifyContent: "space-between", padding: 12, backgroundColor: "#f8f9fa", borderRadius: 8, marginBottom: 8 },
   pickerName: { fontSize: 14, fontWeight: "500", color: "#1a1a2e" },
   pickerIp: { fontSize: 13, color: "#999" },
   pickerCancel: { alignItems: "center", paddingTop: 8 },
-  // Output view
+  // Output / viewer
   outputHeader: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 12 },
   backText: { fontSize: 15, color: "#1a1a2e", fontWeight: "500" },
   outputTitle: { flex: 1, fontSize: 14, fontWeight: "500", color: "#1a1a2e" },

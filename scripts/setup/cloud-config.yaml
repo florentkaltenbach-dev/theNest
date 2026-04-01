@@ -1,135 +1,28 @@
 #cloud-config
-# ── theNest Cloud-Config ──────────────────────────────
-# Passed as user_data when creating a Hetzner server via API.
-# Handles: user creation, hardening, packages, Docker, Node.js, Claude Code.
-# After this completes, run bootstrap.sh from your laptop for repo + service setup.
-
+# Minimal: create claude user + DNS64 for IPv6-only networking.
+# Everything else is handled by bootstrap.sh.
 users:
   - name: claude
-    groups: sudo, docker
-    shell: /bin/bash
+    groups: users, admin, sudo
     sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
     ssh_authorized_keys:
       - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIM531k1GDcpriv5YmH7x8yNN8m/VCMmMxZqAmHe8t7hR theNest
 
-package_update: true
-package_upgrade: true
-
-packages:
-  - build-essential
-  - jq
-  - unzip
-  - fail2ban
-  - python3-pip
-  - python3-venv
-  - ufw
-
+# DNS64 via nat64.net — required for IPv6-only servers to reach IPv4 hosts (GitHub, Docker Hub, npm)
 write_files:
-  # ── fail2ban config ─────────────────────────────────
-  - path: /etc/fail2ban/jail.local
+  - path: /etc/netplan/99-dns64.yaml
     content: |
-      [sshd]
-      enabled  = true
-      port     = ssh
-      filter   = sshd
-      maxretry = 5
-      bantime  = 3600
-      findtime = 600
-
-  # ── sysctl hardening ───────────────────────────────
-  - path: /etc/sysctl.d/99-nest-hardening.conf
-    content: |
-      net.ipv4.conf.all.rp_filter = 1
-      net.ipv4.conf.default.rp_filter = 1
-      net.ipv4.tcp_syncookies = 1
-      net.ipv4.conf.all.accept_redirects = 0
-      net.ipv4.conf.default.accept_redirects = 0
-      net.ipv4.conf.all.send_redirects = 0
-      net.ipv4.conf.default.send_redirects = 0
-      net.ipv4.icmp_echo_ignore_broadcasts = 1
-      net.ipv6.conf.all.accept_redirects = 0
-      net.ipv6.conf.default.accept_redirects = 0
-      kernel.randomize_va_space = 2
-      vm.swappiness = 10
-
-  # ── Unattended upgrades config ─────────────────────
-  - path: /etc/apt/apt.conf.d/50unattended-upgrades
-    content: |
-      Unattended-Upgrade::Allowed-Origins {
-          "${distro_id}:${distro_codename}-security";
-          "${distro_id}ESMApps:${distro_codename}-apps-security";
-      };
-      Unattended-Upgrade::Automatic-Reboot "true";
-      Unattended-Upgrade::Automatic-Reboot-Time "03:00";
+      network:
+        version: 2
+        ethernets:
+          eth0:
+            nameservers:
+              addresses:
+                - 2a01:4f9:c010:3f02::1
+                - 2a00:1098:2b::1
+                - 2a01:4f8:c2c:123f::1
 
 runcmd:
-  # ── SSH hardening ───────────────────────────────────
-  - sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
-  - sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config
-  - sed -i 's/^#\?MaxAuthTries.*/MaxAuthTries 3/' /etc/ssh/sshd_config
-  - sed -i 's/^#\?MaxSessions.*/MaxSessions 5/' /etc/ssh/sshd_config
-  - grep -q "^PubkeyAuthentication" /etc/ssh/sshd_config && sed -i 's/^PubkeyAuthentication.*/PubkeyAuthentication yes/' /etc/ssh/sshd_config || echo "PubkeyAuthentication yes" >> /etc/ssh/sshd_config
-  - systemctl restart ssh
-
-  # ── UFW firewall ────────────────────────────────────
-  - ufw default deny incoming
-  - ufw default allow outgoing
-  - ufw allow 22/tcp
-  - ufw allow 80/tcp
-  - ufw allow 443/tcp
-  - echo "y" | ufw enable
-
-  # ── fail2ban ────────────────────────────────────────
-  - systemctl enable fail2ban
-  - systemctl restart fail2ban
-
-  # ── sysctl ──────────────────────────────────────────
-  - sysctl --system > /dev/null 2>&1
-
-  # ── Swap (2GB) ──────────────────────────────────────
-  - |
-    if [ ! -f /swapfile ]; then
-      fallocate -l 2G /swapfile
-      chmod 600 /swapfile
-      mkswap /swapfile > /dev/null
-      swapon /swapfile
-      echo '/swapfile none swap sw 0 0' >> /etc/fstab
-    fi
-
-  # ── Node.js 22 LTS (NodeSource) ────────────────────
-  - curl -fsSL https://deb.nodesource.com/setup_22.x | bash - > /dev/null 2>&1
-  - apt-get install -y -qq nodejs > /dev/null
-
-  # ── Docker CE + Compose ─────────────────────────────
-  - install -m 0755 -d /etc/apt/keyrings
-  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-  - chmod a+r /etc/apt/keyrings/docker.gpg
-  - echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list
-  - apt-get update -qq
-  - apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin > /dev/null
-
-  # ── GitHub CLI ──────────────────────────────────────
-  - curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg 2>/dev/null
-  - echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list
-  - apt-get update -qq
-  - apt-get install -y -qq gh > /dev/null
-
-  # ── Fix home dir ownership (cloud-init creates files as root) ──
+  - netplan apply
   - chown -R claude:claude /home/claude
-
-  # ── Claude Code native install (as claude user, NOT root) ──
-  - su - claude -c 'curl -fsSL https://claude.ai/install.sh | bash'
-
-  # ── Fix home dir ownership again (installer may create files as root) ──
-  - chown -R claude:claude /home/claude
-
-  # ── Create /opt/nest ────────────────────────────────
-  - mkdir -p /opt/nest
-  - chown claude:claude /opt/nest
-
-  # ── Write cloud-init completion marker ──────────────
-  - touch /opt/nest/.cloud-init-done
-  - chown claude:claude /opt/nest/.cloud-init-done
-
-  # ── Reboot ──────────────────────────────────────────
-  - reboot

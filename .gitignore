@@ -3,5 +3,8 @@ config.env
 .deploy-key.pub
 .bootstrap-state
 *.log
+*.png
 CLAUDE.md
+ROADMAP.md
 node_modules/
+.playwright-mcp/

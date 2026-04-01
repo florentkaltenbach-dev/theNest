@@ -165,6 +165,31 @@ export async function projectRoutes(app: FastifyInstance) {
     return { projects };
   });
 
+  // Clone a repo to /opt/repos/<name>/ on a server
+  app.post<{ Body: { url: string; name: string; hostname?: string } }>("/projects/clone", async (req, reply) => {
+    const { role } = req.user as any;
+    if (role !== "admin") return reply.code(403).send({ error: "Admin only" });
+
+    const { url, name, hostname } = req.body;
+    if (!url || !name) return reply.code(400).send({ error: "url and name required" });
+    if (!/^[a-zA-Z0-9_-]+$/.test(name)) return reply.code(400).send({ error: "Invalid repo name" });
+
+    const agents = getAgentData() as any[];
+    const targetHost = hostname || agents[0]?.hostname;
+    if (!targetHost) return reply.code(503).send({ error: "No agents connected" });
+
+    const requestId = `clone-${Date.now()}`;
+    const sent = sendToAgent(targetHost, {
+      command: "clone_repo",
+      url,
+      name,
+      requestId,
+    });
+    if (!sent) return reply.code(503).send({ error: "Agent not reachable" });
+
+    return { status: "cloning", requestId, hostname: targetHost };
+  });
+
   // Register a local instance (called by external Claude Code sessions)
   app.post<{ Body: RegisteredInstance }>("/projects/register", async (req, reply) => {
     const { role } = req.user as any;
