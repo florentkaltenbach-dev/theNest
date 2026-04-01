@@ -501,21 +501,36 @@ if ! phase_done "setup-claude-code"; then
   # Upload config.env to server
   upload_file "${CONFIG_FILE}" "/tmp/nest-config.env"
 
-  ssh "${SSH_OPTS[@]}" "claude@${SERVER_IP}" "sudo bash -s" <<'CLAUDE_EOF'
+  # ── Root tasks: place config.env ─────────────────────
+  ssh "${SSH_OPTS[@]}" "claude@${SERVER_IP}" "sudo bash -s" <<'ROOT_EOF'
 set -Eeuo pipefail
-
-# ── Install Claude Code ────────────────────────────────
-npm install -g @anthropic-ai/claude-code
-
-# ── Place config.env ───────────────────────────────────
 mv /tmp/nest-config.env /opt/nest/config.env
 chown claude:claude /opt/nest/config.env
 chmod 0600 /opt/nest/config.env
+ROOT_EOF
 
+  # ── Claude user tasks: install Claude Code ───────────
+  ssh "${SSH_OPTS[@]}" "claude@${SERVER_IP}" "bash -s" <<'CLAUDE_EOF'
+set -Eeuo pipefail
+
+# Set up user-owned npm global prefix
+mkdir -p ~/.npm-global
+npm config set prefix ~/.npm-global
+
+# Ensure it's on PATH for this session
+export PATH="$HOME/.npm-global/bin:$PATH"
+
+# Install Claude Code owned by claude user
+npm install -g @anthropic-ai/claude-code
 CLAUDE_EOF
 
-  # Source config.env in bashrc (as claude user, not sudo)
+  # Source config.env and npm-global PATH in bashrc (as claude user, not sudo)
   ssh "${SSH_OPTS[@]}" "claude@${SERVER_IP}" "bash -s" <<'BASHRC_EOF'
+# Add npm-global to PATH if not already present
+if ! grep -q "npm-global/bin" ~/.bashrc 2>/dev/null; then
+  echo 'export PATH="$HOME/.npm-global/bin:$PATH"' >> ~/.bashrc
+fi
+
 # Add env sourcing to .bashrc if not already present
 if ! grep -q "nest/config.env" ~/.bashrc 2>/dev/null; then
   cat >> ~/.bashrc <<'INNER'
@@ -561,7 +576,8 @@ User=claude
 Group=claude
 WorkingDirectory=/opt/nest
 EnvironmentFile=/opt/nest/config.env
-ExecStart=/usr/bin/claude --dangerously-skip-permissions
+Environment=PATH=/home/claude/.npm-global/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/home/claude/.npm-global/bin/claude --dangerously-skip-permissions
 Restart=on-failure
 RestartSec=10
 
