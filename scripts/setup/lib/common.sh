@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# @name        Common Utilities
+# @name        📦 Common Utilities
 # @description Shared logging and IPv6 helpers for bootstrap scripts
 # @target      local
 # ── theNest Bootstrap: Shared Utilities ────────────────

@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1a1a2e">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon-192.png" sizes="192x192">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<title>Nest — Servers</title>
+<style>
+:root {
+  --bg: #f5f5f5;
+  --card: #ffffff;
+  --ink: #1a1a2e;
+  --muted: #6b7280;
+  --line: #e5e7eb;
+  --line-2: #f0f0f0;
+  --accent: #1a1a2e;
+  --blue: #7eb8ff;
+  --green: #22c55e;
+  --amber: #eab308;
+  --red: #ef4444;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 14px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.topbar {
+  background: var(--accent);
+  color: #fff;
+  padding: 12px 16px;
+  border-bottom: 1px solid #2a2a4a;
+}
+.topbar-row {
+  max-width: 1120px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.brand {
+  font-size: 20px;
+  font-weight: 800;
+}
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.nav a, .nav button {
+  border: 0;
+  background: transparent;
+  color: #8b8fa3;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+.nav a.active { color: #fff; border-bottom: 2px solid var(--blue); }
+.nav a:hover, .nav button:hover { color: #d7d9e0; }
+.page {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 16px;
+}
+.heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.heading h1 {
+  margin: 0;
+  font-size: 24px;
+}
+.actions { display: flex; gap: 8px; }
+.btn {
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.btn.primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 50vh;
+  gap: 12px;
+  text-align: center;
+}
+.spinner {
+  width: 32px; height: 32px;
+  border: 3px solid var(--line);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.error { color: var(--red); }
+.server-list { display: grid; gap: 12px; }
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px;
+}
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  flex: none;
+}
+.title-wrap { flex: 1; min-width: 0; }
+.title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+}
+.sub {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.type {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+.stat {
+  background: #f8f9fa;
+  border-radius: 10px;
+  padding: 12px;
+}
+.stat-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+.stat-label {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: .4px;
+}
+.stat-value {
+  font-size: 16px;
+  font-weight: 800;
+}
+.bars {
+  display: flex;
+  align-items: end;
+  gap: 2px;
+  height: 42px;
+  margin-top: 10px;
+}
+.bar-slot {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: end;
+}
+.bar {
+  width: 100%;
+  min-height: 2px;
+  border-radius: 2px 2px 0 0;
+}
+.detail {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 8px;
+}
+.footer {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-2);
+}
+@media (max-width: 720px) {
+  .topbar-row, .heading { align-items: flex-start; flex-direction: column; }
+  .nav { width: 100%; }
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-row">
+    <div class="brand">Nest</div>
+    <nav class="nav">
+      <a href="/" class="active">Servers</a>
+      <a href="/tokens">Tokens</a>
+      <a href="/claw">Claw</a>
+      <a href="/scripts">Scripts</a>
+      <button id="logout" type="button">Logout</button>
+    </nav>
+  </div>
+</header>
+<main class="page" id="app"></main>
+<script>
+const TOKEN_KEY = "nest_token";
+const HISTORY_SIZE = 30;
+const app = document.getElementById("app");
+const historyMap = {};
+const metricsMap = {};
+let socket = null;
+
+function getToken() {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+function clearToken() {
+  localStorage.removeItem(TOKEN_KEY);
+}
+
+function ensureAuth() {
+  if (!getToken()) location.href = "/login";
+}
+
+async function api(path) {
+  const res = await fetch("/api" + path, {
+    headers: { Authorization: "Bearer " + getToken() }
+  });
+  if (res.status === 401) {
+    clearToken();
+    location.href = "/login";
+    throw new Error("Unauthorized");
+  }
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || body.detail || ("API error " + res.status));
+  return body;
+}
+
+function esc(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function barColor(percent) {
+  if (percent > 80) return "var(--red)";
+  if (percent > 60) return "var(--amber)";
+  return "var(--green)";
+}
+
+function fmtHours(seconds) {
+  const h = Math.floor((seconds || 0) / 3600);
+  const m = Math.floor(((seconds || 0) % 3600) / 60);
+  return h + "h " + m + "m";
+}
+
+function addHistory(hostname, metrics) {
+  if (!metrics) return;
+  const h = historyMap[hostname] || { cpu: [], ram: [], disk: [] };
+  h.cpu = [...h.cpu.slice(-(HISTORY_SIZE - 1)), metrics.cpu.percent];
+  h.ram = [...h.ram.slice(-(HISTORY_SIZE - 1)), metrics.memory.percent];
+  h.disk = [...h.disk.slice(-(HISTORY_SIZE - 1)), metrics.disk.percent];
+  historyMap[hostname] = h;
+}
+
+function histogram(label, current, history, detail) {
+  const bars = history && history.length ? history : [0];
+  const minVal = Math.min(...bars);
+  const maxVal = Math.max(...bars);
+  const range = maxVal - minVal;
+  const scaleMin = Math.max(0, minVal - Math.max(range * 0.3, 2));
+  const scaleMax = maxVal + Math.max(range * 0.3, 5);
+  const scaleRange = scaleMax - scaleMin || 1;
+  const graph = bars.map((val, i) => {
+    const scaled = ((val - scaleMin) / scaleRange) * 100;
+    return '<div class="bar-slot"><div class="bar" style="height:' + Math.max(scaled, 3) + '%;background:' +
+      barColor(val) + ';opacity:' + (0.5 + (i / bars.length) * 0.5) + '"></div></div>';
+  }).join("");
+  return '<div class="stat">' +
+    '<div class="stat-head"><div class="stat-label">' + esc(label) + '</div><div class="stat-value" style="color:' + barColor(current) + '">' + esc(current) + '%</div></div>' +
+    '<div class="bars">' + graph + '</div>' +
+    '<div class="detail">' + esc(detail || "") + '</div>' +
+    '</div>';
+}
+
+function render(servers) {
+  const cards = servers.map((server) => {
+    const metrics = metricsMap[server.name];
+    const history = historyMap[server.name] || { cpu: [], ram: [], disk: [] };
+    const statusColor = server.status === "running" ? "var(--green)" : server.status === "off" ? "var(--red)" : "var(--amber)";
+    const stats = metrics ? [
+      histogram("CPU", metrics.cpu.percent, history.cpu, "load " + metrics.load["1m"]),
+      histogram("RAM", metrics.memory.percent, history.ram, metrics.memory.used_mb + "MB / " + metrics.memory.total_mb + "MB"),
+      histogram("Disk", metrics.disk.percent, history.disk, metrics.disk.used_gb + "GB / " + metrics.disk.total_gb + "GB"),
+    ] : [
+      histogram("CPU", 0, [], server.cores + " cores"),
+      histogram("RAM", 0, [], server.memory + " GB"),
+      histogram("Disk", 0, [], server.disk + " GB"),
+    ];
+    const footer = metrics
+      ? '<div class="footer"><span>Load ' + esc(metrics.load["1m"]) + '</span><span>Up ' + esc(fmtHours(metrics.uptime_seconds)) + '</span></div>'
+      : "";
+    return '<section class="card">' +
+      '<div class="card-header">' +
+      '<span class="dot" style="background:' + statusColor + '"></span>' +
+      '<div class="title-wrap"><h2 class="title">' + esc(server.name) + '</h2><div class="sub">' + esc(server.ip || "no ip") + ' · ' + esc(server.location) + '</div></div>' +
+      '<div class="type">' + esc(server.type) + '</div>' +
+      '</div>' +
+      '<div class="stats">' + stats.join("") + '</div>' +
+      footer +
+      '</section>';
+  }).join("");
+
+  app.innerHTML = '<div class="heading"><h1>' + esc(servers.length) + ' Server' + (servers.length === 1 ? '' : 's') + '</h1><div class="actions"><button class="btn" id="refresh">Refresh</button></div></div>' +
+    (servers.length ? '<div class="server-list">' + cards + '</div>' : '<div class="center"><p>No servers found.</p></div>');
+
+  document.getElementById("refresh")?.addEventListener("click", load);
+}
+
+function connectWs() {
+  if (socket && socket.readyState === WebSocket.OPEN) return;
+  const proto = location.protocol === "https:" ? "wss:" : "ws:";
+  socket = new WebSocket(proto + "//" + location.host + "/ws/client");
+  socket.onmessage = (event) => {
+    try {
+      const msg = JSON.parse(event.data);
+      if (msg.type === "metrics" && msg.hostname && msg.data) {
+        metricsMap[msg.hostname] = msg.data;
+        addHistory(msg.hostname, msg.data);
+        if (window.__servers) render(window.__servers);
+      }
+      if (msg.type === "agents" && Array.isArray(msg.data)) {
+        for (const agent of msg.data) {
+          if (agent.metrics) {
+            metricsMap[agent.hostname] = agent.metrics;
+            addHistory(agent.hostname, agent.metrics);
+          }
+        }
+        if (window.__servers) render(window.__servers);
+      }
+      if (msg.type === "agent_disconnected" && msg.hostname) {
+        delete metricsMap[msg.hostname];
+        if (window.__servers) render(window.__servers);
+      }
+    } catch {}
+  };
+  socket.onclose = () => {
+    socket = null;
+    setTimeout(connectWs, 3000);
+  };
+  socket.onerror = () => socket && socket.close();
+}
+
+async function load() {
+  ensureAuth();
+  app.innerHTML = '<div class="center"><div class="spinner"></div><div>Loading servers…</div></div>';
+  try {
+    const data = await api("/servers");
+    window.__servers = data.servers || [];
+    render(window.__servers);
+  } catch (error) {
+    app.innerHTML = '<div class="center"><div class="error">' + esc(error.message || "Failed to load servers") + '</div><button class="btn primary" id="retry">Retry</button></div>';
+    document.getElementById("retry")?.addEventListener("click", load);
+  }
+}
+
+document.getElementById("logout").addEventListener("click", () => {
+  clearToken();
+  location.href = "/login";
+});
+
+ensureAuth();
+connectWs();
+load();
+</script>
+</body>
+</html>

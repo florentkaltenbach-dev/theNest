@@ -61,15 +61,15 @@ Build the measurement and automation layer before adding AI. Scripts do the heav
 
 ### Hub observability endpoints
 
-- [ ] **O5: Hub request logging** — Middleware that logs every API call (endpoint, method, status, timestamp, response time) to a JSONL file. Lightweight — no tokens.
+- [x] **O5: Hub request logging** — (2026-04-03) Append-only JSONL at `/opt/nest/data/requests.jsonl`. Every request: ts, method, path, status, ms. 5MB cap with auto-rotation.
 - [ ] **O6: `GET /api/observability/tokens`** — Serves telemetry summary JSON. Token usage by provider, waste counter, 5-min granularity.
-- [ ] **O7: `GET /api/observability/api-surface`** — Serves API surface manifest. Every component, every endpoint, every connection.
-- [ ] **O8: `GET /api/roadmap`** — Serves ROADMAP.md as raw markdown.
+- [x] **O7: API surface** — (2026-04-03) Superseded by self-knowledge API: `GET /api/nest/surface` returns all routes grouped by file. `GET /api/nest/wiring` shows external connections.
+- [x] **O8: `GET /api/roadmap`** — Already implemented in `routes/roadmap.js`.
 
 ### Client pages
 
-- [ ] **O9: Roadmap page** — `app/app/roadmap.tsx`. Renders ROADMAP.md with markdown. Accessible at `/roadmap`.
-- [ ] **O10: Observability page** — `app/app/observability.tsx`. Token counter (visual, auto-refreshes every 5 min), API surface map, waste indicator. Accessible at `/observability`.
+- [x] **O9: Roadmap page** — `hub/static/roadmap.html`. Renders ROADMAP.md from `/api/roadmap`. Accessible at `/roadmap`.
+- [ ] **O10: Observability page** — standalone HTML page. Token counter, API surface map, waste indicator. Accessible at `/observability`.
 
 ### What counts as "wasted"
 
@@ -101,7 +101,7 @@ Install OpenClaw in Docker. Authenticate with ChatGPT subscription via Codex OAu
 
 ### Hub integration
 
-- [ ] **C9: Route chat through OpenClaw** — Replace `hub/src/routes/chat.ts` keyword stub with OpenClaw WebChat proxy. Preserve existing API contract (`POST /chat/send` → `{userMessage, assistantMessage}`).
+- [ ] **C9: Route chat through OpenClaw** — Replace `hub/src/routes/chat.js` keyword stub with OpenClaw WebChat proxy. Preserve existing API contract (`POST /chat/send` → `{userMessage, assistantMessage}`).
 - [ ] **C10: Telemetry bridge** — Feed OpenClaw's `~/.openclaw/logs/telemetry.jsonl` into the observability pipeline (O2 script reads it).
 
 ---
@@ -140,8 +140,8 @@ Transform the hardcoded catalog into the pluggable schema-driven architecture fr
 
 ### Wizard renderer
 
-- [ ] **A4: Client wizard screen** — `app/appendage/add.tsx` reads the `wizard.steps` from appendage YAML and renders dynamic form fields.
-- [ ] **A5: Client appendage detail** — `app/appendage/[id].tsx` shows status, config, logs, actions.
+- [ ] **A4: Client wizard screen** — HTML page reads `wizard.steps` from appendage YAML and renders dynamic form fields.
+- [ ] **A5: Client appendage detail** — HTML page shows status, config, logs, actions.
 
 ### Agent lifecycle
 
@@ -161,9 +161,7 @@ Polish the client into the distinctive, European aesthetic described in Nest.md.
 
 ### Architecture cleanup
 
-- [ ] **U1: Zustand stores** — Extract component-local state into stores: `authStore`, `serversStore`, `metricsStore`, `settingsStore`.
-- [ ] **U2: React Query integration** — Replace manual fetch/polling with React Query for caching, deduplication, and background refresh.
-- [ ] **U3: Reusable components** — Extract repeated patterns: `Card`, `StatusDot`, `MetricBar`, `ActionButton`, `Modal`.
+- [x] **U1–U3: Framework removal** — (2026-04-03) Replaced React Native/Expo app with vanilla HTML5 pages. Replaced Fastify+TypeScript with raw node:http+JSDoc. No stores, no query library, no component framework. Vanilla JS `fetch()` + `localStorage`.
 
 ### Design
 
@@ -172,9 +170,9 @@ Polish the client into the distinctive, European aesthetic described in Nest.md.
 
 ### Features
 
-- [ ] **U6: i18n** — English + German. `expo-localization` + `i18next`. Create `app/i18n/en.json` and `app/i18n/de.json`.
-- [ ] **U7: Push notifications** — Expo Notifications for task completion, service alerts.
-- [ ] **U8: Biometric unlock** — `expo-local-authentication` for Face ID / fingerprint.
+- [ ] **U6: i18n** — English + German. Lightweight browser-side string tables.
+- [ ] **U7: Push notifications** — Web push or server-side notifications for task completion and alerts.
+- [ ] **U8: Biometric unlock** — Browser-native passkey or WebAuthn flow.
 - [ ] **U9: Native builds** — TestFlight (iOS) + internal track (Android).
 
 ---
@@ -230,4 +228,4 @@ Bring the battle-tested stoneshop/Dockbase patterns into Nest as appendages.
 
 ---
 
-*Last updated: 2026-03-25. Phase 1 complete. Preparing observability layer and OpenClaw integration.*
+*Last updated: 2026-04-03. Phase 1 complete. Refactor complete: Fastify→raw node:http, TypeScript→JSDoc, 9 deps→3, self-knowledge engine live. O5 done. Phase 2 in progress.*

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# @name        Bootstrap Server
+# @name        🚀 Bootstrap Server
 # @description Takes a fresh Hetzner Ubuntu 24.04 with claude user to full Nest setup
 # @author      florent
 # @target      remote
@@ -108,6 +108,32 @@ if ! run "command -v claude" &>/dev/null; then
 else
   info "Claude Code already installed, skipping"
 fi
+
+# ── Claude Code settings ─────────────────────────────
+info "Writing Claude Code settings..."
+run "mkdir -p ~/.claude"
+
+# Permissions go in settings.json
+run "cat > ~/.claude/settings.json" <<'PERMS'
+{
+  "skipDangerousModePermissionPrompt": true
+}
+PERMS
+
+# MCP servers go in ~/.claude.json (merged with existing config)
+run "python3 -c \"
+import json, os
+path = os.path.expanduser('~/.claude.json')
+data = json.load(open(path)) if os.path.exists(path) else {}
+data['mcpServers'] = {
+    'chrome-devtools': {
+        'command': 'npx',
+        'args': ['-y', 'chrome-devtools-mcp@latest', '--browser-url=http://127.0.0.1:9222']
+    }
+}
+json.dump(data, open(path, 'w'), indent=2)
+\""
+success "Claude Code settings written"
 
 # ══════════════════════════════════════════════════════
 # 3. HARDEN
@@ -265,6 +291,7 @@ check "fail2ban running"        "sudo systemctl is-active fail2ban"
 check "repo at /opt/nest"       "test -f /opt/nest/Nest.md"
 check "claude-code.service"     "test -f /etc/systemd/system/claude-code.service"
 check "claude-session"          "test -x /usr/local/bin/claude-session"
+check "claude settings.json"    "test -f /home/claude/.claude/settings.json"
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

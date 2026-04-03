@@ -123,7 +123,7 @@ async def handle_commands(ws):
                 elif action == "rebuild":
                     target = msg.get("target", "hub")
                     if target == "all":
-                        targets = ["hub", "app"]
+                        targets = ["hub"]
                     else:
                         targets = [target]
                     outputs = []
@@ -132,12 +132,6 @@ async def handle_commands(ws):
                             proc = subprocess.run(
                                 ["npm", "run", "build"],
                                 cwd="/opt/nest/hub",
-                                capture_output=True, text=True, timeout=120,
-                            )
-                        elif t == "app":
-                            proc = subprocess.run(
-                                ["npx", "expo", "export", "--platform", "web"],
-                                cwd="/opt/nest/app",
                                 capture_output=True, text=True, timeout=120,
                             )
                         else:
@@ -157,15 +151,13 @@ async def handle_commands(ws):
                     result["stderr"] = proc.stderr[-500:] if proc.stderr else ""
 
                 elif action == "deploy":
-                    # Full pipeline: pull + rebuild all + restart
+                    # Full pipeline: pull + rebuild hub + restart
                     steps = []
                     proc = subprocess.run(["git", "pull", "--ff-only"], cwd="/opt/nest", capture_output=True, text=True, timeout=30)
                     steps.append({"step": "pull", "success": proc.returncode == 0, "output": proc.stdout[-200:] + proc.stderr[-200:]})
                     if proc.returncode == 0:
                         proc = subprocess.run(["npm", "run", "build"], cwd="/opt/nest/hub", capture_output=True, text=True, timeout=120)
                         steps.append({"step": "build-hub", "success": proc.returncode == 0, "output": proc.stdout[-200:] + proc.stderr[-200:]})
-                        proc = subprocess.run(["npx", "expo", "export", "--platform", "web"], cwd="/opt/nest/app", capture_output=True, text=True, timeout=120)
-                        steps.append({"step": "build-app", "success": proc.returncode == 0, "output": proc.stdout[-200:] + proc.stderr[-200:]})
                         proc = subprocess.run(["sudo", "systemctl", "restart", "nest-hub", "nest-agent"], capture_output=True, text=True, timeout=30)
                         steps.append({"step": "restart", "success": proc.returncode == 0, "output": proc.stderr[-200:] if proc.stderr else ""})
                     result["success"] = all(s["success"] for s in steps)

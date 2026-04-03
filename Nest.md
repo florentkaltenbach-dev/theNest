@@ -14,7 +14,7 @@ Build specification for a coding agent. Contains all architectural decisions (63
 
 ## 1. Overview
 
-Nest is a mobile-first platform for managing servers, AI agents, and services. Users install the client application (iOS, Android, or web — single Expo codebase), connect a server provider, and build infrastructure by adding appendages: mail servers, websites, coding agents, chat assistants, backups, and more.
+Nest is a platform for managing servers, AI agents, and services through a plain HTML5 client served by the hub. Users open the web client, connect a server provider, and build infrastructure by adding appendages: mail servers, websites, coding agents, chat assistants, backups, and more.
 
 The client dispatches commands and can disconnect. All server-side components operate autonomously after initial configuration. The client is not required for ongoing operation.
 
@@ -22,7 +22,7 @@ The client dispatches commands and can disconnect. All server-side components op
 
 | Component | Role |
 |-----------|------|
-| **Client app** | Holds all secrets and credentials. Dispatches configuration and commands. Built with Expo (iOS + Android + web from one TypeScript codebase). |
+| **Client** | Holds auth tokens in the browser, dispatches configuration and commands, and is served as standalone HTML files by the hub. |
 | **Hub** | Runs on one server. Relays messages, proxies traffic, executes cached scripts. Stateless — stores no secrets except one SSH key pair. No database. |
 | **Agent** | Runs on every managed server. Reports metrics, manages containers, caches encrypted secrets, manages appendage lifecycle. Python daemon under systemd. |
 | **OpenClaw** | Conversational interface. Routes user intents to the appropriate appendages. Operates fully without the client connected. |
@@ -500,15 +500,15 @@ The client reads this schema, renders the setup wizard, collects input, encrypts
 
 | Component | Technology | Notes |
 |-----------|-----------|-------|
-| Client app | Expo (React Native) + TypeScript | Single codebase: iOS + Android + web |
-| Navigation | Expo Router | File-based routing |
-| UI | Custom design system (unstyled) | Design direction: distinctive, European aesthetic. Coding agent designs freely. |
-| State management | Zustand + React Query | Zustand for UI state, React Query for server/API state |
-| i18n | expo-localization + i18next | English + German from v1 |
+| Client | Plain HTML5 + CSS + JavaScript | One self-contained `.html` file per screen, served by the hub |
+| Navigation | URL-routed HTML pages | No client-side router |
+| UI | Handwritten CSS | Distinctive, low-dependency interface |
+| State management | Direct fetch + WebSocket updates | No client framework state layer |
+| i18n | TBD | English-first for now |
 | Theme | Follow system setting | Light and dark mode |
 | Encryption in client | age-encryption npm | Pure JS implementation of age protocol |
-| Push notifications | Expo Notifications | iOS + Android + web |
-| Distribution (v1) | TestFlight (iOS) + internal track (Android) | Invite-only beta |
+| Push notifications | TBD | Not implemented in the HTML client |
+| Distribution (v1) | Web app via Caddy + hub static files | Installable through PWA manifest |
 | Hub | Node.js + Fastify | WebSocket support for agent and client connections |
 | Agent | Python + systemd | ~1500–2000 lines, Docker SDK (docker-py) |
 | Reverse proxy | Caddy (IProxy) | Auto-TLS |
@@ -532,17 +532,17 @@ nest/
 ├── README.md
 ├── LICENSE                         # MIT
 │
-├── app/                            # Expo client (iOS + Android + web)
-│   ├── app/                        # Expo Router
-│   │   ├── (tabs)/
-│   │   │   ├── index.tsx           # Home — server overview
-│   │   │   ├── projects.tsx        # Appendages and projects
-│   │   │   ├── claw.tsx            # OpenClaw chat view
-│   │   │   ├── scripts.tsx         # Script browser and executor
-│   │   │   ├── secrets.tsx         # Secret management
-│   │   │   └── settings.tsx        # Auth, providers, preferences
-│   │   ├── server/[id].tsx         # Server detail
-│   │   ├── appendage/[id].tsx      # Appendage detail and configuration
+├── hub/
+│   ├── static/                     # Plain HTML client pages
+│   │   ├── index.html              # Home — server overview
+│   │   ├── login.html              # Login
+│   │   ├── tokens.html             # Token telemetry
+│   │   ├── claw.html               # OpenClaw chat
+│   │   ├── scripts.html            # Script browser and executor
+│   │   ├── secrets.html            # Secret management
+│   │   ├── settings.html           # Auth, users, API tokens
+│   │   ├── server.html             # Server detail
+│   │   └── manifest.webmanifest    # PWA metadata
 │   │   ├── appendage/add.tsx       # Add appendage wizard
 │   │   └── onboarding/             # First-time setup flow
 │   ├── components/                 # Shared UI components
