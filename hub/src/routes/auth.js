@@ -174,7 +174,7 @@ pw.onkeydown=e=>{if(e.key==="Enter")go.click()};
     if (!name || !password) return sendError(res, 400, 'Name and password required');
 
     const users = await loadUsers();
-    const user = users.find((u) => u.name === name);
+    const user = users.find((u) => u.name.toLowerCase() === name.toLowerCase());
     if (!user || !verifyPassword(password, user.passwordHash)) {
       return sendError(res, 401, 'Invalid credentials');
     }
