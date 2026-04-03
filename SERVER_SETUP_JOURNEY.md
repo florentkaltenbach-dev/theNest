@@ -1,4 +1,6 @@
-# Nest New Server Setup Journey
+# SERVER_SETUP_JOURNEY.md — Operator Runbook
+
+> Operational journal. Documents the manual server bootstrap process, gaps, and automation priorities. Historical reference.
 
 This document tracks the operator journey for bringing Nest onto a fresh server based on the repository state on April 1, 2026.
 

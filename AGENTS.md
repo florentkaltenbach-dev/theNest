@@ -1,4 +1,6 @@
-# AGENTS.md - Your Workspace
+# AGENTS.md — Your Workspace
+
+> Agent framework. Defines session startup, memory conventions, and workspace rules. All agent files (SOUL, IDENTITY, USER, HEARTBEAT, TOOLS) are governed by this file. Do not delete.
 
 This folder is home. Treat it that way.
 
