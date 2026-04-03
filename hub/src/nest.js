@@ -368,14 +368,12 @@ export async function scanNest(rootDir, opts = {}) {
 // ── Path security ──────────────────────────────────────
 
 function validatePath(queryPath, rootDir) {
-  if (!queryPath) return null;
+  if (queryPath === undefined || queryPath === null) return null;
+  if (queryPath === '') return ''; // root level — valid for openclaw/meta
   const resolved = resolve(rootDir, queryPath);
   if (!resolved.startsWith(rootDir + sep) && resolved !== rootDir) return null;
   const rel = relative(rootDir, resolved);
   if (rel.startsWith('..')) return null;
-  // Must be within a known service root (or meta at root level)
-  const svc = assignService(rel);
-  if (!svc) return null;
   return rel;
 }
 
@@ -397,12 +395,15 @@ export function nestRoutes(router, nestState, fullRouter) {
   router.get('/nest/folder', (req, res) => {
     const rootDir = resolve(dirname(new URL(import.meta.url).pathname), '../..');
     const query = parseQuery(req.url);
-    const prefix = validatePath(query.path || '', rootDir);
+    const prefix = validatePath(query.path ?? '', rootDir);
     if (prefix === null) return sendError(res, 400, 'Invalid path');
+    const serviceFilter = query.service || null;
 
     const result = [];
     for (const [relPath, file] of files) {
-      if (!relPath.startsWith(prefix)) continue;
+      if (prefix && !relPath.startsWith(prefix)) continue;
+      if (!prefix && relPath.includes('/')) continue; // root level only when prefix is empty
+      if (serviceFilter && file.service !== serviceFilter) continue;
       const lastCommit = file.gitHistory.length > 0 ? file.gitHistory[0] : null;
       result.push({
         path: relPath,

@@ -178,7 +178,7 @@ async function showServices() {
     if (!state.services.length) { el.innerHTML = '<p style="color:var(--muted)">No services found.</p>'; return; }
     el.innerHTML = `<div class="service-grid">${state.services.map(s => {
       const color = SERVICE_COLORS[s.name] || SERVICE_COLORS[s.role] || '#6b7280';
-      return `<div class="service-card" style="border-left-color:${color}" data-root="${esc(s.root)}" data-svc="${esc(s.name)}">
+      return `<div class="service-card" style="border-left-color:${color}" data-root="${esc(s.root)}" data-svc="${esc(s.name)}" data-id="${esc(s.id)}">
         <div class="sname">${esc(s.name)}</div>
         <div class="srole">${esc(s.role || '')}</div>
         <div class="scount">${s.fileCount ?? s.files ?? '—'} files</div>
@@ -188,7 +188,7 @@ async function showServices() {
 }
 
 // --- Folder ---
-async function showFolder(path, label) {
+async function showFolder(path, label, serviceId) {
   state.view = 'folder'; state.path = path;
   const parts = path.split('/').filter(Boolean);
   const segments = parts.map((p, i) => ({
@@ -198,7 +198,9 @@ async function showFolder(path, label) {
   }));
   renderBreadcrumb(segments);
   try {
-    const data = await api('/api/nest/folder?path=' + encodeURIComponent(path));
+    let folderUrl = '/api/nest/folder?path=' + encodeURIComponent(path);
+    if (serviceId) folderUrl += '&service=' + encodeURIComponent(serviceId);
+    const data = await api(folderUrl);
     const dirs = (data.directories || []).map(d => ({ ...d, isDir: true, name: d.name || d.path?.split('/').pop() }));
     const files = [...dirs, ...(data.files || [])];
     state.data = files;
@@ -364,7 +366,7 @@ async function loadState() {
 // --- Event delegation ---
 document.getElementById('content').addEventListener('click', e => {
   const card = e.target.closest('.service-card');
-  if (card) { showFolder(card.dataset.root, card.dataset.svc); return; }
+  if (card) { showFolder(card.dataset.root, card.dataset.svc, card.dataset.id); return; }
   const row = e.target.closest('.file-row');
   if (row) {
     if (row.dataset.dir === 'true') showFolder(row.dataset.path);
