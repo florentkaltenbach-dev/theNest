@@ -8,99 +8,91 @@
 <style>
 :root {
   color-scheme: dark;
-  --bg: #0f1117;
-  --card: #1a1d27;
-  --ink: #e4e7ef;
-  --muted: #6b7280;
-  --line: #2a2d3a;
-  --accent: #6366f1;
-  --ok: #22c55e;
-  --warn: #eab308;
-  --error: #ef4444;
+  --bg: #0f1117; --card: #1a1d27; --ink: #e4e7ef; --muted: #6b7280;
+  --line: #2a2d3a; --accent: #6366f1; --ok: #22c55e; --warn: #eab308; --error: #ef4444;
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { background: var(--bg); color: var(--ink); font: 14px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; min-height: 100vh; display: flex; flex-direction: column; }
-a { color: var(--accent); text-decoration: none; }
-a:hover { text-decoration: underline; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.5 system-ui, sans-serif; min-height: 100vh; display: flex; flex-direction: column; }
 
 /* Header */
-.header { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; border-bottom: 1px solid var(--line); }
-.header h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
-.convention-badge { display: flex; align-items: center; gap: 8px; padding: 6px 14px; background: var(--card); border: 1px solid var(--line); border-radius: 20px; cursor: pointer; font-size: 12px; color: var(--muted); position: relative; }
-.convention-badge:hover { border-color: var(--muted); }
-.dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.dot.green { background: var(--ok); }
-.dot.yellow { background: var(--warn); }
-.dot.red { background: var(--error); }
-.violations-dropdown { display: none; position: absolute; top: 100%; right: 0; margin-top: 8px; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px; min-width: 320px; z-index: 10; max-height: 300px; overflow-y: auto; }
+.header { display: flex; align-items: center; justify-content: space-between; padding: 14px 24px; border-bottom: 1px solid var(--line); }
+.header h1 { font-size: 18px; font-weight: 700; }
+.convention-badge { display: flex; align-items: center; gap: 8px; padding: 5px 12px; background: var(--card); border: 1px solid var(--line); border-radius: 20px; cursor: pointer; font-size: 12px; color: var(--muted); position: relative; }
+.dot { width: 8px; height: 8px; border-radius: 50%; }
+.dot.green { background: var(--ok); } .dot.yellow { background: var(--warn); } .dot.red { background: var(--error); }
+.violations-dropdown { display: none; position: absolute; top: 100%; right: 0; margin-top: 8px; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px; min-width: 300px; z-index: 10; }
 .violations-dropdown.open { display: block; }
-.violation { padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 12px; color: var(--ink); }
+.violation { padding: 4px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
 .violation:last-child { border-bottom: 0; }
-.violation .vpath { color: var(--muted); font-family: monospace; font-size: 11px; }
 
-/* Breadcrumb */
-.breadcrumb { padding: 10px 24px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
-.breadcrumb span { cursor: pointer; color: var(--muted); }
-.breadcrumb span:hover { color: var(--ink); }
-.breadcrumb span.current { color: var(--ink); cursor: default; }
-.breadcrumb .sep { color: var(--line); cursor: default; }
+/* Ancestors zone */
+.ancestors { border-bottom: 1px solid var(--line); }
+.ancestor { display: flex; align-items: center; gap: 10px; padding: 7px 24px; cursor: pointer; font-size: 12px; color: var(--muted); transition: background .1s; }
+.ancestor:hover { background: var(--card); }
+.abar { width: 3px; height: 14px; border-radius: 2px; flex-shrink: 0; }
+.aname { font-weight: 600; color: var(--ink); }
+.ameta { color: var(--muted); font-size: 11px; }
+.siblings { display: flex; gap: 3px; margin-left: auto; }
+.sib-dot { width: 7px; height: 7px; border-radius: 50%; cursor: pointer; opacity: 0.5; transition: opacity .15s, transform .15s; }
+.sib-dot:hover { opacity: 1; transform: scale(1.5); }
 
-/* Content */
-.content { flex: 1; padding: 24px; max-width: 1100px; width: 100%; margin: 0 auto; }
+/* Focus zone */
+.focus { flex: 1; padding: 20px 24px; max-width: 1100px; width: 100%; margin: 0 auto; }
+.focus-title { font-size: 14px; font-weight: 700; margin-bottom: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
 
 /* Service grid */
-.service-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
-.service-card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 18px 18px 18px 22px; cursor: pointer; border-left: 4px solid var(--muted); transition: border-color 0.15s, background 0.15s; }
-.service-card:hover { background: #1f2230; border-color: var(--accent); border-left-color: inherit; }
-.service-card .sname { font-weight: 700; font-size: 15px; margin-bottom: 2px; }
-.service-card .srole { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
-.service-card .scount { font-size: 12px; color: var(--muted); }
+.service-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+.service-card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px 16px 16px 20px; cursor: pointer; border-left: 4px solid var(--muted); transition: background .12s; }
+.service-card:hover { background: #1f2230; }
+.service-card .sname { font-weight: 700; font-size: 14px; }
+.service-card .srole { font-size: 12px; color: var(--muted); margin: 2px 0 8px; }
+.service-card .scount { font-size: 11px; color: var(--muted); }
 
-/* File listing */
+/* File list */
 .file-list { display: flex; flex-direction: column; gap: 2px; }
-.file-row { display: flex; align-items: center; gap: 14px; padding: 10px 16px; background: var(--card); border: 1px solid var(--line); border-radius: 8px; cursor: pointer; transition: background 0.12s; }
+.file-row { display: flex; align-items: center; gap: 12px; padding: 9px 14px; background: var(--card); border: 1px solid var(--line); border-radius: 8px; cursor: pointer; transition: background .1s; }
 .file-row:hover { background: #1f2230; }
-.file-row .fname { font-weight: 600; min-width: 160px; flex-shrink: 0; }
-.file-row .fdesc { color: var(--muted); font-size: 12px; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.file-row .fexports { display: flex; gap: 4px; flex-wrap: wrap; }
-.badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; background: #2a2d3a; color: var(--accent); }
-.file-row .fcommit { font-size: 11px; color: var(--muted); font-family: monospace; white-space: nowrap; text-align: right; min-width: 140px; }
+.fname { font-weight: 600; min-width: 140px; flex-shrink: 0; font-size: 13px; }
+.fdesc { color: var(--muted); font-size: 11px; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fexports { display: flex; gap: 3px; flex-wrap: wrap; }
+.badge { padding: 1px 7px; border-radius: 4px; font-size: 10px; font-weight: 600; background: #2a2d3a; color: var(--accent); }
 
 /* File detail */
-.file-detail h2 { font-size: 16px; font-weight: 700; margin-bottom: 4px; font-family: monospace; }
-.file-detail .fdesc-full { color: var(--muted); margin-bottom: 20px; font-size: 13px; }
-.file-detail section { margin-bottom: 24px; }
-.file-detail section h3 { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+.file-detail h2 { font-size: 15px; font-weight: 700; margin-bottom: 4px; font-family: monospace; }
+.file-detail .fdesc-full { color: var(--muted); margin-bottom: 16px; font-size: 12px; }
+.file-detail section { margin-bottom: 20px; }
+.file-detail section h3 { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 6px; }
 table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
-th { text-align: left; padding: 8px 12px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; border-bottom: 1px solid var(--line); background: #15171f; }
-td { padding: 8px 12px; border-bottom: 1px solid var(--line); font-size: 13px; }
+th { text-align: left; padding: 6px 10px; font-size: 10px; color: var(--muted); text-transform: uppercase; border-bottom: 1px solid var(--line); background: #15171f; }
+td { padding: 6px 10px; border-bottom: 1px solid var(--line); font-size: 12px; }
 tr:last-child td { border-bottom: 0; }
-.method-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; color: #fff; }
-.method-GET { background: var(--ok); }
-.method-POST { background: #3b82f6; }
-.method-PUT, .method-PATCH { background: var(--warn); color: #000; }
-.method-DELETE { background: var(--error); }
-.method-WS { background: #8b5cf6; }
-.link-list { display: flex; flex-direction: column; gap: 4px; }
-.link-list a { font-size: 13px; font-family: monospace; }
-.commit-row { display: flex; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
-.commit-row:last-child { border-bottom: 0; }
-.commit-row .chash { font-family: monospace; color: var(--accent); min-width: 70px; }
-.commit-row .cdate { color: var(--muted); min-width: 90px; }
-.commit-row .cmsg { color: var(--ink); }
+.method-badge { padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 700; color: #fff; }
+.method-GET { background: var(--ok); } .method-POST { background: #3b82f6; }
+.method-PUT, .method-PATCH { background: var(--warn); color: #000; } .method-DELETE { background: var(--error); }
+.link-list { display: flex; flex-direction: column; gap: 3px; }
+.link-list a { font-size: 12px; font-family: monospace; color: var(--accent); text-decoration: none; }
+.link-list a:hover { text-decoration: underline; }
+.commit-row { display: flex; gap: 10px; padding: 4px 0; font-size: 11px; }
+.chash { font-family: monospace; color: var(--accent); min-width: 60px; }
+.cdate { color: var(--muted); min-width: 80px; }
+
+/* Below zone */
+.below { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); opacity: 0.4; }
+.below-title { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; padding: 0 4px; }
+.below-item { padding: 3px 14px; font-size: 11px; display: flex; gap: 10px; align-items: baseline; }
+.bname { font-weight: 600; min-width: 120px; flex-shrink: 0; }
+.bchips { color: var(--muted); font-size: 10px; }
+.bchip { display: inline; }
+.bchip::after { content: ' · '; }
+.bchip:last-child::after { content: ''; }
+.bmore { color: var(--muted); font-style: italic; padding: 3px 14px; font-size: 10px; }
 
 /* Live bar */
-.live-bar { padding: 10px 24px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 20px; background: var(--card); }
-.live-bar .litem { display: flex; align-items: center; gap: 6px; }
-.live-bar .pulse { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); animation: pulse 2s infinite; }
-@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+.live-bar { padding: 8px 24px; border-top: 1px solid var(--line); font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 8px; background: var(--card); }
+.pulse { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.3; } }
 
-/* Error */
-.error-box { padding: 20px; background: #1c1012; border: 1px solid var(--error); border-radius: 8px; color: var(--error); text-align: center; }
-
-/* Folder header */
-.folder-header { margin-bottom: 16px; }
-.folder-header h2 { font-size: 16px; font-weight: 700; }
+.error-box { padding: 16px; background: #1c1012; border: 1px solid var(--error); border-radius: 8px; color: var(--error); text-align: center; font-size: 13px; }
 </style>
 </head>
 <body>
@@ -109,152 +101,180 @@ tr:last-child td { border-bottom: 0; }
   <h1>Nest Explorer</h1>
   <div class="convention-badge" id="conventionBadge" onclick="toggleViolations()">
     <div class="dot" id="conventionDot"></div>
-    <span id="conventionLabel">Checking...</span>
+    <span id="conventionLabel">...</span>
     <div class="violations-dropdown" id="violationsDropdown"></div>
   </div>
 </div>
 
-<div class="breadcrumb" id="breadcrumb">
-  <span class="current">Nest</span>
-</div>
+<div class="ancestors" id="ancestors"></div>
 
-<div class="content" id="content">
+<div class="focus" id="focus">
   <p style="color:var(--muted)">Loading...</p>
 </div>
 
-<div class="live-bar" id="liveBar">
-  <div class="litem"><div class="pulse"></div><span id="stateText">Connecting...</span></div>
+<div class="live-bar">
+  <div class="pulse"></div>
+  <span id="stateText">Connecting...</span>
 </div>
 
 <script>
 const TOKEN = localStorage.getItem('nest_token');
 if (!TOKEN) location.href = '/login';
 
-const esc = s => String(s ?? '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+const esc = s => String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 
-const state = { view: 'services', path: '', data: null, services: [], violations: [] };
+const SVC_COLORS = { hub:'#6366f1', client:'#eab308', agent:'#22c55e', scripts:'#6b7280', docs:'#f97316', meta:'#94a3b8', openclaw:'#ec4899' };
 
-const SERVICE_COLORS = {
-  hub: '#6366f1', client: '#eab308', agent: '#22c55e',
-  scripts: '#6b7280', docs: '#f97316', meta: '#94a3b8'
-};
+// Trail: [{type, path, label, serviceId, data, siblings}]
+const trail = [];
 
 async function api(url) {
-  const res = await fetch(url, { headers: { Authorization: 'Bearer ' + TOKEN } });
-  if (res.status === 401) { localStorage.removeItem('nest_token'); location.href = '/login'; return; }
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-  return res.json();
+  const r = await fetch(url, { headers: { Authorization: 'Bearer ' + TOKEN } });
+  if (r.status === 401) { localStorage.removeItem('nest_token'); location.href = '/login'; }
+  if (!r.ok) throw new Error(r.status);
+  return r.json();
 }
 
-function renderError(msg) {
-  document.getElementById('content').innerHTML = `<div class="error-box">${esc(msg)}</div>`;
+// ── Navigation ──────────────────────────────────────
+
+async function goServices() {
+  const data = await api('/api/nest/services');
+  const services = data.services || [];
+  trail.length = 0;
+  trail.push({ type: 'services', label: 'Nest', data: services, siblings: [] });
+  render();
 }
 
-// --- Breadcrumb ---
-function renderBreadcrumb(segments) {
-  const el = document.getElementById('breadcrumb');
-  let html = `<span onclick="showServices()">Nest</span>`;
-  for (let i = 0; i < segments.length; i++) {
-    const isLast = i === segments.length - 1;
-    const path = segments.slice(0, i + 1).map(s => s.path).join('/');
-    html += `<span class="sep">/</span>`;
-    if (isLast) {
-      html += `<span class="current">${esc(segments[i].label)}</span>`;
+async function goFolder(path, label, serviceId, siblings) {
+  let url = '/api/nest/folder?path=' + encodeURIComponent(path);
+  if (serviceId) url += '&service=' + encodeURIComponent(serviceId);
+  const data = await api(url);
+  const dirs = (data.directories || []).map(d => ({ ...d, isDir: true, name: d.name || d.path?.split('/').pop() }));
+  const files = [...dirs, ...(data.files || [])];
+  trail.push({ type: 'folder', path, label: label || path.split('/').pop() || path, serviceId, data: files, siblings: siblings || [] });
+  render();
+  fetchBelow(files, path);
+}
+
+async function goFile(path, siblings) {
+  const data = await api('/api/nest/file?path=' + encodeURIComponent(path));
+  trail.push({ type: 'file', path, label: path.split('/').pop(), data, siblings: siblings || [] });
+  render();
+}
+
+function jumpTo(index) {
+  trail.length = index + 1;
+  render();
+  // Re-fetch below if focus is a folder
+  const cur = trail[trail.length - 1];
+  if (cur.type === 'folder') fetchBelow(cur.data, cur.path);
+}
+
+async function jumpSibling(trailIndex, sibPath, sibLabel, sibServiceId) {
+  trail.length = trailIndex; // truncate to parent
+  if (trailIndex === 0) {
+    // Jumping to a sibling service from root
+    await goFolder(sibPath, sibLabel, sibServiceId,
+      trail[0]?.data?.filter(s => s.root !== sibPath).map(s => ({ path: s.root, label: s.name, id: s.id, color: SVC_COLORS[s.id] || '#6b7280' })) || []);
+  } else {
+    const parent = trail[trailIndex - 1];
+    const siblings = (parent?.data || []).filter(f => f.path !== sibPath);
+    if (sibPath.endsWith('/') || !sibPath.includes('.')) {
+      await goFolder(sibPath, sibLabel, sibServiceId, siblings);
     } else {
-      html += `<span onclick="${esc(segments[i].onclick)}">${esc(segments[i].label)}</span>`;
+      await goFile(sibPath, siblings);
     }
+  }
+}
+
+// ── Render ──────────────────────────────────────────
+
+function render() {
+  renderAncestors();
+  renderFocus();
+}
+
+function renderAncestors() {
+  const el = document.getElementById('ancestors');
+  if (trail.length <= 1) { el.innerHTML = ''; return; }
+
+  let html = '';
+  for (let i = 0; i < trail.length - 1; i++) {
+    const t = trail[i];
+    const indent = i * 16;
+    const color = t.serviceId ? (SVC_COLORS[t.serviceId] || '#6b7280') : '#6b7280';
+    const meta = t.type === 'services'
+      ? `${(t.data || []).length} services`
+      : `${(t.data || []).length} items`;
+    const sibs = (trail[i + 1]?.siblings || []);
+
+    html += `<div class="ancestor" style="padding-left:${24 + indent}px" onclick="jumpTo(${i})">
+      <div class="abar" style="background:${color}"></div>
+      <span class="aname">${esc(t.label)}</span>
+      <span class="ameta">${esc(meta)}</span>
+      <span class="siblings">${sibs.map(s =>
+        `<span class="sib-dot" style="background:${s.color || '#6b7280'}"
+          title="${esc(s.label)}"
+          onclick="event.stopPropagation();jumpSibling(${i + 1},'${esc(s.path)}','${esc(s.label)}','${esc(s.id || '')}')"></span>`
+      ).join('')}</span>
+    </div>`;
   }
   el.innerHTML = html;
 }
 
-// --- Services ---
-async function showServices() {
-  state.view = 'services'; state.path = '';
-  renderBreadcrumb([]);
-  try {
-    const data = await api('/api/nest/services');
-    state.services = data.services || data || [];
-    const el = document.getElementById('content');
-    if (!state.services.length) { el.innerHTML = '<p style="color:var(--muted)">No services found.</p>'; return; }
-    el.innerHTML = `<div class="service-grid">${state.services.map(s => {
-      const color = SERVICE_COLORS[s.name] || SERVICE_COLORS[s.role] || '#6b7280';
-      return `<div class="service-card" style="border-left-color:${color}" data-root="${esc(s.root)}" data-svc="${esc(s.name)}" data-id="${esc(s.id)}">
+function renderFocus() {
+  const el = document.getElementById('focus');
+  const cur = trail[trail.length - 1];
+  if (!cur) { el.innerHTML = ''; return; }
+
+  if (cur.type === 'services') {
+    el.innerHTML = `<div class="service-grid">${(cur.data || []).map(s => {
+      const color = SVC_COLORS[s.id] || '#6b7280';
+      return `<div class="service-card" style="border-left-color:${color}" data-root="${esc(s.root)}" data-id="${esc(s.id)}" data-label="${esc(s.name)}">
         <div class="sname">${esc(s.name)}</div>
-        <div class="srole">${esc(s.role || '')}</div>
-        <div class="scount">${s.fileCount ?? s.files ?? '—'} files</div>
+        <div class="srole">${esc(s.role)}</div>
       </div>`;
     }).join('')}</div>`;
-  } catch (e) { renderError(e.message); }
-}
+    return;
+  }
 
-// --- Folder ---
-async function showFolder(path, label, serviceId) {
-  state.view = 'folder'; state.path = path;
-  const parts = path.split('/').filter(Boolean);
-  const segments = parts.map((p, i) => ({
-    label: p,
-    path: parts.slice(0, i + 1).join('/'),
-    onclick: `showFolder('${parts.slice(0, i + 1).join('/')}', '${p}')`
-  }));
-  renderBreadcrumb(segments);
-  try {
-    let folderUrl = '/api/nest/folder?path=' + encodeURIComponent(path);
-    if (serviceId) folderUrl += '&service=' + encodeURIComponent(serviceId);
-    const data = await api(folderUrl);
-    const dirs = (data.directories || []).map(d => ({ ...d, isDir: true, name: d.name || d.path?.split('/').pop() }));
-    const files = [...dirs, ...(data.files || [])];
-    state.data = files;
-    const el = document.getElementById('content');
-    if (!files.length) { el.innerHTML = '<div class="folder-header"><h2>' + esc(label || path) + '</h2></div><p style="color:var(--muted)">Empty folder.</p>'; return; }
-    el.innerHTML = `<div class="folder-header"><h2>${esc(label || path)}</h2></div>
-    <div class="file-list">${files.map(f => {
+  if (cur.type === 'folder') {
+    const items = cur.data || [];
+    el.innerHTML = `<div class="focus-title">${esc(cur.label)}</div>
+    <div class="file-list">${items.map(f => {
       const name = f.name || f.path?.split('/').pop() || '';
-      const fpath = f.path || (path + '/' + name);
-      const isDir = f.type === 'directory' || f.isDir;
-      return `<div class="file-row" data-path="${esc(fpath)}" data-dir="${isDir}">
+      const fpath = f.path || '';
+      const isDir = f.isDir;
+      return `<div class="file-row" data-path="${esc(fpath)}" data-dir="${!!isDir}" data-name="${esc(name)}">
         <div class="fname">${isDir ? '📁 ' : ''}${esc(name)}</div>
-        <div class="fdesc">${esc(f.description || f.header || '')}</div>
+        <div class="fdesc">${esc(f.header || '')}</div>
         <div class="fexports">${(f.exports || []).slice(0, 4).map(e => `<span class="badge">${esc(e)}</span>`).join('')}</div>
-        <div class="fcommit">${f.commitHash ? esc(f.commitHash.slice(0, 7)) + ' ' + esc((f.commitMessage || '').slice(0, 30)) : ''}</div>
       </div>`;
-    }).join('')}</div>`;
-  } catch (e) { renderError(e.message); }
-}
+    }).join('')}</div>
+    <div class="below" id="below"></div>`;
+    return;
+  }
 
-// --- File detail ---
-async function showFile(path) {
-  state.view = 'file'; state.path = path;
-  const parts = path.split('/').filter(Boolean);
-  const segments = parts.map((p, i) => ({
-    label: p,
-    path: parts.slice(0, i + 1).join('/'),
-    onclick: i < parts.length - 1
-      ? `showFolder('${parts.slice(0, i + 1).join('/')}', '${p}')`
-      : `showFile('${parts.slice(0, i + 1).join('/')}')`
-  }));
-  renderBreadcrumb(segments);
-  try {
-    const data = await api('/api/nest/file?path=' + encodeURIComponent(path));
-    const el = document.getElementById('content');
-    const fns = data.functions || [];
-    const routes = data.routes || [];
-    const imports = data.imports || [];
-    const importedBy = data.importedBy || [];
-    const commits = data.commits || data.history || [];
+  if (cur.type === 'file') {
+    const d = cur.data;
+    const fns = d.functions || [];
+    const routes = d.routes || [];
+    const imports = d.imports || [];
+    const importedBy = d.importedBy || [];
+    const commits = d.commits || d.history || [];
 
     let html = `<div class="file-detail">
-      <h2>${esc(path)}</h2>
-      <p class="fdesc-full">${esc(data.description || data.header || 'No description.')}</p>`;
+      <h2>${esc(cur.path)}</h2>
+      <p class="fdesc-full">${esc(d.description || d.header || '')}</p>`;
 
     if (fns.length) {
       html += `<section><h3>Functions</h3><table>
         <tr><th>Name</th><th>Params</th><th>Summary</th></tr>
         ${fns.map(f => `<tr>
           <td><strong>${esc(f.name)}</strong></td>
-          <td style="font-family:monospace;font-size:12px;color:var(--muted)">${esc(typeof f.params === 'string' ? f.params : (f.params || []).join(', '))}</td>
+          <td style="font-family:monospace;font-size:11px;color:var(--muted)">${esc(typeof f.params === 'string' ? f.params : (f.params||[]).join(', '))}</td>
           <td style="color:var(--muted)">${esc(f.summary || f.description || '')}</td>
-        </tr>`).join('')}
-      </table></section>`;
+        </tr>`).join('')}</table></section>`;
     }
 
     if (routes.length) {
@@ -262,121 +282,152 @@ async function showFile(path) {
         <tr><th>Method</th><th>Path</th></tr>
         ${routes.map(r => `<tr>
           <td><span class="method-badge method-${esc(r.method)}">${esc(r.method)}</span></td>
-          <td style="font-family:monospace">${esc(r.path || r.url)}</td>
-        </tr>`).join('')}
-      </table></section>`;
+          <td style="font-family:monospace;font-size:12px">${esc(r.path || r.url)}</td>
+        </tr>`).join('')}</table></section>`;
     }
 
     if (imports.length) {
       html += `<section><h3>Imports</h3><div class="link-list">
-        ${imports.map(i => {
-          const ip = typeof i === 'string' ? i : i.path || i.module;
-          return `<a href="#" onclick="event.preventDefault();showFile('${esc(ip)}')">${esc(ip)}</a>`;
-        }).join('')}
+        ${imports.map(i => { const p = typeof i === 'string' ? i : i.path || i.module;
+          return `<a href="#" onclick="event.preventDefault();trail.length=${trail.length};goFile('${esc(p)}')">${esc(p)}</a>`; }).join('')}
       </div></section>`;
     }
 
     if (importedBy.length) {
       html += `<section><h3>Imported By</h3><div class="link-list">
-        ${importedBy.map(i => {
-          const ip = typeof i === 'string' ? i : i.path || i.module;
-          return `<a href="#" onclick="event.preventDefault();showFile('${esc(ip)}')">${esc(ip)}</a>`;
-        }).join('')}
+        ${importedBy.map(i => { const p = typeof i === 'string' ? i : i.path || i.module;
+          return `<a href="#" onclick="event.preventDefault();trail.length=${trail.length};goFile('${esc(p)}')">${esc(p)}</a>`; }).join('')}
       </div></section>`;
     }
 
     if (commits.length) {
       html += `<section><h3>Git History</h3>
         ${commits.slice(0, 5).map(c => `<div class="commit-row">
-          <span class="chash">${esc((c.hash || c.sha || '').slice(0, 7))}</span>
-          <span class="cdate">${esc(c.date || c.timestamp || '')}</span>
-          <span class="cmsg">${esc(c.message || '')}</span>
-        </div>`).join('')}
-      </section>`;
+          <span class="chash">${esc((c.hash||'').slice(0,7))}</span>
+          <span class="cdate">${esc(c.date||'')}</span>
+          <span>${esc(c.message||'')}</span>
+        </div>`).join('')}</section>`;
     }
 
     html += '</div>';
     el.innerHTML = html;
-  } catch (e) { renderError(e.message); }
+  }
 }
 
-// --- Convention health ---
+// ── Below zone (lazy) ───────────────────────────────
+
+async function fetchBelow(items, parentPath) {
+  const belowEl = document.getElementById('below');
+  if (!belowEl || !items.length) return;
+
+  let html = '<div class="below-title">Contains</div>';
+  const dirs = items.filter(f => f.isDir);
+  const files = items.filter(f => !f.isDir);
+
+  // Files: show exports (already have them)
+  for (const f of files) {
+    const name = f.name || f.path?.split('/').pop() || '';
+    const exports = f.exports || [];
+    if (!exports.length) continue;
+    html += `<div class="below-item">
+      <span class="bname">${esc(name)}</span>
+      <span class="bchips">${exports.slice(0, 6).map(e => `<span class="bchip">${esc(e)}</span>`).join('')}${exports.length > 6 ? ' ...' : ''}</span>
+    </div>`;
+  }
+
+  // Dirs: fetch contents (cap at 5)
+  const dirsToFetch = dirs.slice(0, 5);
+  const remaining = dirs.length - dirsToFetch.length;
+
+  const results = await Promise.all(dirsToFetch.map(async d => {
+    try {
+      const data = await api('/api/nest/folder?path=' + encodeURIComponent(d.path));
+      const children = [...(data.directories || []), ...(data.files || [])];
+      return { name: d.name, children };
+    } catch { return { name: d.name, children: [] }; }
+  }));
+
+  for (const r of results) {
+    const names = r.children.slice(0, 8).map(c => c.name || c.path?.split('/').pop() || '');
+    html += `<div class="below-item">
+      <span class="bname">📁 ${esc(r.name)}</span>
+      <span class="bchips">${names.map(n => `<span class="bchip">${esc(n)}</span>`).join('')}${r.children.length > 8 ? ' ...' : ''}</span>
+    </div>`;
+  }
+
+  if (remaining > 0) {
+    html += `<div class="bmore">+ ${remaining} more folders</div>`;
+  }
+
+  belowEl.innerHTML = html;
+}
+
+// ── Event delegation ────────────────────────────────
+
+document.getElementById('focus').addEventListener('click', e => {
+  const card = e.target.closest('.service-card');
+  if (card) {
+    const services = trail[trail.length - 1]?.data || [];
+    const siblings = services.filter(s => s.id !== card.dataset.id).map(s => ({
+      path: s.root, label: s.name, id: s.id, color: SVC_COLORS[s.id] || '#6b7280'
+    }));
+    goFolder(card.dataset.root, card.dataset.label, card.dataset.id, siblings);
+    return;
+  }
+  const row = e.target.closest('.file-row');
+  if (row) {
+    const items = trail[trail.length - 1]?.data || [];
+    const siblings = items.filter(f => f.path !== row.dataset.path).map(f => ({
+      path: f.path, label: f.name || f.path?.split('/').pop(), color: '#6b7280'
+    }));
+    if (row.dataset.dir === 'true') goFolder(row.dataset.path, row.dataset.name, null, siblings);
+    else goFile(row.dataset.path, siblings);
+  }
+});
+
+// ── Convention health ───────────────────────────────
+
 async function loadConventions() {
   try {
     const data = await api('/api/nest/health/conventions');
-    const violations = data.violations || data.failures || [];
-    const total = data.total || 0;
-    const passing = data.passing || (total - violations.length);
-    state.violations = violations;
+    const v = data.violations || data.failures || [];
     const dot = document.getElementById('conventionDot');
     const label = document.getElementById('conventionLabel');
-    if (violations.length === 0) {
-      dot.className = 'dot green';
-      label.textContent = 'All conventions pass';
-    } else if (violations.length <= 3) {
-      dot.className = 'dot yellow';
-      label.textContent = violations.length + ' violation' + (violations.length > 1 ? 's' : '');
-    } else {
-      dot.className = 'dot red';
-      label.textContent = violations.length + ' violations';
-    }
+    if (!v.length) { dot.className = 'dot green'; label.textContent = 'All conventions pass'; }
+    else if (v.length <= 3) { dot.className = 'dot yellow'; label.textContent = v.length + ' violation' + (v.length > 1 ? 's' : ''); }
+    else { dot.className = 'dot red'; label.textContent = v.length + ' violations'; }
     const dd = document.getElementById('violationsDropdown');
-    if (violations.length) {
-      dd.innerHTML = violations.map(v => `<div class="violation">
-        <div>${esc(v.rule || v.message || v)}</div>
-        ${v.path ? `<div class="vpath">${esc(v.path)}</div>` : ''}
-      </div>`).join('');
-    } else {
-      dd.innerHTML = '<div class="violation" style="color:var(--ok)">All conventions passing.</div>';
-    }
-  } catch (e) {
+    dd.innerHTML = v.length
+      ? v.map(x => `<div class="violation">${esc(x.rule || x.message || x)}${x.path ? `<br><span style="color:var(--muted);font-family:monospace;font-size:10px">${esc(x.path)}</span>` : ''}</div>`).join('')
+      : '<div class="violation" style="color:var(--ok)">All passing.</div>';
+  } catch {
     document.getElementById('conventionDot').className = 'dot';
-    document.getElementById('conventionLabel').textContent = 'Unavailable';
+    document.getElementById('conventionLabel').textContent = '?';
   }
 }
+function toggleViolations() { document.getElementById('violationsDropdown').classList.toggle('open'); }
+document.addEventListener('click', e => { if (!document.getElementById('conventionBadge').contains(e.target)) document.getElementById('violationsDropdown').classList.remove('open'); });
 
-function toggleViolations() {
-  document.getElementById('violationsDropdown').classList.toggle('open');
-}
+// ── Live state ──────────────────────────────────────
 
-// Close dropdown on outside click
-document.addEventListener('click', e => {
-  if (!document.getElementById('conventionBadge').contains(e.target)) {
-    document.getElementById('violationsDropdown').classList.remove('open');
-  }
-});
-
-// --- Live state ---
 async function loadState() {
   try {
-    const data = await api('/api/nest/state');
-    const hub = data.hub || {};
-    const agents = data.agents?.connected ?? data.agents ?? 0;
-    const parts = [];
-    if (agents != null) parts.push(agents + ' agent' + (agents !== 1 ? 's' : ''));
+    const d = await api('/api/nest/state');
+    const hub = d.hub || {};
+    const agents = d.agents?.connected ?? d.agents ?? 0;
+    const p = [];
+    p.push(agents + ' agent' + (agents !== 1 ? 's' : ''));
     const up = hub.uptime_seconds || hub.uptime || 0;
-    if (up) { const m = Math.floor(up / 60); parts.push('uptime ' + (m >= 60 ? Math.floor(m/60) + 'h' : m + 'm')); }
-    if (hub.routeCount || hub.routes) parts.push((hub.routeCount || hub.routes) + ' routes');
-    document.getElementById('stateText').textContent = parts.join(' | ') || 'Connected';
-  } catch (e) {
-    document.getElementById('stateText').textContent = 'Disconnected';
-  }
+    if (up) { const m = Math.floor(up/60); p.push('uptime ' + (m >= 60 ? Math.floor(m/60)+'h' : m+'m')); }
+    if (hub.routeCount) p.push(hub.routeCount + ' routes');
+    document.getElementById('stateText').textContent = p.join(' · ');
+  } catch { document.getElementById('stateText').textContent = '—'; }
 }
 
-// --- Event delegation ---
-document.getElementById('content').addEventListener('click', e => {
-  const card = e.target.closest('.service-card');
-  if (card) { showFolder(card.dataset.root, card.dataset.svc, card.dataset.id); return; }
-  const row = e.target.closest('.file-row');
-  if (row) {
-    if (row.dataset.dir === 'true') showFolder(row.dataset.path);
-    else showFile(row.dataset.path);
-  }
-});
+// ── Init ────────────────────────────────────────────
 
-// --- Init ---
-(async function init() {
-  await Promise.all([showServices(), loadState(), loadConventions()]);
+(async () => {
+  await Promise.all([goServices(), loadState(), loadConventions()]);
   setInterval(loadState, 30000);
 })();
 </script>
