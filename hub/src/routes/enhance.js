@@ -2,12 +2,11 @@
 // Send enhance commands to connected agents
 // ──────────────────────────────────────────────────────
 import { sendToAgent, getAgentData } from "../ws/agentHandler.js";
-import { sendJson, sendError } from '../server.js';
+import { sendJson, sendError, requireAdmin } from '../server.js';
 
 export function enhanceRoutes(router) {
   router.post("/nest/enhance", async (req, res) => {
-    const { role } = req.user;
-    if (role !== "admin") return sendError(res, 403, "Admin only");
+    if (!requireAdmin(req, res)) return;
     const { action, target, packages, services } = req.body;
     if (!action) return sendError(res, 400, "action required");
     const agents = getAgentData();

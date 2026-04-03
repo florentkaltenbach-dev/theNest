@@ -104,6 +104,15 @@ export function parseBody(req) {
   });
 }
 
+// ── Auth helpers ────────────────────────────────────────
+
+/** Check req.user is admin. Sends 401/403 and returns false if not. */
+export function requireAdmin(req, res) {
+  if (!req.user) { sendError(res, 401, 'Unauthorized'); return false; }
+  if (req.user.role !== 'admin') { sendError(res, 403, 'Admin only'); return false; }
+  return true;
+}
+
 // ── Response helpers ────────────────────────────────────
 
 /** @param {import('node:http').ServerResponse} res */

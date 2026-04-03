@@ -5,7 +5,6 @@
 // Depends: node:http, ws, server.js, all route modules, HUB.md page table
 
 import { createServer } from 'node:http';
-import { randomBytes } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { existsSync, readFileSync, appendFileSync, statSync, renameSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -19,7 +18,7 @@ import {
 
 import { healthRoutes } from './routes/health.js';
 import { serverRoutes } from './routes/servers.js';
-import { authRoutes, loadTokens, hashPassword } from './routes/auth.js';
+import { authRoutes, loadTokens, hashToken, ensureJwtSecret } from './routes/auth.js';
 import { scriptRoutes } from './routes/scripts.js';
 import { chatRoutes } from './routes/chat.js';
 import { secretRoutes } from './routes/secrets.js';
@@ -42,7 +41,7 @@ const NEST_ROOT = join(__dirname, '../..');
 
 // ── JWT secret ──────────────────────────────────────────
 
-const jwtSecret = process.env.NEST_JWT_SECRET || randomBytes(32).toString('hex');
+const jwtSecret = ensureJwtSecret();
 const jwt = {
   sign: (payload, expiresIn = '7d') => signJwt(payload, jwtSecret, expiresIn),
   verify: (token) => verifyJwt(token, jwtSecret),
@@ -127,57 +126,55 @@ function isPublicRoute(url) {
 
 // ── Auth middleware ─────────────────────────────────────
 
+function parseCookie(header, name) {
+  if (!header) return null;
+  const match = header.match(new RegExp(`(?:^|;)\\s*${name}=([^;]+)`));
+  return match ? match[1] : null;
+}
+
+async function tryAuth(req, token) {
+  if (!token) return false;
+  // JWT
+  if (!token.startsWith('nest_')) {
+    try { req.user = jwt.verify(token); return true; } catch {}
+    return false;
+  }
+  // API token
+  const tokens = await loadTokens();
+  const th = hashToken(token);
+  const matched = tokens.find((t) => t.tokenHash === th);
+  if (matched) {
+    req.user = { id: matched.id, role: matched.role, name: matched.name };
+    matched.lastUsed = Date.now();
+    saveTokens(tokens).catch(() => {});
+    return true;
+  }
+  return false;
+}
+
 async function authMiddleware(req, res) {
   const url = req.url.split('?')[0];
 
-  // Non-API routes: don't block, just try to set req.user
+  // Extract token from: Bearer header > cookie
+  const authHeader = req.headers.authorization;
+  const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  const cookieToken = parseCookie(req.headers.cookie, 'nest_token');
+  const token = bearerToken || cookieToken;
+
+  // Non-API routes: try to set req.user but don't block
   if (!url.startsWith('/api/')) {
-    const authHeader = req.headers.authorization;
-    if (authHeader) {
-      try {
-        if (authHeader.startsWith('Bearer ')) {
-          const token = authHeader.slice(7);
-          if (token.startsWith('nest_')) {
-            const tokens = await loadTokens();
-            const tokenHash = hashPassword(token);
-            const matched = tokens.find((t) => t.tokenHash === tokenHash);
-            if (matched) req.user = { id: matched.id, role: matched.role, name: matched.name };
-          } else {
-            req.user = jwt.verify(token);
-          }
-        }
-      } catch {}
-    }
-    return true; // don't block — page handler checks auth
+    if (token) await tryAuth(req, token);
+    return true;
   }
 
-  // Public API routes
+  // Try to authenticate (sets req.user if valid token)
+  if (token) await tryAuth(req, token);
+
+  // Public API routes — let through even without auth
   if (isPublicRoute(url)) return true;
 
-  // Try JWT
-  const authHeader = req.headers.authorization;
-  if (authHeader?.startsWith('Bearer ')) {
-    const token = authHeader.slice(7);
-
-    // Try JWT first
-    try {
-      req.user = jwt.verify(token);
-      return true;
-    } catch {}
-
-    // Try API token
-    if (token.startsWith('nest_')) {
-      const tokens = await loadTokens();
-      const tokenHash = hashPassword(token);
-      const matched = tokens.find((t) => t.tokenHash === tokenHash);
-      if (matched) {
-        req.user = { id: matched.id, role: matched.role, name: matched.name };
-        matched.lastUsed = Date.now();
-        (await import('./routes/auth.js')).saveTokens(tokens).catch(() => {});
-        return true;
-      }
-    }
-  }
+  // Protected routes — require auth
+  if (req.user) return true;
 
   sendError(res, 401, 'Unauthorized');
   return false;
@@ -230,9 +227,7 @@ api.get('/agents/:hostname', (req, res) => {
 
 for (const page of pages) {
   router.get(page.path, (req, res) => {
-    if (page.auth && !req.user) {
-      return sendFile(res, join(STATIC_DIR, 'login.html'));
-    }
+    // Always serve the file — client-side JS handles auth via localStorage
     sendFile(res, join(STATIC_DIR, page.file));
   });
 }

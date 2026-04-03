@@ -2,7 +2,7 @@
 // Aggregated project overview, clone, register instances
 // ──────────────────────────────────────────────────────
 import { getAgentData, sendToAgent } from "../ws/agentHandler.js";
-import { sendJson, sendError } from '../server.js';
+import { sendJson, sendError, requireAdmin } from '../server.js';
 
 // In-memory registry for local instances (registered by external Claude Code sessions)
 const localInstances = [];
@@ -11,8 +11,7 @@ export function projectRoutes(router) {
 
   // Trigger discovery on all connected agents
   router.post("/projects/discover", async (req, res) => {
-    const { role } = req.user;
-    if (role !== "admin") return sendError(res, 403, "Admin only");
+    if (!requireAdmin(req, res)) return;
 
     const agents = getAgentData();
     if (agents.length === 0) {
@@ -30,8 +29,7 @@ export function projectRoutes(router) {
 
   // Get aggregated project overview
   router.get("/projects", async (req, res) => {
-    const { role } = req.user;
-    if (role !== "admin") return sendError(res, 403, "Admin only");
+    if (!requireAdmin(req, res)) return;
 
     // Fetch GitHub repos
     const githubToken = process.env.GITHUB_TOKEN;
@@ -160,8 +158,7 @@ export function projectRoutes(router) {
 
   // Clone a repo to /opt/repos/<name>/ on a server
   router.post("/projects/clone", async (req, res) => {
-    const { role } = req.user;
-    if (role !== "admin") return sendError(res, 403, "Admin only");
+    if (!requireAdmin(req, res)) return;
 
     const { url, name, hostname } = req.body;
     if (!url || !name) return sendError(res, 400, "url and name required");
@@ -185,8 +182,7 @@ export function projectRoutes(router) {
 
   // Register a local instance (called by external Claude Code sessions)
   router.post("/projects/register", async (req, res) => {
-    const { role } = req.user;
-    if (role !== "admin") return sendError(res, 403, "Admin only");
+    if (!requireAdmin(req, res)) return;
 
     const { host, path, branch, commit } = req.body;
     if (!host || !path) return sendError(res, 400, "host and path required");

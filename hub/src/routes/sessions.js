@@ -3,14 +3,13 @@
 // ──────────────────────────────────────────────────────
 import { exec } from "child_process";
 import { promisify } from "util";
-import { sendJson, sendError } from '../server.js';
+import { sendJson, sendError, requireAdmin } from '../server.js';
 
 const execAsync = promisify(exec);
 
 export function sessionRoutes(router) {
   router.get("/sessions", async (req, res) => {
-    const { role } = req.user;
-    if (role !== "admin") return sendError(res, 403, "Admin only");
+    if (!requireAdmin(req, res)) return;
     try {
       const { stdout } = await execAsync('tmux list-sessions -F "#{session_name}|#{session_created}|#{session_windows}|#{session_attached}" 2>/dev/null || echo ""');
       const sessions = stdout.trim().split("\n").filter(Boolean).map((line) => {
@@ -24,8 +23,7 @@ export function sessionRoutes(router) {
   });
 
   router.post("/sessions", async (req, res) => {
-    const { role } = req.user;
-    if (role !== "admin") return sendError(res, 403, "Admin only");
+    if (!requireAdmin(req, res)) return;
     const { name, cmd } = req.body;
     if (!name) return sendError(res, 400, "name required");
     try {
@@ -42,8 +40,7 @@ export function sessionRoutes(router) {
   });
 
   router.delete("/sessions/:name", async (req, res) => {
-    const { role } = req.user;
-    if (role !== "admin") return sendError(res, 403, "Admin only");
+    if (!requireAdmin(req, res)) return;
     try {
       await execAsync(`tmux kill-session -t "${req.params.name}"`);
       sendJson(res, { success: true });

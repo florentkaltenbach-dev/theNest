@@ -28,9 +28,9 @@ export function createTerminalHandler(jwtSecret) {
     } catch {
       // JWT failed, try API token
       if (token.startsWith("nest_")) {
-        const { loadTokens, hashPassword } = await import("../routes/auth.js");
+        const { loadTokens, hashToken } = await import("../routes/auth.js");
         const tokens = await loadTokens();
-        const tokenHash = hashPassword(token);
+        const tokenHash = hashToken(token);
         const matched = tokens.find((t) => t.tokenHash === tokenHash);
         if (matched) {
           decoded = { id: matched.id, role: matched.role, name: matched.name };
