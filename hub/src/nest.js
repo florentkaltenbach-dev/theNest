@@ -406,15 +406,30 @@ export function nestRoutes(router, nestState, fullRouter) {
       });
     }
 
-    // Group by directory
-    const grouped = {};
+    // Split into direct files and subdirectories
+    const directFiles = [];
+    const subdirs = new Set();
+    const prefixDepth = prefix ? prefix.split('/').length : 0;
+
     for (const item of result) {
-      const dir = dirname(item.path);
-      if (!grouped[dir]) grouped[dir] = [];
-      grouped[dir].push(item);
+      const parts = item.path.split('/');
+      const depth = parts.length;
+      if (depth === prefixDepth + 1) {
+        // Direct child file
+        directFiles.push(item);
+      } else if (depth > prefixDepth + 1) {
+        // File in a subdirectory — record the subdir name
+        subdirs.add(parts.slice(0, prefixDepth + 1).join('/'));
+      }
     }
 
-    sendJson(res, { path: prefix, directories: grouped });
+    const dirs = [...subdirs].map(d => ({
+      name: d.split('/').pop(),
+      path: d,
+      isDir: true,
+    }));
+
+    sendJson(res, { path: prefix, files: directFiles, directories: dirs });
   }, 'hub/src/nest.js');
 
   // 3. GET /nest/file?path=X
