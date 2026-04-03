@@ -305,6 +305,7 @@ Every file in the repo belongs to exactly one service. A file not listed under a
 | **client** | The eyes | `hub/static/` | All files in hub/static/ |
 | **agent** | The hands | `agent/` | All files in agent/ |
 | **scripts** | The workhorses | `scripts/` | All files in scripts/ |
+| **openclaw** | The brain | repo root | `AGENTS.md`, `SOUL.md`, `IDENTITY.md`, `USER.md`, `HEARTBEAT.md`, `TOOLS.md` |
 | **meta** | The spec | repo root | All root-level files not claimed by another service |
 | **docs** | Reference | `docs/` | All files in docs/ |
 | **runtime** | Not in repo | — | config.env, setup.json, users.json, CLAUDE.md |

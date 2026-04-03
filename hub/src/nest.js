@@ -11,12 +11,15 @@ import { sendJson, sendError, parseQuery } from './server.js';
 
 // ── Service definitions ────────────────────────────────
 
+const OPENCLAW_FILES = new Set(['AGENTS.md', 'SOUL.md', 'IDENTITY.md', 'USER.md', 'HEARTBEAT.md', 'TOOLS.md']);
+
 const SERVICES = [
   { id: 'hub', role: 'The switchboard', root: 'hub/src' },
   { id: 'client', role: 'The eyes', root: 'hub/static' },
   { id: 'agent', role: 'The hands', root: 'agent' },
   { id: 'scripts', role: 'The workhorses', root: 'scripts' },
   { id: 'docs', role: 'Reference', root: 'docs' },
+  { id: 'openclaw', role: 'The brain', root: '' },
   { id: 'meta', role: 'The spec', root: '' },
 ];
 
@@ -151,9 +154,13 @@ function extractImports(content, ext, filePath, rootDir) {
 // ── Service assignment ─────────────────────────────────
 
 function assignService(relPath) {
-  // Check from most specific to least specific
+  // OpenClaw agent files — matched by filename
+  const basename = relPath.split('/').pop();
+  if (!relPath.includes('/') && OPENCLAW_FILES.has(basename)) return 'openclaw';
+
+  // Path-prefix matching, most specific first
   for (const svc of SERVICES) {
-    if (svc.id === 'meta') continue;
+    if (svc.id === 'meta' || svc.id === 'openclaw') continue;
     if (svc.root && relPath.startsWith(svc.root + '/')) return svc.id;
     if (svc.root && relPath.startsWith(svc.root + sep)) return svc.id;
   }
