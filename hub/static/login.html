@@ -132,7 +132,8 @@ code {
     <h1>Sign In</h1>
     <p class="subtitle">Use your admin password to enter the Nest.</p>
 
-    <input id="password" type="password" placeholder="Admin password" autofocus>
+    <input id="name" type="text" placeholder="Name" autofocus>
+    <input id="password" type="password" placeholder="Password">
 
     <div class="row">
       <button class="ghost" id="toggle">Show password</button>
@@ -143,10 +144,11 @@ code {
     <div class="status" id="status"></div>
 
     <div class="hint">
-      If login fails, verify <code>NEST_ADMIN_PASSWORD</code> in <code>/opt/nest/config.env</code>.
+      Default admin name is <code>Admin</code>. Password was set during onboarding.
     </div>
   </main>
 <script>
+const nameInput = document.getElementById("name");
 const password = document.getElementById("password");
 const statusEl = document.getElementById("status");
 const toggleBtn = document.getElementById("toggle");
@@ -177,7 +179,7 @@ async function handleLogin() {
     const res = await fetch("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password: value }),
+      body: JSON.stringify({ name: nameInput.value.trim(), password: value }),
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(body.error || body.detail || "Login failed");

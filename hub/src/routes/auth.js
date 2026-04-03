@@ -168,26 +168,14 @@ pw.onkeydown=e=>{if(e.key==="Enter")go.click()};
 </script></body></html>`);
   });
 
-  // Login — accepts { password } or { name, password }
+  // Login — requires { name, password }
   router.post('/auth/login', async (req, res) => {
     const { password, name } = req.body || {};
-    if (!password) return sendError(res, 400, 'Password required');
+    if (!name || !password) return sendError(res, 400, 'Name and password required');
 
     const users = await loadUsers();
-    let user;
-
-    if (name) {
-      // Look up by name
-      user = users.find((u) => u.name === name);
-    } else {
-      // No name provided — try all users (single-user convenience)
-      user = users.find((u) => verifyPassword(password, u.passwordHash));
-    }
-
-    if (!user) return sendError(res, 401, 'Invalid credentials');
-
-    // Verify password (skip if already verified in the no-name path)
-    if (name && !verifyPassword(password, user.passwordHash)) {
+    const user = users.find((u) => u.name === name);
+    if (!user || !verifyPassword(password, user.passwordHash)) {
       return sendError(res, 401, 'Invalid credentials');
     }
 
