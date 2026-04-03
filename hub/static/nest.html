@@ -199,7 +199,8 @@ async function showFolder(path, label) {
   renderBreadcrumb(segments);
   try {
     const data = await api('/api/nest/folder?path=' + encodeURIComponent(path));
-    const files = data.files || data.entries || data || [];
+    const dirs = (data.directories || []).map(d => ({ ...d, isDir: true, name: d.name || d.path?.split('/').pop() }));
+    const files = [...dirs, ...(data.files || [])];
     state.data = files;
     const el = document.getElementById('content');
     if (!files.length) { el.innerHTML = '<div class="folder-header"><h2>' + esc(label || path) + '</h2></div><p style="color:var(--muted)">Empty folder.</p>'; return; }
@@ -248,7 +249,7 @@ async function showFile(path) {
         <tr><th>Name</th><th>Params</th><th>Summary</th></tr>
         ${fns.map(f => `<tr>
           <td><strong>${esc(f.name)}</strong></td>
-          <td style="font-family:monospace;font-size:12px;color:var(--muted)">${esc((f.params || []).join(', '))}</td>
+          <td style="font-family:monospace;font-size:12px;color:var(--muted)">${esc(typeof f.params === 'string' ? f.params : (f.params || []).join(', '))}</td>
           <td style="color:var(--muted)">${esc(f.summary || f.description || '')}</td>
         </tr>`).join('')}
       </table></section>`;
@@ -347,11 +348,13 @@ document.addEventListener('click', e => {
 async function loadState() {
   try {
     const data = await api('/api/nest/state');
+    const hub = data.hub || {};
+    const agents = data.agents?.connected ?? data.agents ?? 0;
     const parts = [];
-    if (data.agents != null) parts.push(data.agents + ' agent' + (data.agents !== 1 ? 's' : ''));
-    if (data.containers != null) parts.push(data.containers + ' container' + (data.containers !== 1 ? 's' : ''));
-    if (data.uptime) parts.push('uptime ' + data.uptime);
-    if (data.routes != null) parts.push(data.routes + ' routes');
+    if (agents != null) parts.push(agents + ' agent' + (agents !== 1 ? 's' : ''));
+    const up = hub.uptime_seconds || hub.uptime || 0;
+    if (up) { const m = Math.floor(up / 60); parts.push('uptime ' + (m >= 60 ? Math.floor(m/60) + 'h' : m + 'm')); }
+    if (hub.routeCount || hub.routes) parts.push((hub.routeCount || hub.routes) + ' routes');
     document.getElementById('stateText').textContent = parts.join(' | ') || 'Connected';
   } catch (e) {
     document.getElementById('stateText').textContent = 'Disconnected';

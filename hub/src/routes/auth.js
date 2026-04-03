@@ -157,14 +157,15 @@ input{width:100%;padding:14px 16px;border:1px solid var(--line);border-radius:10
 button{border:0;border-radius:10px;padding:12px 14px;font:inherit;cursor:pointer}
 .primary{width:100%;background:var(--accent);color:#fff;font-weight:700;margin-top:4px}
 .status{min-height:22px;margin:8px 0 0;font-size:14px;text-align:center}.error{color:var(--error)}.ok{color:var(--ok)}
-</style></head><body><div class="card"><h1>Nest</h1><p>Direct login</p>
-<input id="pw" type="password" placeholder="Admin password" autofocus>
+</style></head><body><div class="card"><h1>Nest</h1>
+<input id="nm" type="text" placeholder="Name" autofocus>
+<input id="pw" type="password" placeholder="Password">
 <button class="primary" id="go">Sign in</button>
 <div class="status" id="st"></div></div>
 <script>
-const pw=document.getElementById("pw"),st=document.getElementById("st"),go=document.getElementById("go");
-go.onclick=async()=>{st.textContent="";try{const r=await fetch("/api/auth/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({password:pw.value.trim()})});const d=await r.json();if(!r.ok)throw new Error(d.error);localStorage.setItem("nest_token",d.token);st.className="status ok";st.textContent="OK";location.href="/"}catch(e){st.className="status error";st.textContent=e.message}};
-pw.onkeydown=e=>{if(e.key==="Enter")go.click()};
+const nm=document.getElementById("nm"),pw=document.getElementById("pw"),st=document.getElementById("st"),go=document.getElementById("go");
+go.onclick=async()=>{st.textContent="";try{const r=await fetch("/api/auth/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({name:nm.value.trim(),password:pw.value.trim()})});const d=await r.json();if(!r.ok)throw new Error(d.error);localStorage.setItem("nest_token",d.token);location.href="/"}catch(e){st.className="status error";st.textContent=e.message}};
+pw.onkeydown=nm.onkeydown=e=>{if(e.key==="Enter")go.click()};
 </script></body></html>`);
   });
 
