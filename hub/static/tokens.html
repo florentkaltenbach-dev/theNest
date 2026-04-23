@@ -309,6 +309,7 @@ function render() {
   const weekWindows = waste ? waste.week_total_windows : 0;
   const weekUnused = Math.max(0, weekWindows * 100 - weekBurned);
   const weekAvg = waste ? waste.week_avg_pct : 0;
+  const hasSamples = waste && waste.week_total_windows > 0;
   const codexHealthy = codex ? !codex.token_expired : false;
 
   let html = '';
@@ -343,8 +344,8 @@ function render() {
       renderStatPill('Overage', limits.overage_available ? 'available' : 'off',
         limits.overage_available ? 'var(--blue)' : 'var(--muted)') +
       renderStatPill('Current peak', currentPeak + '%', toneForPercent(currentPeak)) +
-      renderStatPill('Week avg burn', weekAvg + '%', 'var(--ink)') +
-      renderStatPill('Unused headroom', weekUnused + '%', 'var(--amber)') +
+      renderStatPill('Week avg burn', hasSamples ? weekAvg + '%' : 'no samples', hasSamples ? 'var(--ink)' : 'var(--muted)') +
+      renderStatPill('Unused headroom', hasSamples ? weekUnused + '%' : 'no samples', hasSamples ? 'var(--amber)' : 'var(--muted)') +
       '</div></div>';
 
     html += renderWindowHistory(waste ? waste.completed_windows : []);
