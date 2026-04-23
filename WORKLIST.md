@@ -83,8 +83,28 @@ S7 (hub storing secrets): confirmed still plaintext in `hub/src/routes/secrets.j
 
 ---
 
+## Evidence audit (2026-04-23)
+
+One-line verification per `[x]`. All confirmed live; no demotions to `[?]`.
+
+| Item | Evidence |
+|------|----------|
+| Track A delete orphan .ts | `ls /opt/nest/*.ts` → no such file. Commit `95f7e67`. |
+| Track B document canvas/enhance | `head -3 hub/src/routes/{canvas,enhance}.js` → convention headers present. Commit `95f7e67`. |
+| Track C S7 verdict recorded | `ROADMAP.md:31` carries S7 line with 2026-04-23 condition. Commit `95f7e67`. |
+| O1 scripts/tasks README | `ls scripts/tasks/README.md` → 2431 bytes. Commit `40473be`. |
+| O2 aggregate-telemetry | `echo '{}' \| scripts/tasks/aggregate-telemetry.sh` → emits summary JSON with 70 requests over 24h. Commit `40473be`. |
+| O6 /api/observability/tokens | `curl /api/routes \| jq '.routes[] \| select(.url=="/api/observability/tokens")'` → present. Commit `40473be`. |
+| O10 /observability page | Same curl for `/observability` → present. 20 pages loaded per `journalctl`. Commit `40473be`. |
+| Step 3 read waste data | Commit `589f0b3` records per-window numbers (1h/6h/24h/7d). |
+| Step 3 verdict | `589f0b3` records 7d=3.9% < 5% → skip O3/O4. |
+| C1 gateway running | `ss -tlnp \| grep 18789` → `openclaw-gateway` PID 323664. `curl 127.0.0.1:18789/` → 200. Pre-existing. |
+| C4 Caddyfile /claw/ | `systemctl is-active caddy` → active. `/etc/caddy/Caddyfile` contains `handle_path /claw/* { reverse_proxy localhost:18789 }`. Pre-existing. |
+
 ## Log
 
 - 2026-04-23 — WORKLIST created. Steps 1 and 2 already complete (committed 95f7e67, 40473be).
 - 2026-04-23 — Step 3 reassessment: 7d waste 3.9% < 5% threshold → O3/O4 skipped, advancing to step 4.
-- 2026-04-23 — Audit of ROADMAP vs reality. Surprise finds: C9 (chat.js) already routes to Codex CLI, A7 (`discovery.py`) pre-existing, C4 (Caddyfile) pre-existing. ROADMAP and WORKLIST sanitized to match. Only genuine remaining Phase 3 gates are C2 (HUMAN) and C3 (post-C2).
+- 2026-04-23 — Audit of ROADMAP vs reality. Surprise finds: C9 (chat.js) already routes to Codex CLI, A7 (`discovery.py`) pre-existing, C4 (Caddyfile) pre-existing. ROADMAP and WORKLIST sanitized to match.
+- 2026-04-23 — Convention update: `[/]` partial, `[?]` review, `blocked-on` suffix, removal-goal audit rule added to AGENTS.md. Applied to E7, I7, A7, C3, C5, C9, C10.
+- 2026-04-23 — Evidence audit: all 11 `[x]` items verified with live commands. No demotions.
