@@ -341,8 +341,8 @@ server.on('upgrade', (req, socket, head) => {
 
 // ── Listen ──────────────────────────────────────────────
 
-const port = parseInt(process.env.PORT || '3000', 10);
-const host = process.env.HOST || '0.0.0.0';
+const port = parseInt(process.env.NEST_PORT || process.env.PORT || '3000', 10);
+const host = process.env.NEST_HOST || process.env.HOST || '0.0.0.0';
 
 server.listen(port, host, () => {
   console.log(`Hub listening on ${host}:${port}`);

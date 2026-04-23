@@ -1,16 +1,15 @@
 [Unit]
-Description=Nest Agent
-After=network-online.target docker.service nest-hub.service
+Description=theNest Hub
+After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
 User=claude
 Group=claude
-WorkingDirectory=/opt/nest/agent
+WorkingDirectory=/opt/nest/hub
 EnvironmentFile=/opt/nest/config.env
-Environment=NEST_HUB_URL=ws://localhost:3000/ws/agent
-ExecStart=/opt/nest/agent/venv/bin/python -m nest_agent.main
+ExecStart=/usr/bin/node src/index.js
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal
