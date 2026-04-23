@@ -56,10 +56,22 @@ Per 2026-04-23 audit: the C-chain is mostly already done (some via pre-existing 
 - [ ] C2: Codex OAuth `HUMAN`. Open `https://nest.kaltenbach.dev/claw/`, run onboarding, pick `openai-codex`.
 - [ ] C3: WebChat channel. `blocked-on: C2` (Control UI requires authenticated session).
 - [x] C4: Caddyfile — pre-existing, `/claw/` → `localhost:18789`.
-- [?] C9: chat.js uses local Codex CLI — functionally live, different backend than ROADMAP's "WebChat proxy" plan. **Architecture decision outstanding — see `docs/ADR-001-chat-pathway.md`.** Same `/chat/send` contract, but whether this counts as "done" depends on whether OpenClaw is the intended chat pathway or not.
+- [x] C9: Codex CLI backend live in `chat.js`. Per ADR-001 (accepted), Codex is one of two chat backends; a Nest-owned interface will route between them. `/chat/send` contract preserved. Follow-up: **C9b** below for the OpenClaw backend wiring.
 - [ ] C10: telemetry bridge — aggregator points at `/home/claude/.openclaw/logs/telemetry.jsonl`. `blocked-on: C2` (no telemetry until OpenClaw processes chat via the gateway).
 - [/] C5: `skills/server-overview/SKILL.md` skeleton drafted — triggers/API/thresholds written. Missing: end-to-end test with an authenticated OpenClaw (`blocked-on: C2`) and a decision on skill-dispatch mechanism pending ADR-001.
-- [ ] `REASSESS` end-of-phase checkpoint — after C2, verify: chat returns real replies, telemetry file exists, observability page shows OpenClaw data. Also re-open ADR-001 and close out C9's `[?]`.
+- [ ] C9b: OpenClaw backend wired into the custom chat interface. `blocked-on: C2` and on custom-interface scope (step 4.5 below). Parallel to C9; does not replace it.
+- [ ] `REASSESS` end-of-phase checkpoint — after C2, verify: OpenClaw returns real replies via `/claw/`, telemetry file materializes, observability page shows OpenClaw data in addition to hub requests. Week of usage before scoping the custom interface.
+
+## Step 4.5 — Custom Nest chat interface (placeholder)
+
+Per ADR-001. Not scoped yet. Exists here so we don't lose it.
+
+- [ ] Design: how does the interface decide Codex vs OpenClaw per request? (User toggle, task type, slash-commands, first-available — see Nest.md §16 → Chat backends.)
+- [ ] Design: does history carry across backend switches?
+- [ ] Design: unified telemetry view across both backends in `/observability`.
+- [ ] Implementation: new `hub/static/chat.html` (or amend existing) + backend router in `chat.js` or a new route.
+
+**Prerequisite:** at least one week of usage with both engines running, so routing decisions are informed by what each is actually good at.
 
 ## Step 5 — Phase 3 skill fan-out (parallelizable after C5)
 

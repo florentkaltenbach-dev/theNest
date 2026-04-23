@@ -390,7 +390,11 @@ Claude Code runs in a Docker container. The agent manages its filesystem access:
 
 ## 7. OpenClaw integration
 
-OpenClaw serves as the conversational interface. It does not perform tasks directly — it routes user intents to the appropriate appendages.
+OpenClaw is **one** conversational backend among potentially several. It routes user intents to the appropriate appendages via skills (molts). It does not perform tasks directly.
+
+As of 2026-04-23 the Nest also runs a second backend — a direct Codex CLI integration in `hub/src/routes/chat.js` — good at hub-context reasoning and workspace-write flows. A custom Nest chat interface will route between backends based on request type; the routing logic itself is an open thread (see §16 → Chat backends). See `docs/ADR-001-chat-pathway.md` for the full rationale.
+
+For the OpenClaw-routed case:
 
 ### Routing example
 
@@ -769,6 +773,11 @@ Issues identified but not yet resolved. Flagged so the coding agent skips or ask
 - Local model hosting: runtime selection, resource limits, scheduling
 - Appendage marketplace: publishing, review, trust, installation
 - Claude Code access granularity (currently: unrestricted)
+
+### Chat backends
+- **Backend routing** — how does the Nest chat interface decide between Codex CLI and OpenClaw for a given request? Candidates: user preference (toggle in UI), task type (write-mode → Codex, skill-dispatch → OpenClaw), explicit selection ("/claw", "/codex"), first-available fallback. No decision yet. Revisit after a week of running both engines (post-C2) with real usage data.
+- **Shared state between backends** — if a user starts a conversation with Codex and switches to OpenClaw mid-thread, does history carry? Probably not for v1; flag in UI when backend changes.
+- **Telemetry unification** — the observability page reads `requests.jsonl` (Codex path) and `~/.openclaw/logs/telemetry.jsonl` (OpenClaw path) separately. A unified view requires normalization.
 
 ### Business
 - Setup service pricing model

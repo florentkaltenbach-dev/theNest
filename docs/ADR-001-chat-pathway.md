@@ -1,8 +1,26 @@
 # ADR-001: Chat pathway
 
-> **Status:** proposed, decision pending
+> **Status:** accepted (Option C, reframed)
 > **Date:** 2026-04-23
 > **Context:** Phase 3 C9 audit surfaced a gap between the planned architecture and the shipped code.
+
+## Decision
+
+**Both backends coexist. A custom Nest chat interface will route between them; design deferred.**
+
+- **Codex CLI** stays as the hub-context / write-mode backend. `chat.js` as shipped.
+- **OpenClaw** stays as the skills/molts + multi-channel backend. Authenticated via C2, reachable at `/claw/`.
+- **Above both**: a Nest-owned interface decides which engine handles a given request. Not yet designed (open thread in Nest.md §15).
+
+Earlier options A (adopt direct-Codex only) and B (revert and build WebChat proxy) are not chosen. A would lose OpenClaw's skill/channel capabilities; B would lose Codex CLI's workspace-write UX. The two are *different tools*, not competing chat implementations.
+
+## Consequences
+
+- **C9 stays `[x]`** — but its meaning is narrowed: "Codex backend is live." A parallel `C9b` (OpenClaw backend wired into the custom interface) will be needed post-C2. ROADMAP and WORKLIST reflect this.
+- **Nest.md §7 stays valid** for the OpenClaw path. §7 is amended to note that OpenClaw is *one* backend, not *the* backend.
+- **Nest.md §15 gets a new open thread:** "Chat backend routing — how does the Nest interface pick Codex vs OpenClaw for a given request? User preference, task type, explicit selection?"
+- **C2, C3, C5, C10 proceed as planned.** They bring OpenClaw online; that's still a prerequisite for skills and telemetry.
+- **Custom chat interface** is a new scope item, placeholder in WORKLIST. Design conversation after a week of running both engines, when we know what each is good at.
 
 ## Planned (Nest.md §7 + ROADMAP C9)
 
@@ -75,12 +93,15 @@ Route normal chat through OpenClaw (for skill dispatch, telemetry, channels). Ke
 Pro: Best of both. Matches how humans actually work (conversation ≠ coding).
 Con: Two auth flows. Two telemetry streams. UI has to know which mode it's in.
 
-## Recommendation
+## Recommendation (historical — superseded by decision above)
 
-**Option A**, with one caveat. The Codex-CLI path is already working and demonstrably better at the thing it does (code edits with full workspace context). Reverting it for spec purity costs real capability. Update Nest.md to reflect reality: OpenClaw becomes an *optional* conversational channel (Telegram, Slack, etc.) for workflows where that interface matters, but the primary dashboard chat talks to Codex directly. Skills become Codex-CLI-level tools or context-builder modules, not OpenClaw-side dispatchers. `IClawAdapter` stays in §5 for anyone who wants the OpenClaw integration — just no longer required.
+Earlier draft of this ADR recommended Option A with a post-C2 Option-C experiment. User reframed Option C: both backends coexist as *tools*, and a custom Nest interface routes. This reframing removes the wastefulness objection to C (no duplicated chat pathway — different jobs) and is now accepted.
 
-The caveat: before committing to A, try **one** Option-C experiment post-C2 to see whether OpenClaw adds enough value (skill dispatch, telemetry) to justify the second path. If not, A is the answer.
+## What to do next (derived from the decision)
 
-## Decision
-
-_Pending user review._ Once chosen, update Nest.md §7, ROADMAP C5–C10, and resolve C9's `[?]` in WORKLIST.
+- [x] ADR status flipped to accepted (this commit).
+- [ ] Nest.md §7 amended to note OpenClaw is one backend, not the only one.
+- [ ] Nest.md §15 gets a new open thread on chat backend routing.
+- [ ] WORKLIST: C9 `[?]` → `[x]` with "Codex backend" note. Add placeholder for the custom interface.
+- [ ] ROADMAP: C9 `[?]` → `[x]` with same note. Flag C9b as follow-up (OpenClaw backend wiring, post-C2).
+- [ ] `REASSESS` after C2: spend a week using both engines. Only then scope the custom-interface router.

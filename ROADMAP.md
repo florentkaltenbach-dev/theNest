@@ -112,7 +112,8 @@ Install OpenClaw in Docker. Authenticate with ChatGPT subscription via Codex OAu
 
 ### Hub integration
 
-- [?] **C9: Chat route replaced** — `hub/src/routes/chat.js` calls local `codex` CLI (model `gpt-5.4`) with agent/Hetzner/history context, supports `/apply` write mode. **Different architecture** than the "replace stub with OpenClaw WebChat proxy" plan. Functional (`/chat/send` contract preserved), but whether this satisfies C9 depends on whether OpenClaw remains the chat pathway. See `docs/ADR-001-chat-pathway.md`.
+- [x] **C9: Codex backend in chat.js** — `hub/src/routes/chat.js` calls local `codex` CLI (model `gpt-5.4`) with agent/Hetzner/history context, supports `/apply` write mode. Per ADR-001 (accepted 2026-04-23), Codex is one of two chat backends. Same `/chat/send` contract.
+- [ ] **C9b: OpenClaw backend wired in** — After C2, add a path that targets OpenClaw's WebChat `send` endpoint. Custom interface (step 4.5 in WORKLIST) decides which backend gets each request.
 - [~] **C10: Telemetry bridge** — Aggregator defaults `OPENCLAW_TELEMETRY=/home/claude/.openclaw/logs/telemetry.jsonl`. File doesn't exist yet (OpenClaw hasn't written telemetry without auth). Activates automatically after C2.
 
 ---
