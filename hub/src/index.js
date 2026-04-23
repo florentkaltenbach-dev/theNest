@@ -30,6 +30,7 @@ import { projectRoutes } from './routes/projects.js';
 import { tokenRoutes } from './routes/tokens.js';
 import { artifactRoutes } from './routes/artifacts.js';
 import { canvasRoutes } from './routes/canvas.js';
+import { observabilityRoutes } from './routes/observability.js';
 import { handleAgentWs, handleClientWs, getAgentData } from './ws/agentHandler.js';
 import { createTerminalHandler } from './ws/terminal.js';
 import { scanNest, nestRoutes } from './nest.js';
@@ -198,6 +199,7 @@ projectRoutes(api);
 tokenRoutes(api);
 artifactRoutes(api);
 canvasRoutes(api);
+observabilityRoutes(api);
 
 // Self-knowledge engine
 const nestState = await scanNest(NEST_ROOT, { pages });

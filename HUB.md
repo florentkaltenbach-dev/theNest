@@ -43,6 +43,7 @@ Every page the Hub serves is registered here. A path not listed here returns 404
 | `/server` | `server.html` | Server Detail | yes |
 | `/tasks` | `tasks.html` | Tasks | yes |
 | `/nest` | `nest.html` | Nest Explorer | yes |
+| `/observability` | `observability.html` | Observability | yes |
 
 The last entry — `/nest` — is the self-generated interface. One HTML page that fetches from the self-knowledge API and renders the Nest's own structure.
 

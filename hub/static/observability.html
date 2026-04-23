@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nest — Observability</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<style>
+  body{margin:0;background:#f5f5f5;color:#1a1a2e;font:14px/1.45 system-ui,sans-serif}
+  .top{background:#1a1a2e;color:#fff;padding:12px 16px}
+  .nav a{color:#8b8fa3;text-decoration:none;margin-right:12px;font-weight:700;font-size:12px}
+  .nav a.active{color:#fff}
+  .page{max-width:1040px;margin:0 auto;padding:16px}
+  h1{margin:8px 0 12px 0}
+  .controls{display:flex;gap:8px;align-items:center;margin-bottom:16px;font-size:13px}
+  .controls select,.controls button{font:inherit;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;background:#fff;cursor:pointer}
+  .controls button{background:#1a1a2e;color:#fff;border-color:#1a1a2e}
+  .meta{color:#6b7280;font-size:12px;margin-left:auto}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:16px}
+  .card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px}
+  .card .k{font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;font-weight:700}
+  .card .v{font-size:28px;font-weight:700;margin-top:6px}
+  .card .sub{font-size:12px;color:#6b7280;margin-top:2px}
+  .waste-low{color:#15803d}
+  .waste-mid{color:#b45309}
+  .waste-high{color:#b91c1c}
+  .section{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px;margin-bottom:12px}
+  .section h2{margin:0 0 10px 0;font-size:14px;text-transform:uppercase;color:#6b7280;letter-spacing:0.5px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:6px 8px;border-bottom:1px solid #f0f0f0}
+  th{color:#6b7280;font-weight:700;font-size:11px;text-transform:uppercase}
+  td.num{text-align:right;font-variant-numeric:tabular-nums}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .badge{display:inline-block;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:700;color:#fff}
+  .bar{display:flex;align-items:center;gap:6px}
+  .bar-fill{height:6px;background:#e5e7eb;border-radius:3px;flex:1;overflow:hidden}
+  .bar-fill > span{display:block;height:100%;background:#1a1a2e}
+  .placeholder{color:#9ca3af;font-style:italic}
+  .err{color:#b91c1c;padding:12px;background:#fee;border:1px solid #fcc;border-radius:6px}
+</style>
+</head>
+<body>
+<div class="top"><div class="nav">
+  <a href="/">Servers</a>
+  <a href="/nest">Nest</a>
+  <a href="/roadmap">Roadmap</a>
+  <a href="/observability" class="active">Observability</a>
+  <a href="/routes">Routes</a>
+  <a href="/settings">Settings</a>
+</div></div>
+<div class="page">
+  <h1>Observability</h1>
+  <div class="controls">
+    <label>Window:</label>
+    <select id="window">
+      <option value="60">Last hour</option>
+      <option value="360">Last 6h</option>
+      <option value="1440" selected>Last 24h</option>
+      <option value="10080">Last 7d</option>
+    </select>
+    <button id="refresh">Refresh</button>
+    <span class="meta" id="meta"></span>
+  </div>
+  <div id="app">Loading…</div>
+</div>
+<script>
+const t = localStorage.getItem("nest_token");
+if (!t) location.href = "/login";
+
+const esc = s => String(s ?? "").replace(/[&<>"]/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
+const METHOD_COLORS = {GET:"#22c55e",POST:"#3b82f6",PUT:"#f59e0b",PATCH:"#f59e0b",DELETE:"#ef4444",HEAD:"#6366f1"};
+
+function wasteClass(pct) {
+  if (pct < 5) return "waste-low";
+  if (pct < 15) return "waste-mid";
+  return "waste-high";
+}
+
+function fmtTs(iso) {
+  try { return new Date(iso).toLocaleString(); } catch { return iso; }
+}
+
+function render(d) {
+  const w = d.hub?.waste || {};
+  const r = d.hub?.requests || {};
+  const pct = w.wastePct || 0;
+  const cls = wasteClass(pct);
+  const lat = r.latencyMs || {};
+
+  const cards = `
+    <div class="cards">
+      <div class="card"><div class="k">Total requests</div><div class="v">${r.total || 0}</div><div class="sub">window: ${d.windowMinutes} min</div></div>
+      <div class="card"><div class="k">Waste</div><div class="v ${cls}">${pct.toFixed(1)}%</div><div class="sub">errors + dupes / total</div></div>
+      <div class="card"><div class="k">Errors (4xx/5xx)</div><div class="v">${w.errorRequests || 0}</div><div class="sub">of ${w.totalRequests || 0}</div></div>
+      <div class="card"><div class="k">Duplicates &lt;2s</div><div class="v">${w.duplicateRequests || 0}</div><div class="sub">likely retries</div></div>
+      <div class="card"><div class="k">p95 latency</div><div class="v">${lat.p95 || 0}<span style="font-size:14px;color:#6b7280"> ms</span></div><div class="sub">p50: ${lat.p50 || 0} · max: ${lat.max || 0}</div></div>
+    </div>`;
+
+  const byStatus = Object.entries(r.byStatus || {}).sort().map(([k,v]) => `<tr><td>${esc(k)}</td><td class="num">${v}</td></tr>`).join("") || '<tr><td colspan="2" class="placeholder">No data</td></tr>';
+  const byMethod = Object.entries(r.byMethod || {}).sort().map(([k,v]) =>
+    `<tr><td><span class="badge" style="background:${METHOD_COLORS[k] || "#6b7280"}">${esc(k)}</span></td><td class="num">${v}</td></tr>`).join("") || '<tr><td colspan="2" class="placeholder">No data</td></tr>';
+
+  const topMax = Math.max(1, ...(r.topPaths || []).map(p => p.count));
+  const topPaths = (r.topPaths || []).map(p => `
+    <tr>
+      <td class="mono">${esc(p.path)}</td>
+      <td class="num">${p.count}</td>
+      <td><div class="bar"><div class="bar-fill"><span style="width:${(p.count/topMax*100).toFixed(0)}%"></span></div></div></td>
+    </tr>`).join("") || '<tr><td colspan="3" class="placeholder">No data</td></tr>';
+
+  const tokenPeaks = (d.tokens?.windows?.recentPeaks || []).map(p =>
+    `<tr><td class="mono">${esc(fmtTs(p.ended))}</td><td class="num">${p.peak_pct}%</td></tr>`).join("") || '<tr><td colspan="2" class="placeholder">No token windows yet</td></tr>';
+
+  const oc = d.openclaw || {};
+  const openclawSection = oc.available
+    ? `<div class="section"><h2>OpenClaw telemetry</h2><div>${oc.eventCount} events. Providers: <span class="mono">${esc(JSON.stringify(oc.byProvider))}</span></div></div>`
+    : `<div class="section"><h2>OpenClaw telemetry</h2><div class="placeholder">${esc(oc.reason || "Not available yet")}</div></div>`;
+
+  return `
+    ${cards}
+    <div class="section">
+      <h2>Top paths</h2>
+      <table><thead><tr><th>Path</th><th class="num">Hits</th><th style="width:30%"></th></tr></thead><tbody>${topPaths}</tbody></table>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="section"><h2>By status</h2><table><tbody>${byStatus}</tbody></table></div>
+      <div class="section"><h2>By method</h2><table><tbody>${byMethod}</tbody></table></div>
+    </div>
+    <div class="section">
+      <h2>Token windows (recent)</h2>
+      <table><thead><tr><th>Window end</th><th class="num">Peak %</th></tr></thead><tbody>${tokenPeaks}</tbody></table>
+    </div>
+    ${openclawSection}
+  `;
+}
+
+async function load() {
+  const win = document.getElementById("window").value;
+  document.getElementById("app").innerHTML = "Loading…";
+  try {
+    const res = await fetch(`/api/observability/tokens?window=${win}`, { headers: { Authorization: "Bearer " + t } });
+    if (res.status === 401) { localStorage.removeItem("nest_token"); location.href = "/login"; return; }
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+    const d = await res.json();
+    document.getElementById("meta").textContent = `Generated ${fmtTs(d.generatedAt)} · ${d._source || ""}`;
+    document.getElementById("app").innerHTML = render(d);
+  } catch (e) {
+    document.getElementById("app").innerHTML = `<div class="err">${esc(e.message)}</div>`;
+  }
+}
+
+document.getElementById("refresh").addEventListener("click", load);
+document.getElementById("window").addEventListener("change", load);
+load();
+</script>
+</body>
+</html>
