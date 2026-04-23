@@ -48,19 +48,18 @@ Nothing in the data resembles "AI-for-data-fetching waste" that O3/O4 would catc
 - [x] Read waste data across windows.
 - [x] Verdict: 7d waste 3.9% < 5% threshold. Skip O3/O4.
 
-## Step 4 — Phase 3 OpenClaw (strict sequential)
+## Step 4 — Phase 3 OpenClaw
 
-- [x] C1: OpenClaw gateway running (2026-04-23).
-  - Pre-existing native install under `claude` user (`systemd --user`, binary `openclaw-gateway`, port 18789, config at `/home/claude/.openclaw/`). Started Apr 2. Control UI responds.
-  - Docker compose template kept as `scripts/templates/docker-compose.openclaw.yml` for future fresh-provisioning. Image now `alpine/openclaw:latest` (Docker Hub mirror of the IPv4-only ghcr.io official) — verified pull works over IPv6, container starts cleanly when port 18789 isn't already bound.
-  - IPv6-only blocker from earlier attempt dissolved via route-around (see AGENTS.md §Before escalating to a HUMAN gate).
-- [ ] C2: Codex OAuth onboarding `HUMAN` (requires browser). Gateway is unauthenticated — `agents.main.models.json` has `provider: null`, `wizard_done: null`, no Codex token. Run in browser: `http://127.0.0.1:18789/` (or via Caddy at `https://nest.kaltenbach.dev/claw/`) → onboarding wizard → choose `openai-codex`, complete OAuth.
-- [ ] C3: WebChat channel + gateway token auth
-- [ ] C10: telemetry bridge — pipe `~/.openclaw/logs/telemetry.jsonl` into O2 aggregator (Phase 2↔3 seam, must land right after C3 so token data stays unified)
-- [x] C4: Caddyfile route `/claw/` → `localhost:18789` — already present in `/etc/caddy/Caddyfile` (verified 2026-04-23). Activates as soon as OpenClaw is running.
-- [ ] C9: replace `hub/src/routes/chat.js` keyword stub with WebChat proxy
-- [~] C5: `server-overview` skill — **skeleton drafted at `skills/server-overview/SKILL.md`**. Defines triggers, API to call (`GET /api/agents`), output format, thresholds, fallbacks. Real test requires OpenClaw running (C2 dependency).
-- [ ] `REASSESS` end-of-phase checkpoint
+Per 2026-04-23 audit: the C-chain is mostly already done (some via pre-existing code, some this session). Only C2 + C3 remain, both blocked on the user.
+
+- [x] C1: gateway running — native install, port 18789 (2026-04-23).
+- [ ] C2: Codex OAuth `HUMAN`. Open `https://nest.kaltenbach.dev/claw/`, run onboarding, pick `openai-codex`.
+- [ ] C3: WebChat channel — gated on C2. Configure via Control UI post-onboarding.
+- [x] C4: Caddyfile — pre-existing, `/claw/` → `localhost:18789`.
+- [x] C9: chat.js uses local Codex CLI — pre-existing. Different backend than the ROADMAP's WebChat-proxy plan; same `/chat/send` contract. Includes agent-metric context and `/apply` write mode.
+- [~] C10: telemetry bridge — aggregator points at `/home/claude/.openclaw/logs/telemetry.jsonl`. File materializes once OpenClaw processes chat (i.e., after C2).
+- [~] C5: `skills/server-overview/SKILL.md` skeleton drafted. End-to-end validation requires C2.
+- [ ] `REASSESS` end-of-phase checkpoint — after C2, verify: chat via `/claw/` returns real replies, telemetry file exists, observability page shows OpenClaw data.
 
 ## Step 5 — Phase 3 skill fan-out (parallelizable after C5)
 
@@ -72,13 +71,15 @@ Dispatch C6/C7/C8 as three subagents in parallel **only after** C5 proves the pa
 
 ## Step 6+ — Menu (not active)
 
-Selection happens after step 5 completes.
+Selection happens after step 5 completes. Audit 2026-04-23 updated the baseline — items marked `[x]` or `[~]` are already done or partial and can be skipped or shortened when their phase becomes active.
 
-- Phase 4 (age encryption): E1, E2, E3, E4, E5, E6, E7
-- Phase 5 (appendages): A1–A9
-- Phase 6 (client): U4–U9
-- Phase 7 (infra): I1–I8
-- Phase 8 (Dockbase): D1–D5
+- **Phase 4 (age encryption):** E1–E5 not started. E6 not done (hub still proxies Hetzner; client-direct is the goal). E7 partial (`secrets.html` has CRUD; no encrypted export/import).
+- **Phase 5 (appendages):** A1 [x] (`config/appendage-schema.json`). A7 [x] (pre-existing `agent/nest_agent/discovery.py`, git-repo discovery only — Docker/systemd/port discovery still open). A2–A6, A8, A9 open.
+- **Phase 6 (client):** U4 [x] (`DESIGN.md`). U5–U9 open.
+- **Phase 7 (infra):** I1–I8 all open. I7 partial (5MB cap on `requests.jsonl` with 50% rotation; no per-period archival).
+- **Phase 8 (Dockbase):** D1–D5 open.
+
+S7 (hub storing secrets): confirmed still plaintext in `hub/src/routes/secrets.js` → `/opt/nest/config.env`. Rides with Phase 4 per 2026-04-23 decision.
 
 ---
 
@@ -86,3 +87,4 @@ Selection happens after step 5 completes.
 
 - 2026-04-23 — WORKLIST created. Steps 1 and 2 already complete (committed 95f7e67, 40473be).
 - 2026-04-23 — Step 3 reassessment: 7d waste 3.9% < 5% threshold → O3/O4 skipped, advancing to step 4.
+- 2026-04-23 — Audit of ROADMAP vs reality. Surprise finds: C9 (chat.js) already routes to Codex CLI, A7 (`discovery.py`) pre-existing, C4 (Caddyfile) pre-existing. ROADMAP and WORKLIST sanitized to match. Only genuine remaining Phase 3 gates are C2 (HUMAN) and C3 (post-C2).

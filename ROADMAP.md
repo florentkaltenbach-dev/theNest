@@ -65,22 +65,22 @@ Build the measurement and automation layer before adding AI. Scripts do the heav
 
 ### Scripts layer
 
-- [ ] **O1: Create `scripts/tasks/` directory** — Reusable scripts that both AIs and cron jobs can invoke. Each script takes JSON args, returns JSON output.
-- [ ] **O2: `aggregate-telemetry.sh`** — Reads OpenClaw telemetry JSONL + hub request logs. Computes: total tokens, tokens per provider, waste estimate. Writes summary JSON to `/opt/nest/data/telemetry-summary.json`.
-- [ ] **O3: `api-surface-snapshot.sh`** — Scrapes all inter-component API interactions (hub↔agent, hub↔claw, hub↔Hetzner, hub↔client). Writes manifest JSON to `/opt/nest/data/api-surface.json`.
-- [ ] **O4: Cron jobs** — Install crontab entries on server: telemetry aggregation every 5 min, API surface snapshot every 15 min.
+- [x] **O1: `scripts/tasks/` directory** — 2026-04-23. README defines JSON-in/JSON-out contract.
+- [x] **O2: `aggregate-telemetry.sh`** — 2026-04-23. Reads `requests.jsonl` + token-windows, writes `/opt/nest/data/telemetry-summary.json`. Leaves OpenClaw slot for C10.
+- [~] **O3: `api-surface-snapshot.sh`** — Skipped per step 3 reassessment (2026-04-23). Obviated by existing `/api/nest/wiring` + `/api/nest/surface` self-knowledge endpoints. Re-open if the signal changes.
+- [~] **O4: Cron jobs** — Skipped per step 3 reassessment (7d waste 3.9%, below 5% threshold). Re-open if aggregation-on-demand becomes a bottleneck.
 
 ### Hub observability endpoints
 
 - [x] **O5: Hub request logging** — (2026-04-03) Append-only JSONL at `/opt/nest/data/requests.jsonl`. Every request: ts, method, path, status, ms. 5MB cap with auto-rotation.
-- [ ] **O6: `GET /api/observability/tokens`** — Serves telemetry summary JSON. Token usage by provider, waste counter, 5-min granularity.
+- [x] **O6: `GET /api/observability/tokens`** — 2026-04-23. Auto-regenerates summary if >5 min stale.
 - [x] **O7: API surface** — (2026-04-03) Superseded by self-knowledge API: `GET /api/nest/surface` returns all routes grouped by file. `GET /api/nest/wiring` shows external connections.
 - [x] **O8: `GET /api/roadmap`** — Already implemented in `routes/roadmap.js`.
 
 ### Client pages
 
 - [x] **O9: Roadmap page** — `hub/static/roadmap.html`. Renders ROADMAP.md from `/api/roadmap`. Accessible at `/roadmap`.
-- [ ] **O10: Observability page** — standalone HTML page. Token counter, API surface map, waste indicator. Accessible at `/observability`.
+- [x] **O10: Observability page** — 2026-04-23. `/observability` — waste indicator, top paths, status/method breakdown, window selector.
 
 ### What counts as "wasted"
 
@@ -98,22 +98,22 @@ Install OpenClaw in Docker. Authenticate with ChatGPT subscription via Codex OAu
 
 ### Install
 
-- [ ] **C1: Docker Compose for OpenClaw** — Slim image (`node:22-bookworm-slim`, ~500MB). Mount volumes for config + data. Add to server's Docker setup.
-- [ ] **C2: Codex OAuth authentication** — Run `openclaw onboard --auth-choice openai-codex`. Interactive — requires user to paste OAuth URL in browser. Uses ChatGPT subscription (flat rate, no per-token billing).
-- [ ] **C3: WebChat channel** — Enable built-in WebChat. Configure gateway auth (token mode).
-- [ ] **C4: Caddyfile route** — Reverse proxy `/claw/` to OpenClaw WebChat port. TLS via existing cert.
+- [x] **C1: OpenClaw gateway running** — 2026-04-23. Native install (not Docker) under `claude` user's `systemd --user`, port 18789, config `/home/claude/.openclaw/`. Docker compose template kept for fresh-provisioning (`scripts/templates/docker-compose.openclaw.yml`, `alpine/openclaw:latest`).
+- [ ] **C2: Codex OAuth authentication** — `HUMAN`. Gateway unauthenticated (`agents/main/models.json` has `provider: null`, `wizard_done: null`). Browser: `https://nest.kaltenbach.dev/claw/` → onboarding → `openai-codex`.
+- [~] **C3: WebChat channel** — PARTIAL. Gateway UI serves but no WebChat channel config in `/home/claude/.openclaw/openclaw.json`. Needs C2 first.
+- [x] **C4: Caddyfile route** — Pre-existing. `/etc/caddy/Caddyfile` routes `/claw/` → `localhost:18789` with WebSocket upgrade.
 
 ### Nest skills
 
-- [ ] **C5: `server-overview` skill** — SKILL.md that calls `GET /api/agents` for live metrics. Claw reads pre-computed data, no tokens wasted on data fetching.
+- [~] **C5: `server-overview` skill** — Skeleton drafted 2026-04-23 at `skills/server-overview/SKILL.md`. Real validation requires C2.
 - [ ] **C6: `container-manager` skill** — SKILL.md for start/stop/restart/logs via hub API.
 - [ ] **C7: `script-runner` skill** — SKILL.md that invokes scripts from `scripts/tasks/`. Claw triggers, script executes, Claw interprets result.
 - [ ] **C8: `token-report` skill** — SKILL.md that reads `/api/observability/tokens`. Claw can report on its own efficiency.
 
 ### Hub integration
 
-- [ ] **C9: Route chat through OpenClaw** — Replace `hub/src/routes/chat.js` keyword stub with OpenClaw WebChat proxy. Preserve existing API contract (`POST /chat/send` → `{userMessage, assistantMessage}`).
-- [ ] **C10: Telemetry bridge** — Feed OpenClaw's `~/.openclaw/logs/telemetry.jsonl` into the observability pipeline (O2 script reads it).
+- [x] **C9: Chat route replaced** — Pre-existing. `hub/src/routes/chat.js` calls local `codex` CLI (model `gpt-5.4`) with agent/Hetzner/history context, supports `/apply` write mode. Different backend than the original "WebChat proxy" plan (direct Codex CLI, not via gateway WebChat), same API contract.
+- [~] **C10: Telemetry bridge** — Aggregator defaults `OPENCLAW_TELEMETRY=/home/claude/.openclaw/logs/telemetry.jsonl`. File doesn't exist yet (OpenClaw hasn't written telemetry without auth). Activates automatically after C2.
 
 ---
 
@@ -157,7 +157,7 @@ Transform the hardcoded catalog into the pluggable schema-driven architecture fr
 ### Agent lifecycle
 
 - [ ] **A6: Full lifecycle in agent** — Create `agent/nest_agent/lifecycle.py`. Install, remove, update appendages. Handle volume management, port allocation, route registration.
-- [ ] **A7: Service discovery** — Create `agent/nest_agent/discovery.py`. Auto-detect running services (Docker containers, systemd units, listening ports) and match to known appendages.
+- [x] **A7: Service discovery** — Pre-existing. `agent/nest_agent/discovery.py` scans git repos with metadata. Docker/systemd/port discovery not yet wired; repo discovery is.
 - [ ] **A8: Git discovery** — Create `agent/nest_agent/git.py`. List repos on server with branch, recent commits.
 
 ### Peer APIs
@@ -176,7 +176,7 @@ Polish the client into the distinctive, European aesthetic described in Nest.md.
 
 ### Design
 
-- [ ] **U4: Design system** — Color tokens, spacing scale, typography. Dark mode and light mode. Follow system setting.
+- [x] **U4: Design tokens** — 2026-04-23. `DESIGN.md` — palette, method badges, typography, spacing, patterns. Dark mode deferred to U5.
 - [ ] **U5: Distinctive UI** — The spec says "European aesthetic, coding agent designs freely." This is the creative phase — make it beautiful.
 
 ### Features
