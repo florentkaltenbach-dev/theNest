@@ -58,9 +58,9 @@ Nothing in the data resembles "AI-for-data-fetching waste" that O3/O4 would catc
 - [ ] C2: Codex OAuth onboarding `HUMAN` (requires browser, also blocked until C1 deploys)
 - [ ] C3: WebChat channel + gateway token auth
 - [ ] C10: telemetry bridge — pipe `~/.openclaw/logs/telemetry.jsonl` into O2 aggregator (Phase 2↔3 seam, must land right after C3 so token data stays unified)
-- [ ] C4: Caddyfile route `/claw/` → OpenClaw WebChat port
+- [x] C4: Caddyfile route `/claw/` → `localhost:18789` — already present in `/etc/caddy/Caddyfile` (verified 2026-04-23). Activates as soon as OpenClaw is running.
 - [ ] C9: replace `hub/src/routes/chat.js` keyword stub with WebChat proxy
-- [ ] C5: `server-overview` skill — first real skill, proves the pattern
+- [~] C5: `server-overview` skill — **skeleton drafted at `skills/server-overview/SKILL.md`**. Defines triggers, API to call (`GET /api/agents`), output format, thresholds, fallbacks. Real test requires OpenClaw running (C2 dependency).
 - [ ] `REASSESS` end-of-phase checkpoint
 
 ## Step 5 — Phase 3 skill fan-out (parallelizable after C5)
