@@ -14,7 +14,7 @@ DATA_DIR="${NEST_DATA_DIR:-/opt/nest/data}"
 REQUESTS_LOG="$DATA_DIR/requests.jsonl"
 TOKEN_WINDOWS="$DATA_DIR/token-windows.jsonl"
 TOKEN_STATE="$DATA_DIR/token-state.json"
-OPENCLAW_TELEMETRY="${OPENCLAW_TELEMETRY:-/opt/nest/data/openclaw/logs/telemetry.jsonl}"
+OPENCLAW_TELEMETRY="${OPENCLAW_TELEMETRY:-/home/claude/.openclaw/logs/telemetry.jsonl}"
 OUT_FILE="$DATA_DIR/telemetry-summary.json"
 
 # ── parse args ──────────────────────────────────────────

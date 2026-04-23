@@ -263,9 +263,22 @@ Do **not** spawn subagents for sequential work where step N's output is step N+1
 
 When you learn something about Nest that isn't in this file or CLAUDE.md — a gotcha, a convention, a restart quirk — **add it here in the same commit that revealed it**. Entries must be short and operational. No philosophy, no retrospectives. If an entry stops being true, delete it.
 
+### Before escalating to a HUMAN gate
+
+When a dependency looks unreachable, **check whether it can be routed around before calling it a human gate**. Cheap checks, in order:
+
+1. Is there an AAAA record? `getent ahosts <host>` — on this server, IPv4-only hosts are unreachable, IPv6 hosts work.
+2. Is there a Docker Hub mirror? `docker.io` has IPv6 since 2023. Names to try: `alpine/<image>`, `0penclaw/<image>`, common upstream mirrors.
+3. Is there an upstream Git repo? If yes and `github.com` is AAAA-reachable (it is for this server), `git clone` + `docker build` locally is a valid path.
+4. Only if none of the above: treat as infra HUMAN gate and document the resolution options.
+
+Enabling IPv4 on the host is the *last* resort, not the first. Gate 1 of this session's Phase 3 dissolved after a one-line image swap.
+
 ### Learned gotchas
 
-- **This server is IPv6-only.** No default IPv4 route, no NAT64/DNS64. Anything that depends on an IPv4-only service (ghcr.io, github.com, anything without AAAA) will fail with "network is unreachable". Check `getent ahosts <host>` before assuming a pull/fetch will work. Docker Hub (`registry-1.docker.io`) has AAAA and works.
+- **This server is IPv6-only.** No default IPv4 route, no NAT64/DNS64. IPv4-only hosts (ghcr.io) fail with "network is unreachable". `registry-1.docker.io` and `github.com` both have AAAA and work. See the "route around" checklist above before treating an IPv4-only dep as a blocker.
+- **OpenClaw is installed natively under the `claude` user** (not Docker). Runs via `systemd --user`, binary name `openclaw-gateway`, port 18789, config at `/home/claude/.openclaw/`. Hub runs as `claude` too, so it can read `logs/telemetry.jsonl` directly.
+- **Docker compose template is for *fresh* provisioning**, not this host. `scripts/templates/docker-compose.openclaw.yml` exists so a new nest can bootstrap cleanly.
 - **Hub reloads via `sudo systemctl restart nest-hub`.** Not `node --watch` in prod. After any `hub/src/**` edit, restart + check `journalctl -u nest-hub -n 5` for the "Hub listening" line and the page count (should match `HUB.md` page-table rows).
 - **Route verification without auth:** `curl -sS http://localhost:3000/api/routes | jq '.routes[] | select(.url | contains("..."))'` — `/api/routes` is public, returns every registered route. Fastest sanity check after adding a route.
 - **jq `from_entries` expects `{key, value}`**, not `{key, count}` — the values field will silently become `null` if you pass the wrong key name. Caught this in O2's first pass.

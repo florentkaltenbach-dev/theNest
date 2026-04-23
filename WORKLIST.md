@@ -50,12 +50,11 @@ Nothing in the data resembles "AI-for-data-fetching waste" that O3/O4 would catc
 
 ## Step 4 — Phase 3 OpenClaw (strict sequential)
 
-- [~] C1: Docker Compose for OpenClaw — **artifacts staged, deployment blocked** `HUMAN`
-  - `scripts/templates/docker-compose.openclaw.yml` (image `ghcr.io/openclaw/openclaw:latest`, gateway 18789, bridge 18790, data at `/opt/nest/data/openclaw`)
-  - `scripts/appendages/install-openclaw.sh`
-  - Compose config validates cleanly.
-  - **Blocker:** server is IPv6-only (no default IPv4 route). `ghcr.io` has no AAAA records and no NAT64/DNS64 is configured. Pull fails with "network is unreachable". Resolve via one of: enable IPv4 in Hetzner Cloud Console, configure Hetzner DNS64 (`2a01:4ff:ff00::add:1`), or configure an HTTP(S) registry proxy. Once routable, run `scripts/appendages/install-openclaw.sh`.
-- [ ] C2: Codex OAuth onboarding `HUMAN` (requires browser, also blocked until C1 deploys)
+- [x] C1: OpenClaw gateway running (2026-04-23).
+  - Pre-existing native install under `claude` user (`systemd --user`, binary `openclaw-gateway`, port 18789, config at `/home/claude/.openclaw/`). Started Apr 2. Control UI responds.
+  - Docker compose template kept as `scripts/templates/docker-compose.openclaw.yml` for future fresh-provisioning. Image now `alpine/openclaw:latest` (Docker Hub mirror of the IPv4-only ghcr.io official) — verified pull works over IPv6, container starts cleanly when port 18789 isn't already bound.
+  - IPv6-only blocker from earlier attempt dissolved via route-around (see AGENTS.md §Before escalating to a HUMAN gate).
+- [ ] C2: Codex OAuth onboarding `HUMAN` (requires browser). Gateway is unauthenticated — `agents.main.models.json` has `provider: null`, `wizard_done: null`, no Codex token. Run in browser: `http://127.0.0.1:18789/` (or via Caddy at `https://nest.kaltenbach.dev/claw/`) → onboarding wizard → choose `openai-codex`, complete OAuth.
 - [ ] C3: WebChat channel + gateway token auth
 - [ ] C10: telemetry bridge — pipe `~/.openclaw/logs/telemetry.jsonl` into O2 aggregator (Phase 2↔3 seam, must land right after C3 so token data stays unified)
 - [x] C4: Caddyfile route `/claw/` → `localhost:18789` — already present in `/etc/caddy/Caddyfile` (verified 2026-04-23). Activates as soon as OpenClaw is running.

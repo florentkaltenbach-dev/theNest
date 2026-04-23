@@ -10,7 +10,9 @@
 
 services:
   openclaw:
-    image: ghcr.io/openclaw/openclaw:latest
+    # Docker Hub mirror of ghcr.io/openclaw/openclaw — Docker Hub has IPv6
+    # (since 2023) so this resolves on IPv6-only hosts where ghcr.io (IPv4-only) cannot.
+    image: alpine/openclaw:latest
     container_name: nest-openclaw
     restart: unless-stopped
     ports:
