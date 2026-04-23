@@ -293,6 +293,20 @@ When a dependency looks unreachable, **check whether it can be routed around bef
 
 Enabling IPv4 on the host is the *last* resort, not the first. Gate 1 of this session's Phase 3 dissolved after a one-line image swap.
 
+### Verify UI flows before prescribing them
+
+Before instructing the user to perform a UI flow ("click Providers", "go to Settings → X"), verify the UI actually contains those elements. Don't trust documentation, memory, or prior conversations — upstream versions drift and docs lag.
+
+Ways to verify, in rough order of cost:
+
+1. **Direct navigation** — open the page with chrome-devtools MCP, take a snapshot, read the element labels.
+2. **Bundle inspection** — fetch the SPA's JS bundle (`curl https://host/assets/index-*.js`), grep for the label strings or i18n dictionary keys. React/Vite apps embed all UI text this way.
+3. **Server-side source / release notes** — check the binary's `--help`, the config schema, or the upstream changelog for the version installed.
+
+When a documented path doesn't exist, **fix the doc, don't route the user around the gap**. A stale guide during a retry is the worst time to discover the drift.
+
+Caught in the wild: `docs/C2-oauth-guide.md` Path A prescribed "Providers → Sign in with ChatGPT" — no such element exists in OpenClaw 2026.4.1. Bundle inspection surfaced the gap before the user clicked; guide rewritten to the CLI-only flow that actually works.
+
 ### Learned gotchas
 
 - **This server is IPv6-only.** No default IPv4 route, no NAT64/DNS64. IPv4-only hosts (ghcr.io) fail with "network is unreachable". `registry-1.docker.io` and `github.com` both have AAAA and work. See the "route around" checklist above before treating an IPv4-only dep as a blocker.

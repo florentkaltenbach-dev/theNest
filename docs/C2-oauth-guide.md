@@ -1,6 +1,8 @@
 # C2: Codex OAuth — what to do
 
-Everything except your browser click is pre-configured. Pick one path.
+OpenClaw version verified against this guide: **2026.4.1**. If the version on the host differs, re-verify the UI elements below before following (see AGENTS.md → "Verify UI flows before prescribing them").
+
+Everything except the OAuth handshake is pre-configured. There is one path — the Control UI at `/claw/` has **no in-browser OAuth button in this version**; the handshake has to be kicked off from the CLI.
 
 ## Current state (verified 2026-04-23)
 
@@ -8,53 +10,61 @@ Everything except your browser click is pre-configured. Pick one path.
 - Wizard already ran 2026-04-02; gateway config complete
 - Caddy routes `https://nest.kaltenbach.dev/claw/` → gateway
 - Workspace: `/opt/nest`
-- Gateway auth: token mode, token exists (don't need to pick one)
+- Gateway auth: token mode (rotatable — see Step 0)
 - Control UI allowed origin: `https://nest.kaltenbach.dev`
-- `openai-codex` provider is registered but `models[]` is empty — this is what OAuth fills in
+- `openai-codex` provider registered; `models[]` empty — OAuth populates it
 
-You do **not** need to:
-- Pick a port, bind, or token
-- Choose a workspace
-- Install a daemon (already running)
-- Configure Caddy
+## Step 0 — rotate the gateway token (recommended)
 
-You only need to **complete the OAuth handshake with OpenAI Codex.**
-
-## Path A — browser only (recommended)
-
-1. Open `https://nest.kaltenbach.dev/claw/` in a normal browser.
-2. In the Control UI, go to **Providers → OpenAI Codex** (exact label may vary by OpenClaw version).
-3. Click **Connect / Sign in with ChatGPT**.
-4. Complete the OpenAI OAuth flow in the popup/redirect.
-5. Return to the Control UI. You should see models populated under `openai-codex` and a green auth indicator.
-
-Done. Tell me and I'll run the post-C2 prep pass on C3 / C5 / C10 / C9b.
-
-## Path B — terminal + browser (if the Control UI route is unclear)
-
-Run on the server as the `claude` user:
+If the current token has been exposed outside the server (pasted into a chat, a ticket, screen-shared, etc.), rotate before continuing:
 
 ```bash
-openclaw onboard \
-  --auth-choice openai-codex \
-  --flow quickstart \
-  --skip-daemon \
-  --skip-channels \
-  --skip-skills \
-  --skip-search
+NEW=$(openssl rand -hex 24)
+sudo -u claude /usr/bin/openclaw config set gateway.auth.token "$NEW"
+sudo -u claude systemctl --user restart openclaw-gateway
+printf 'new token: %s\n' "$NEW"   # capture in a password manager; do not paste this into chat or tickets
 ```
 
-Why the flags:
-- `--auth-choice openai-codex` — the only thing we actually want to do.
-- `--flow quickstart` — no advanced/manual prompts.
-- `--skip-daemon` — gateway is already running.
-- `--skip-channels / --skip-skills / --skip-search` — defer those to follow-up steps (C3, C5, etc.); don't let them block this one.
+`openclaw config get gateway.auth.token` redacts the value as `__OPENCLAW_REDACTED__`, so inspection output is safe to share — only the echo above prints the real token. `openclaw dashboard --no-open` prints a `#token=...` URL with the current token; convenient but equally sensitive.
 
-The command will print an OAuth URL and a short code. Open the URL in a browser on any device, paste the code, sign in with your ChatGPT account, approve access. The terminal command returns when the flow completes.
+## Step 1 — open the Control UI
 
-## Verifying success
+In a browser on your own device:
 
-After either path:
+1. Go to `https://nest.kaltenbach.dev/claw/`. You'll land on the login gate (subtitle: "Gateway Dashboard").
+2. Paste the gateway token into the **Gateway Token** field. Leave **Password** blank (optional in token mode).
+3. Click **Connect**.
+
+You should see the dashboard with nav tabs **Chat / Control / Agent / Settings** and a green gateway-status indicator.
+
+**Avoid the `#token=<value>` URL form** the UI also accepts — it writes the token into browser history and is readable by extensions with `tabs` permission. Manual paste is equivalent auth, cleaner hygiene.
+
+## Step 2 — run Codex OAuth from the server
+
+SSH in. Run as `claude`:
+
+```bash
+sudo -u claude /usr/bin/openclaw onboard \
+  --auth-choice openai-codex \
+  --flow quickstart \
+  --skip-daemon --skip-channels --skip-skills --skip-search
+```
+
+Flags:
+- `--auth-choice openai-codex` — the only thing we want.
+- `--flow quickstart` — no advanced prompts.
+- `--skip-daemon` — gateway already running.
+- `--skip-channels / --skip-skills / --skip-search` — defer to C3, C5.
+
+The command prints an OAuth URL (e.g. `https://chatgpt.com/codex/oauth/...`) and a short verification code.
+
+Two things to know:
+- **The URL must be printed by the `openclaw` binary running in your SSH session.** Never accept this URL from anywhere else — an attacker-supplied URL could bind your ChatGPT identity to their OpenClaw instance.
+- **The verification code is short-lived (~5–15 min).** If you pause past the window, rerun the command.
+
+Open the URL in a browser on any device, paste the code, sign in with ChatGPT, approve. The terminal command exits when the handshake completes.
+
+## Step 3 — verify
 
 ```bash
 sudo jq '.providers["openai-codex"].models | length' /home/claude/.openclaw/agents/main/agent/models.json
@@ -64,9 +74,11 @@ sudo jq '.tokens | keys' /home/claude/.openclaw/identity/device-auth.json
 # should include more than just "operator"
 ```
 
+Also refresh `/claw/` → **Settings → Models** — `openai-codex` should now list populated models.
+
 ## If something goes wrong
 
-- 404 on `/claw/` — `systemctl is-active caddy` and `ss -tlnp | grep 18789` should both be fine; if not, Caddy or the gateway is down.
-- OAuth URL doesn't open — it's likely `https://chatgpt.com/codex/oauth/...`. Nothing Nest-specific; retry.
-- "wizard.lastRunAt was already set" warning — safe; we're running `onboard` re-entrant to update just the auth.
-- Models array stays empty after OAuth succeeds — gateway may need a restart: `sudo -u claude systemctl --user restart openclaw-gateway` (or kill PID 323664 and the user-level systemd will relaunch it).
+- **404 on `/claw/`** — check `systemctl is-active caddy` and `ss -tlnp | grep 18789`; both should report healthy.
+- **Models still empty after OAuth succeeds** — restart the gateway: `sudo -u claude systemctl --user restart openclaw-gateway`.
+- **"wizard.lastRunAt was already set" warning** — safe; re-entrant `onboard` updates only the auth slot.
+- **Connect fails with "gateway auth failed"** — token typo, or the token was rotated after you copied it. Re-fetch from `openclaw.json` (via `sudo`) and retry.
