@@ -1,7 +1,7 @@
 # WORKLIST.md — Nest active work plan
 
 > Canonical sequence. Pick up from the first unchecked item. Rules in AGENTS.md §Nest Development Workflow.
-> Tags: `[x]` done + date · `[~]` in progress · `[ ]` pending · `REASSESS` human-decision gate · `HUMAN` requires user action.
+> Markers: `[x]` done · `[ ]` not started (may carry `blocked-on: <item>`) · `[~]` mid-edit · `[/]` partial (+ note on what's missing) · `[?]` evidence weak. Gates: `REASSESS`, `HUMAN`.
 
 ---
 
@@ -54,12 +54,12 @@ Per 2026-04-23 audit: the C-chain is mostly already done (some via pre-existing 
 
 - [x] C1: gateway running — native install, port 18789 (2026-04-23).
 - [ ] C2: Codex OAuth `HUMAN`. Open `https://nest.kaltenbach.dev/claw/`, run onboarding, pick `openai-codex`.
-- [ ] C3: WebChat channel — gated on C2. Configure via Control UI post-onboarding.
+- [ ] C3: WebChat channel. `blocked-on: C2` (Control UI requires authenticated session).
 - [x] C4: Caddyfile — pre-existing, `/claw/` → `localhost:18789`.
-- [x] C9: chat.js uses local Codex CLI — pre-existing. Different backend than the ROADMAP's WebChat-proxy plan; same `/chat/send` contract. Includes agent-metric context and `/apply` write mode.
-- [~] C10: telemetry bridge — aggregator points at `/home/claude/.openclaw/logs/telemetry.jsonl`. File materializes once OpenClaw processes chat (i.e., after C2).
-- [~] C5: `skills/server-overview/SKILL.md` skeleton drafted. End-to-end validation requires C2.
-- [ ] `REASSESS` end-of-phase checkpoint — after C2, verify: chat via `/claw/` returns real replies, telemetry file exists, observability page shows OpenClaw data.
+- [?] C9: chat.js uses local Codex CLI — functionally live, different backend than ROADMAP's "WebChat proxy" plan. **Architecture decision outstanding — see `docs/ADR-001-chat-pathway.md`.** Same `/chat/send` contract, but whether this counts as "done" depends on whether OpenClaw is the intended chat pathway or not.
+- [ ] C10: telemetry bridge — aggregator points at `/home/claude/.openclaw/logs/telemetry.jsonl`. `blocked-on: C2` (no telemetry until OpenClaw processes chat via the gateway).
+- [/] C5: `skills/server-overview/SKILL.md` skeleton drafted — triggers/API/thresholds written. Missing: end-to-end test with an authenticated OpenClaw (`blocked-on: C2`) and a decision on skill-dispatch mechanism pending ADR-001.
+- [ ] `REASSESS` end-of-phase checkpoint — after C2, verify: chat returns real replies, telemetry file exists, observability page shows OpenClaw data. Also re-open ADR-001 and close out C9's `[?]`.
 
 ## Step 5 — Phase 3 skill fan-out (parallelizable after C5)
 
@@ -73,11 +73,11 @@ Dispatch C6/C7/C8 as three subagents in parallel **only after** C5 proves the pa
 
 Selection happens after step 5 completes. Audit 2026-04-23 updated the baseline — items marked `[x]` or `[~]` are already done or partial and can be skipped or shortened when their phase becomes active.
 
-- **Phase 4 (age encryption):** E1–E5 not started. E6 not done (hub still proxies Hetzner; client-direct is the goal). E7 partial (`secrets.html` has CRUD; no encrypted export/import).
-- **Phase 5 (appendages):** A1 [x] (`config/appendage-schema.json`). A7 [x] (pre-existing `agent/nest_agent/discovery.py`, git-repo discovery only — Docker/systemd/port discovery still open). A2–A6, A8, A9 open.
-- **Phase 6 (client):** U4 [x] (`DESIGN.md`). U5–U9 open.
-- **Phase 7 (infra):** I1–I8 all open. I7 partial (5MB cap on `requests.jsonl` with 50% rotation; no per-period archival).
-- **Phase 8 (Dockbase):** D1–D5 open.
+- **Phase 4 (age encryption):** E1–E5 [ ]. E6 [ ] — hub/src/routes/{servers,chat}.js still call `api.hetzner.cloud` directly; client-direct is the goal. E7 [/] — `secrets.html` has CRUD; encrypted export/import missing.
+- **Phase 5 (appendages):** A1 [x] (`config/appendage-schema.json`). A7 [/] — git-repo discovery in `discovery.py`; Docker/systemd/port discovery still missing. A2–A6, A8, A9 [ ].
+- **Phase 6 (client):** U4 [x] (`DESIGN.md`). U5–U9 [ ].
+- **Phase 7 (infra):** I1–I6, I8 [ ]. I7 [/] — 5MB cap with 50% rotation on `requests.jsonl`; no per-period archival.
+- **Phase 8 (Dockbase):** D1–D5 [ ].
 
 S7 (hub storing secrets): confirmed still plaintext in `hub/src/routes/secrets.js` → `/opt/nest/config.env`. Rides with Phase 4 per 2026-04-23 decision.
 

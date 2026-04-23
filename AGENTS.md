@@ -249,6 +249,25 @@ If any condition fails, **stop and report**. Do not improvise.
 
 End-of-phase checkpoints are always `REASSESS`.
 
+### Status markers
+
+WORKLIST items and ROADMAP rows use these exact markers — don't improvise new ones:
+
+- `[x]` done. Paired with a date and evidence (commit SHA, file path, or verification command).
+- `[ ]` not started.
+- `[~]` **actively mid-edit.** Someone has a file open or a branch in progress on this. Do not use for "waiting on upstream."
+- `[/]` **partial.** A version of this was shipped but doesn't satisfy the item's full goal. Must include a one-line note about what's missing. Example: `[/] E7 — secrets.html CRUD done; encrypted export/import missing`.
+- `[?]` **needs review.** Evidence for `[x]` is weak, or a prior audit is suspect. Demote to `[ ]` or promote to `[x]` after a fresh check.
+- Suffix `blocked-on: <item>` on a `[ ]` line when the blocker is a specific other item. Better than `[~]` for "we're waiting."
+
+### Auditing: removal/migration goals
+
+When an item's goal is "X should not be in Y" or "X should move from Y to Z," verify by **absence in Y**, not by presence of related code somewhere. An item of this shape is done when X is absent from the wrong place — not when X exists *somewhere* in the repo.
+
+Example: E6 ("move Hetzner API calls to client"). Done when `hub/src/routes/` contains no `api.hetzner.cloud` calls. Still having those calls in the hub means `[ ]`, even though the client could in principle call them too.
+
+Pattern-matching alone lies on these. `grep "hetzner"` finds both the thing and the absence-of-the-thing; only the location matters.
+
 ### Subagent dispatch rules
 
 Spawn subagents for:

@@ -112,7 +112,7 @@ Install OpenClaw in Docker. Authenticate with ChatGPT subscription via Codex OAu
 
 ### Hub integration
 
-- [x] **C9: Chat route replaced** — Pre-existing. `hub/src/routes/chat.js` calls local `codex` CLI (model `gpt-5.4`) with agent/Hetzner/history context, supports `/apply` write mode. Different backend than the original "WebChat proxy" plan (direct Codex CLI, not via gateway WebChat), same API contract.
+- [?] **C9: Chat route replaced** — `hub/src/routes/chat.js` calls local `codex` CLI (model `gpt-5.4`) with agent/Hetzner/history context, supports `/apply` write mode. **Different architecture** than the "replace stub with OpenClaw WebChat proxy" plan. Functional (`/chat/send` contract preserved), but whether this satisfies C9 depends on whether OpenClaw remains the chat pathway. See `docs/ADR-001-chat-pathway.md`.
 - [~] **C10: Telemetry bridge** — Aggregator defaults `OPENCLAW_TELEMETRY=/home/claude/.openclaw/logs/telemetry.jsonl`. File doesn't exist yet (OpenClaw hasn't written telemetry without auth). Activates automatically after C2.
 
 ---
@@ -135,7 +135,7 @@ The single biggest gap vs. the Nest.md vision. Without this, the hub is a trust 
 
 ### Backup
 
-- [ ] **E7: Secret export/import** — Client can export all secrets as encrypted file, import on new device with passphrase.
+- [/] **E7: Secret export/import** — `hub/static/secrets.html` has CRUD UI over `config.env`; encrypted export/import not implemented. Depends on E1/E3 for the encryption primitives.
 
 ---
 
@@ -157,7 +157,7 @@ Transform the hardcoded catalog into the pluggable schema-driven architecture fr
 ### Agent lifecycle
 
 - [ ] **A6: Full lifecycle in agent** — Create `agent/nest_agent/lifecycle.py`. Install, remove, update appendages. Handle volume management, port allocation, route registration.
-- [x] **A7: Service discovery** — Pre-existing. `agent/nest_agent/discovery.py` scans git repos with metadata. Docker/systemd/port discovery not yet wired; repo discovery is.
+- [/] **A7: Service discovery** — Pre-existing `agent/nest_agent/discovery.py` does git-repo discovery only. Missing: Docker container, systemd unit, and listening-port discovery per Nest.md spec.
 - [ ] **A8: Git discovery** — Create `agent/nest_agent/git.py`. List repos on server with branch, recent commits.
 
 ### Peer APIs
@@ -207,7 +207,7 @@ Polish the client into the distinctive, European aesthetic described in Nest.md.
 
 ### Monitoring
 
-- [ ] **I7: Log retention** — 7 days detailed, 30 days daily summaries, then delete. Per Nest.md spec.
+- [/] **I7: Log retention** — `hub/src/index.js` caps `requests.jsonl` at 5 MB and rotates by discarding the oldest 50% of lines. Missing: per-period archival (7d detailed / 30d summaries / delete) per Nest.md spec.
 - [ ] **I8: Alerting** — Agent detects unhealthy containers, hub notifies client via push notification.
 
 ---
