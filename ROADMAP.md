@@ -145,7 +145,7 @@ Transform the hardcoded catalog into the pluggable schema-driven architecture fr
 
 ### Schema and validation
 
-- [ ] **A1: appendage-schema.json** — JSON schema for the YAML contract (name, version, requirements, container, routes, apis, skill, wizard).
+- [x] **A1: appendage-schema.json** — 2026-04-23. `config/appendage-schema.json` (Draft 2020-12). Validated against Nest.md §8 mail-server example.
 - [ ] **A2: Appendage YAML files** — Create actual YAML definitions for the 5 existing catalog items + Claude Code + OpenClaw + website.
 - [ ] **A3: Schema validation on install** — Agent validates appendage YAML before pulling images.
 

@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nest.kaltenbach.dev/schemas/appendage.json",
+  "title": "Nest Appendage Contract",
+  "description": "Schema for appendage YAML files. Canonical spec: Nest.md §8. Appendages are networked peers that communicate via API; there is no dependency hierarchy.",
+  "type": "object",
+  "required": ["name", "version", "description", "category", "container"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*[a-z0-9]$",
+      "minLength": 2,
+      "maxLength": 64,
+      "description": "Lowercase kebab-case. Globally unique across the nest."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?$",
+      "description": "SemVer. Appendages always use the latest available version — pinning is a deploy-time concern, not a contract one."
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "category": {
+      "enum": ["service", "tooling", "model", "custom"],
+      "description": "Classification for UI grouping."
+    },
+    "requirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "min_ram_mb": { "type": "integer", "minimum": 64 },
+        "min_cpu_cores": { "type": "number", "minimum": 0.1 },
+        "min_disk_mb": { "type": "integer", "minimum": 64 }
+      },
+      "description": "Server-sizing inputs. The client recommends a server size by summing requirements across selected appendages."
+    },
+    "container": {
+      "type": "object",
+      "required": ["image"],
+      "additionalProperties": false,
+      "properties": {
+        "image": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._/-]*(?::[A-Za-z0-9._-]+)?(?:@sha256:[0-9a-f]{64})?$",
+          "description": "Fully-qualified image reference (registry/repo:tag or ...@sha256:...)."
+        },
+        "ports": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^\\d{1,5}(?::\\d{1,5})?(?:/(?:tcp|udp))?$",
+            "description": "Docker short syntax: \"HOST:CONTAINER\" or \"CONTAINER\", optional /tcp|/udp."
+          }
+        },
+        "volumes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "description": "Docker volume syntax: \"NAME:PATH\" or \"HOST_PATH:CONTAINER_PATH\"."
+          }
+        },
+        "env_from_secrets": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[A-Z_][A-Z0-9_]*$" },
+          "description": "Secret keys injected as env. Agent decrypts locally (age); hub never sees plaintext."
+        }
+      }
+    },
+    "routes": {
+      "type": "array",
+      "description": "HTTP routes exposed to the public via Caddy.",
+      "items": {
+        "type": "object",
+        "required": ["path", "port"],
+        "additionalProperties": false,
+        "properties": {
+          "path": { "type": "string", "pattern": "^/[A-Za-z0-9/_-]*$" },
+          "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
+        }
+      }
+    },
+    "apis": {
+      "type": "array",
+      "description": "APIs exposed to peer appendages on the internal network.",
+      "items": {
+        "type": "object",
+        "required": ["name", "port"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+          "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+          "description": { "type": "string" }
+        }
+      }
+    },
+    "consumes": {
+      "type": "array",
+      "description": "APIs this appendage calls on other appendages. Degrade gracefully when `required: false`.",
+      "items": {
+        "type": "object",
+        "required": ["appendage", "api"],
+        "additionalProperties": false,
+        "properties": {
+          "appendage": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+          "api": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+          "required": { "type": "boolean", "default": true }
+        }
+      }
+    },
+    "skill": {
+      "type": "object",
+      "description": "OpenClaw integration. Optional — not every appendage is conversational.",
+      "required": ["name", "handler"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "triggers": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "handler": {
+          "type": "string",
+          "pattern": "^skills/[A-Za-z0-9_-]+/SKILL\\.md$",
+          "description": "Relative path from repo root to the skill definition."
+        }
+      }
+    },
+    "wizard": {
+      "type": "object",
+      "description": "Setup UI rendered in client app.",
+      "required": ["steps"],
+      "additionalProperties": false,
+      "properties": {
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["field", "label", "type"],
+            "additionalProperties": false,
+            "properties": {
+              "field": { "type": "string", "pattern": "^[A-Z_][A-Z0-9_]*$" },
+              "label": { "type": "string", "minLength": 1 },
+              "type": { "enum": ["text", "secret", "number", "email", "url", "select", "boolean"] },
+              "placeholder": { "type": "string" },
+              "required": { "type": "boolean", "default": true },
+              "options": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Used when type=select."
+              },
+              "validation": {
+                "type": "string",
+                "description": "Regex pattern applied client-side before encryption."
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

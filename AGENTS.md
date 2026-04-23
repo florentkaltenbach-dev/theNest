@@ -262,3 +262,10 @@ Do **not** spawn subagents for sequential work where step N's output is step N+1
 ### Self-amendment
 
 When you learn something about Nest that isn't in this file or CLAUDE.md — a gotcha, a convention, a restart quirk — **add it here in the same commit that revealed it**. Entries must be short and operational. No philosophy, no retrospectives. If an entry stops being true, delete it.
+
+### Learned gotchas
+
+- **This server is IPv6-only.** No default IPv4 route, no NAT64/DNS64. Anything that depends on an IPv4-only service (ghcr.io, github.com, anything without AAAA) will fail with "network is unreachable". Check `getent ahosts <host>` before assuming a pull/fetch will work. Docker Hub (`registry-1.docker.io`) has AAAA and works.
+- **Hub reloads via `sudo systemctl restart nest-hub`.** Not `node --watch` in prod. After any `hub/src/**` edit, restart + check `journalctl -u nest-hub -n 5` for the "Hub listening" line and the page count (should match `HUB.md` page-table rows).
+- **Route verification without auth:** `curl -sS http://localhost:3000/api/routes | jq '.routes[] | select(.url | contains("..."))'` — `/api/routes` is public, returns every registered route. Fastest sanity check after adding a route.
+- **jq `from_entries` expects `{key, value}`**, not `{key, count}` — the values field will silently become `null` if you pass the wrong key name. Caught this in O2's first pass.
