@@ -50,8 +50,12 @@ Nothing in the data resembles "AI-for-data-fetching waste" that O3/O4 would catc
 
 ## Step 4 — Phase 3 OpenClaw (strict sequential)
 
-- [ ] C1: Docker Compose for OpenClaw (`node:22-bookworm-slim`)
-- [ ] C2: Codex OAuth onboarding `HUMAN` (requires browser)
+- [~] C1: Docker Compose for OpenClaw — **artifacts staged, deployment blocked** `HUMAN`
+  - `scripts/templates/docker-compose.openclaw.yml` (image `ghcr.io/openclaw/openclaw:latest`, gateway 18789, bridge 18790, data at `/opt/nest/data/openclaw`)
+  - `scripts/appendages/install-openclaw.sh`
+  - Compose config validates cleanly.
+  - **Blocker:** server is IPv6-only (no default IPv4 route). `ghcr.io` has no AAAA records and no NAT64/DNS64 is configured. Pull fails with "network is unreachable". Resolve via one of: enable IPv4 in Hetzner Cloud Console, configure Hetzner DNS64 (`2a01:4ff:ff00::add:1`), or configure an HTTP(S) registry proxy. Once routable, run `scripts/appendages/install-openclaw.sh`.
+- [ ] C2: Codex OAuth onboarding `HUMAN` (requires browser, also blocked until C1 deploys)
 - [ ] C3: WebChat channel + gateway token auth
 - [ ] C10: telemetry bridge — pipe `~/.openclaw/logs/telemetry.jsonl` into O2 aggregator (Phase 2↔3 seam, must land right after C3 so token data stays unified)
 - [ ] C4: Caddyfile route `/claw/` → OpenClaw WebChat port

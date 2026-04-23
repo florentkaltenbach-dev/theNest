@@ -1,0 +1,31 @@
+# docker-compose.openclaw.yml
+# OpenClaw gateway — conversational interface + WebChat server.
+# Bound to 127.0.0.1 only; Caddy reverse-proxies /claw/ to it (Phase 3 C4).
+# Config and logs persist under /opt/nest/data/openclaw on host.
+#
+# First-run OAuth (Phase 3 C2) is a user-interactive step:
+#   docker compose -f scripts/templates/docker-compose.openclaw.yml exec \
+#     openclaw openclaw onboard --auth-choice openai-codex
+# Follow the printed URL in a browser and complete Codex sign-in.
+
+services:
+  openclaw:
+    image: ghcr.io/openclaw/openclaw:latest
+    container_name: nest-openclaw
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:18789:18789"   # gateway + WebChat
+      - "127.0.0.1:18790:18790"   # bridge
+    volumes:
+      - ${NEST_OPENCLAW_DATA:-/opt/nest/data/openclaw}:/home/node/.openclaw
+    environment:
+      - TZ=UTC
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:18789/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    labels:
+      - "nest.component=openclaw"
+      - "nest.phase=3"
