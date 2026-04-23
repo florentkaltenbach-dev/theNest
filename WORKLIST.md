@@ -43,7 +43,7 @@ Short windows are noise-dominated by same-session probe activity. 7-day is repre
 
 Nothing in the data resembles "AI-for-data-fetching waste" that O3/O4 would catch. O3 also overlaps with the existing self-knowledge `/api/nest/wiring` endpoint. Cron (O4) can be added trivially if a future signal emerges.
 
-**Noted for later:** `/api/servers` 500 — one-off, not on the critical path, tracked here for eventual investigation.
+**Noted for later:** `/api/servers` 500 — one-off, not on the critical path, tracked here for eventual investigation. **Investigated 2026-04-23:** all 5 historical 500s have 1–2 ms response time, consistent with `requireToken()` firing before the fetch — i.e., `HETZNER_API_TOKEN` was not in `config.env` at the time. Token is now set, direct API call returns 200 + 3 servers, endpoint works. No code change.
 
 - [x] Read waste data across windows.
 - [x] Verdict: 7d waste 3.9% < 5% threshold. Skip O3/O4.
