@@ -212,3 +212,53 @@ The goal: Be helpful without being annoying. Check in a few times a day, do usef
 ## Make It Yours
 
 This is a starting point. Add your own conventions, style, and rules as you figure out what works.
+
+---
+
+## Nest Development Workflow
+
+When working on Nest code (not assistant duties), these are load-bearing. Read them at the start of every session and before every step.
+
+### The plan lives in WORKLIST.md
+
+`WORKLIST.md` at repo root is the canonical sequence of work. Pick up from the first unchecked item. Do not rewrite the plan from chat history.
+
+### Commit per step
+
+- One step = one commit. Never bundle two steps.
+- Commit message style: match recent `git log --oneline -10`. Short imperative subject; body explains *why* when non-obvious.
+- Always include the `Co-Authored-By` trailer (check recent commits — the project uses it).
+- Stage files by name, never `git add -A`.
+
+### Auto-proceed conditions
+
+Proceed to the next WORKLIST item **without asking** if **all** hold:
+
+1. Prior item is checked `[x]` in WORKLIST with today's date.
+2. `git status` shows only files expected by the prior item (no stray edits).
+3. The step just completed has been committed (`git log -1` is the step's commit).
+4. The next item has no `REASSESS` or `HUMAN` tag.
+5. The touched code runs: if the change is a hub route/page, restart `nest-hub` and smoke-test via `curl` + `/api/routes`.
+
+If any condition fails, **stop and report**. Do not improvise.
+
+### REASSESS / HUMAN gates
+
+- `REASSESS` — the agent gathers data, presents findings, **user decides**. Example: Phase 2 step 3 (waste-pct vs. skip-O3/O4).
+- `HUMAN` — action requires something only the user can do (browser interaction, credentials, OAuth). Stop and ask.
+
+End-of-phase checkpoints are always `REASSESS`.
+
+### Subagent dispatch rules
+
+Spawn subagents for:
+
+- **Independent audit/triage** — multiple unrelated questions in one step. Template: step 1's Track A/B/C (delete-or-document decisions run in parallel).
+- **Read-only computations over large artifacts** — summaries that would otherwise bloat parent context. Template: step 3's reassessment over `requests.jsonl`.
+- **Proven-pattern parallel fan-out** — once a sequential first instance works, later instances run concurrently. Template: C6/C7/C8 (extra skills) after C5 proves the skill pattern end-to-end.
+
+Do **not** spawn subagents for sequential work where step N's output is step N+1's input. That's an anti-pattern and produces drift.
+
+### Self-amendment
+
+When you learn something about Nest that isn't in this file or CLAUDE.md — a gotcha, a convention, a restart quirk — **add it here in the same commit that revealed it**. Entries must be short and operational. No philosophy, no retrospectives. If an entry stops being true, delete it.
