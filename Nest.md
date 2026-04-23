@@ -658,7 +658,30 @@ Password-based SSH authentication is disabled on all managed servers during boot
 
 ---
 
-## 13. Dependency graph
+## 13. Operations
+
+Hub and agent both run as systemd units, enabled on boot:
+
+- `nest-hub.service` — the hub (Node)
+- `nest-agent.service` — the Python metrics agent
+
+```bash
+systemctl status nest-hub                    # or nest-agent
+sudo systemctl restart nest-hub              # pick up code changes
+journalctl -u nest-hub -f                    # tail logs
+```
+
+Rollback to nohup (restores prior lifecycle in ~1s):
+
+```bash
+sudo systemctl stop nest-hub && cd /opt/nest/hub && nohup node src/index.js > /tmp/hub.log 2>&1 & disown
+```
+
+The unit files in `hub/nest-hub.service` and `agent/nest-agent.service` are the source of truth — if you change a hub or agent entrypoint, update these and reinstall to `/etc/systemd/system/` in the same commit. Stale unit files left over from an earlier refactor are how this repo ended up running under `nohup` for 20 days.
+
+---
+
+## 14. Dependency graph
 
 No prescribed build order. Follow the dependency arrows.
 
@@ -713,7 +736,7 @@ Individual appendages (mail, website, webshop, Claude Code, etc.)
 
 ---
 
-## 14. Security rules
+## 15. Security rules
 
 1. Hub stores no secrets except one SSH key pair required for script execution.
 2. ISecretTransfer is never implemented on the hub. Type definitions are shared; implementations exist only in the client and agent.
@@ -727,7 +750,7 @@ Individual appendages (mail, website, webshop, Claude Code, etc.)
 
 ---
 
-## 15. Open threads
+## 16. Open threads
 
 Issues identified but not yet resolved. Flagged so the coding agent skips or asks rather than guessing.
 
@@ -754,7 +777,7 @@ Issues identified but not yet resolved. Flagged so the coding agent skips or ask
 
 ---
 
-## 16. GitHub integration
+## 17. GitHub integration
 
 Three authentication methods supported. User selects during setup.
 
@@ -766,7 +789,7 @@ Three authentication methods supported. User selects during setup.
 
 ---
 
-## 17. Glossary
+## 18. Glossary
 
 | Term | Definition |
 |------|-----------|
