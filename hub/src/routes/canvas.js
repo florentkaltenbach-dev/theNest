@@ -1,6 +1,6 @@
-// ── canvas.js ─────────────────────────────────────────
-// Visual canvas state (scripts filesystem mapping)
-// ──────────────────────────────────────────────────────
+// hub/src/routes/canvas.js
+//
+// Visual canvas state for the scripts page — persists a box-layout view of scripts/. Exports: canvasRoutes(router). Depends: NEST_CANVAS_FILE env, scripts/ on disk.
 import { readFile, writeFile, mkdir, readdir, stat } from "fs/promises";
 import { existsSync } from "fs";
 import { join, basename, dirname } from "path";

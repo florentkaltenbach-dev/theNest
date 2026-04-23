@@ -21,13 +21,24 @@
 
 ---
 
+## Bit-rot Triage — 2026-04-23
+
+Pre-Phase-2 cleanup pass. Findings:
+
+- `inwebclaude.ts` / `outwebclaude.ts` at repo root — deleted. Untracked agent-to-agent correspondence about a drift investigation; both bugs they flagged (HEAD 404, nohup → systemd) are already fixed in commits `f9acf4d` and `9c6ca0e`. Also violated the no-TS convention.
+- `hub/src/routes/canvas.js` — documented. Actively used by `scripts.html`, persists `/opt/nest/data/canvas.json`. Added conventional 3-line header.
+- `hub/src/routes/enhance.js` — documented. Admin-only self-modification API (`POST /api/nest/enhance`) wired through agent WS. No client UI yet; kept for future OpenClaw integration. Added conventional 3-line header.
+- S7 — decision recorded inline on the Phase 1 line below.
+
+---
+
 ## Phase 1: Harden What Exists ✅
 
 Completed 2026-03-25. All bugs fixed, security hardened, deployed and verified.
 
 - [x] B1–B5: All bugs resolved
 - [x] S1–S6: All security issues resolved (S1 was false alarm, S2–S3 fixed in prior session)
-- [ ] S7: Hub should not store secrets — deferred to age encryption phase
+- [ ] S7: Hub should not store secrets — rides with Phase 4 (age encryption). Pull forward *only* if new secrets are added to `hub/src/routes/secrets.js` or `config.env` before Phase 4 starts. As of 2026-04-23: no new secrets being added, stays deferred.
 
 ---
 

@@ -1,6 +1,6 @@
-// ── enhance.js ────────────────────────────────────────
-// Send enhance commands to connected agents
-// ──────────────────────────────────────────────────────
+// hub/src/routes/enhance.js
+//
+// Self-modification API: relays enhance commands (install packages, restart services) through the agent WebSocket. Exports: enhanceRoutes(router). Depends: agent WS connection, admin auth.
 import { sendToAgent, getAgentData } from "../ws/agentHandler.js";
 import { sendJson, sendError, requireAdmin } from '../server.js';
 
