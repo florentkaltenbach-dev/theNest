@@ -22,12 +22,31 @@ Committed as `40473be`.
 - [x] O6: `GET /api/observability/tokens` (auto-regenerates if >5min stale)
 - [x] O10: `/observability` page (waste indicator, top paths, breakdowns)
 
-## Step 3 — Reassess observability signal `REASSESS`
+## Step 3 — Reassess observability signal [x] 2026-04-23
 
-- [ ] Read live `/observability` output across representative windows (24h, 7d).
-- [ ] **Criterion:** if waste-pct < 5% over a non-noisy sample → skip O3/O4, jump to step 4.
-- [ ] Otherwise: finish O3 (`api-surface-snapshot.sh`) and O4 (cron: O2 every 5 min, O3 every 15 min).
-- [ ] Update this step's outcome inline and proceed.
+**Outcome: skip O3/O4, proceed to step 4.**
+
+Waste-pct across windows:
+
+| Window | Total | Errors | Dupes | Waste % |
+|--------|------:|-------:|------:|--------:|
+| 1h     |   22  |    3   |   3   |  27.3%  |
+| 6h     |   67  |   10   |   5   |  22.4%  |
+| 24h    |   70  |   11   |   5   |  22.9%  |
+| **7d** |  **563** | **15** | **7** | **3.9%** |
+
+Short windows are noise-dominated by same-session probe activity. 7-day is representative.
+
+**Waste composition (24h sample):**
+- Errors: `/favicon.ico` 404 × 3 (missing asset, not retry waste) · `/api/*` 401 × 5 (unauthenticated probes) · `/` 404 × 1, `/nest` 404 × 1 (one-offs) · `/api/servers` 500 × 1 (genuine bug, file separately).
+- Duplicates: all browser asset-fetch patterns (favicon, icon-192.png, manifest.webmanifest) within 74–266ms — browser parallelism, not app retries.
+
+Nothing in the data resembles "AI-for-data-fetching waste" that O3/O4 would catch. O3 also overlaps with the existing self-knowledge `/api/nest/wiring` endpoint. Cron (O4) can be added trivially if a future signal emerges.
+
+**Noted for later:** `/api/servers` 500 — one-off, not on the critical path, tracked here for eventual investigation.
+
+- [x] Read waste data across windows.
+- [x] Verdict: 7d waste 3.9% < 5% threshold. Skip O3/O4.
 
 ## Step 4 — Phase 3 OpenClaw (strict sequential)
 
@@ -63,3 +82,4 @@ Selection happens after step 5 completes.
 ## Log
 
 - 2026-04-23 — WORKLIST created. Steps 1 and 2 already complete (committed 95f7e67, 40473be).
+- 2026-04-23 — Step 3 reassessment: 7d waste 3.9% < 5% threshold → O3/O4 skipped, advancing to step 4.
