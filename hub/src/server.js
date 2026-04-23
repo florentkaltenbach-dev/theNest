@@ -64,6 +64,8 @@ export function createRouter() {
         return { handler: route.handler, params };
       }
     }
+    // HEAD with no explicit handler: dispatch to GET. Node strips the body.
+    if (method === 'HEAD') return match('GET', url);
     return null;
   }
 
