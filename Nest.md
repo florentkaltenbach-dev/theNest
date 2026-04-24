@@ -683,6 +683,8 @@ sudo systemctl stop nest-hub && cd /opt/nest/hub && nohup node src/index.js > /t
 
 The unit files in `hub/nest-hub.service` and `agent/nest-agent.service` are the source of truth — if you change a hub or agent entrypoint, update these and reinstall to `/etc/systemd/system/` in the same commit. Stale unit files left over from an earlier refactor are how this repo ended up running under `nohup` for 20 days.
 
+**Host maintenance.** Security patches and bugfix/backport updates apply automatically via `unattended-upgrades` (daily timer, allow-list: `noble` + `noble-security` + `noble-updates` + ESM security). Kernel updates auto-reboot at 04:00 via `Automatic-Reboot "true"`; `Automatic-Reboot-WithUsers "false"` skips the reboot if a user is logged in. Both overrides are provisioned by `scripts/setup/bootstrap.sh` §3 HARDEN (`/etc/apt/apt.conf.d/51nest-origins.conf`, `/etc/apt/apt.conf.d/52nest-reboot.conf`); the distro's `50unattended-upgrades` is left untouched so package upgrades don't clobber policy.
+
 ---
 
 ## 14. Dependency graph

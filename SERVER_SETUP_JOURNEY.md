@@ -74,6 +74,7 @@ What bootstrap automates today:
 - Creates a 2 GB swap file
 - Applies a small sysctl hardening profile
 - Widens unattended-upgrades allow-list to include the `noble-updates` pocket
+- Enables unattended-upgrades auto-reboot at 04:00 (skipped if a user is logged in)
 - Clones or updates the repo at `/opt/nest`
 - Uploads local `config.env` to `/opt/nest/config.env` if present
 - Adds `config.env` sourcing to `~/.bashrc`

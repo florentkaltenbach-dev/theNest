@@ -192,6 +192,13 @@ sysctl --system > /dev/null 2>&1
 cat > /etc/apt/apt.conf.d/51nest-origins.conf <<'UU'
 Unattended-Upgrade::Allowed-Origins:: "${distro_id}:${distro_codename}-updates";
 UU
+
+# Unattended-upgrades: auto-reboot at 04:00 for kernel updates, skip if users logged in
+cat > /etc/apt/apt.conf.d/52nest-reboot.conf <<'UR'
+Unattended-Upgrade::Automatic-Reboot "true";
+Unattended-Upgrade::Automatic-Reboot-WithUsers "false";
+Unattended-Upgrade::Automatic-Reboot-Time "04:00";
+UR
 HARDEN
 
 success "Hardened"
@@ -297,6 +304,8 @@ check "repo at /opt/nest"       "test -f /opt/nest/Nest.md"
 check "claude-code.service"     "test -f /etc/systemd/system/claude-code.service"
 check "claude-session"          "test -x /usr/local/bin/claude-session"
 check "claude settings.json"    "test -f /home/claude/.claude/settings.json"
+check "apt origins override"    "test -f /etc/apt/apt.conf.d/51nest-origins.conf"
+check "apt auto-reboot"         "test -f /etc/apt/apt.conf.d/52nest-reboot.conf"
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
