@@ -187,6 +187,11 @@ kernel.randomize_va_space = 2
 vm.swappiness = 10
 SC
 sysctl --system > /dev/null 2>&1
+
+# Unattended-upgrades: include noble-updates pocket (bugfix/backport) alongside the defaults
+cat > /etc/apt/apt.conf.d/51nest-origins.conf <<'UU'
+Unattended-Upgrade::Allowed-Origins:: "${distro_id}:${distro_codename}-updates";
+UU
 HARDEN
 
 success "Hardened"

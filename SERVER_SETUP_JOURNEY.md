@@ -73,6 +73,7 @@ What bootstrap automates today:
 - Enables `fail2ban`
 - Creates a 2 GB swap file
 - Applies a small sysctl hardening profile
+- Widens unattended-upgrades allow-list to include the `noble-updates` pocket
 - Clones or updates the repo at `/opt/nest`
 - Uploads local `config.env` to `/opt/nest/config.env` if present
 - Adds `config.env` sourcing to `~/.bashrc`
