@@ -13,6 +13,7 @@
 
   const STORAGE_TOPIC = 'nest-sidebar-topic';
   const STORAGE_COLLAPSED = 'nest-sidebar-collapsed';
+  const STORAGE_TOPICS = 'nest-sidebar-topics';
   const RAIL = 64;
   const PANEL = 220;
 
@@ -32,6 +33,10 @@
   }
   injectStyle();
 
+  // ctx is mutable: refs to mounted rail/panel + current state, so a later
+  // refetch can re-render in place without rebuilding the DOM tree.
+  const ctx = { rail: null, panel: null, state: null, topics: null };
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', boot);
   } else {
@@ -39,16 +44,42 @@
   }
 
   function boot() {
+    // Paint cached topics first so panel-link navigations show fully populated
+    // sidebar from the same paint as the page content. Background refetch keeps
+    // it fresh.
+    const cached = readCache();
+    if (cached) mount(cached);
+
     fetch('/api/nest/topics', { credentials: 'same-origin' })
       .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-      .then(({ topics }) => mount(topics))
+      .then(({ topics }) => {
+        writeCache(topics);
+        if (ctx.topics) refresh(topics);
+        else mount(topics);
+      })
       .catch((err) => {
-        // Pre-auth or session expired — drop the reservation so login/error
-        // pages stay clean.
+        // Pre-auth or session expired — drop reservation and any stale shell.
         html.classList.remove('nest-sidebar');
         html.classList.remove('nest-sidebar-collapsed');
+        if (ctx.rail) ctx.rail.remove();
+        if (ctx.panel) ctx.panel.remove();
         console.warn('[nest-sidebar] failed to load topics:', err);
       });
+  }
+
+  function readCache() {
+    try {
+      const raw = localStorage.getItem(STORAGE_TOPICS);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) && parsed.length ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function writeCache(topics) {
+    try { localStorage.setItem(STORAGE_TOPICS, JSON.stringify(topics)); } catch {}
   }
 
   function mount(topics) {
@@ -60,18 +91,44 @@
       localStorage.getItem(STORAGE_TOPIC) ||
       (topics[0] && topics[0].topic);
 
-    const state = { openTopic: initialOpen };
-    const rail = el('nav', 'nest-rail');
-    const panel = el('aside', 'nest-panel');
+    ctx.state = { openTopic: initialOpen };
+    ctx.topics = topics;
+    ctx.rail = el('nav', 'nest-rail');
+    ctx.panel = el('aside', 'nest-panel');
 
-    function render() {
-      rail.replaceChildren(buildCollapseToggle(), ...topics.map((t) => buildRailItem(t, state, render)));
-      panel.replaceChildren(...buildPanelChildren(topics, state, currentPath));
+    renderInto();
+    document.body.appendChild(ctx.rail);
+    document.body.appendChild(ctx.panel);
+  }
+
+  function refresh(topics) {
+    // Same shape if topics list hasn't structurally changed — skip the rerender
+    // to avoid any visual jitter from replaceChildren.
+    if (sameShape(ctx.topics, topics)) return;
+    ctx.topics = topics;
+    renderInto();
+  }
+
+  function renderInto() {
+    const currentPath = window.location.pathname;
+    ctx.rail.replaceChildren(
+      buildCollapseToggle(),
+      ...ctx.topics.map((t) => buildRailItem(t, ctx.state, renderInto)),
+    );
+    ctx.panel.replaceChildren(...buildPanelChildren(ctx.topics, ctx.state, currentPath));
+  }
+
+  function sameShape(a, b) {
+    if (!a || !b || a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (a[i].topic !== b[i].topic) return false;
+      if (a[i].pages.length !== b[i].pages.length) return false;
+      for (let j = 0; j < a[i].pages.length; j++) {
+        if (a[i].pages[j].path !== b[i].pages[j].path) return false;
+        if (a[i].pages[j].title !== b[i].pages[j].title) return false;
+      }
     }
-
-    render();
-    document.body.appendChild(rail);
-    document.body.appendChild(panel);
+    return true;
   }
 
   function buildCollapseToggle() {
