@@ -2,6 +2,10 @@
 //
 // Unifying address sidebar — topic rail + auxiliary panel injected on every
 // authenticated page. Reads /api/nest/topics. Vanilla, no dependencies.
+//
+// Loaded synchronously in <head> so the layout reservation lands before first
+// paint (no CLS). Layout classes live on <html> because <body> doesn't exist
+// yet at head-time.
 
 (function () {
   if (window.__nestSidebar) return;
@@ -21,12 +25,31 @@
     Plan: '◇',
   };
 
+  const html = document.documentElement;
+  html.classList.add('nest-sidebar');
+  if (localStorage.getItem(STORAGE_COLLAPSED) === '1') {
+    html.classList.add('nest-sidebar-collapsed');
+  }
   injectStyle();
 
-  fetch('/api/nest/topics', { credentials: 'same-origin' })
-    .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-    .then(({ topics }) => mount(topics))
-    .catch((err) => console.warn('[nest-sidebar] failed to load topics:', err));
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
+
+  function boot() {
+    fetch('/api/nest/topics', { credentials: 'same-origin' })
+      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+      .then(({ topics }) => mount(topics))
+      .catch((err) => {
+        // Pre-auth or session expired — drop the reservation so login/error
+        // pages stay clean.
+        html.classList.remove('nest-sidebar');
+        html.classList.remove('nest-sidebar-collapsed');
+        console.warn('[nest-sidebar] failed to load topics:', err);
+      });
+  }
 
   function mount(topics) {
     const currentPath = window.location.pathname;
@@ -36,11 +59,6 @@
       containing ||
       localStorage.getItem(STORAGE_TOPIC) ||
       (topics[0] && topics[0].topic);
-
-    if (localStorage.getItem(STORAGE_COLLAPSED) === '1') {
-      document.body.classList.add('nest-sidebar-collapsed');
-    }
-    document.body.classList.add('nest-sidebar-mounted');
 
     const state = { openTopic: initialOpen };
     const rail = el('nav', 'nest-rail');
@@ -61,12 +79,12 @@
     btn.type = 'button';
     btn.title = 'Toggle panel';
     const sync = () => {
-      btn.textContent = document.body.classList.contains('nest-sidebar-collapsed') ? '›' : '‹';
+      btn.textContent = html.classList.contains('nest-sidebar-collapsed') ? '›' : '‹';
     };
     sync();
     btn.addEventListener('click', () => {
-      document.body.classList.toggle('nest-sidebar-collapsed');
-      const collapsed = document.body.classList.contains('nest-sidebar-collapsed');
+      html.classList.toggle('nest-sidebar-collapsed');
+      const collapsed = html.classList.contains('nest-sidebar-collapsed');
       localStorage.setItem(STORAGE_COLLAPSED, collapsed ? '1' : '0');
       sync();
     });
@@ -85,8 +103,8 @@
     btn.addEventListener('click', () => {
       state.openTopic = topic.topic;
       localStorage.setItem(STORAGE_TOPIC, topic.topic);
-      if (document.body.classList.contains('nest-sidebar-collapsed')) {
-        document.body.classList.remove('nest-sidebar-collapsed');
+      if (html.classList.contains('nest-sidebar-collapsed')) {
+        html.classList.remove('nest-sidebar-collapsed');
         localStorage.setItem(STORAGE_COLLAPSED, '0');
       }
       render();
@@ -170,11 +188,11 @@
 
   function injectStyle() {
     const css = `
-      body.nest-sidebar-mounted {
+      html.nest-sidebar body {
         padding-left: ${RAIL + PANEL}px;
         transition: padding-left 220ms ease;
       }
-      body.nest-sidebar-mounted.nest-sidebar-collapsed { padding-left: ${RAIL}px; }
+      html.nest-sidebar.nest-sidebar-collapsed body { padding-left: ${RAIL}px; }
       .nest-rail {
         position: fixed; top: 0; left: 0; bottom: 0;
         width: ${RAIL}px;
@@ -218,7 +236,7 @@
         border-right: 1px solid #2a2a4a;
         opacity: 1;
       }
-      body.nest-sidebar-collapsed .nest-panel {
+      html.nest-sidebar-collapsed .nest-panel {
         transform: translateX(-${PANEL}px);
         opacity: 0;
         pointer-events: none;
@@ -258,7 +276,7 @@
         background: #1f1f3a;
       }
       @media (max-width: 720px) {
-        body.nest-sidebar-mounted { padding-left: 0; }
+        html.nest-sidebar body { padding-left: 0; }
         .nest-rail, .nest-panel { display: none; }
       }
     `;
