@@ -219,18 +219,6 @@ body {
 <script src="/sidebar.js" defer></script>
 </head>
 <body>
-<header class="topbar">
-  <div class="topbar-row">
-    <div class="brand">Nest</div>
-    <nav class="nav">
-      <a href="/" class="active">Servers</a>
-      <a href="/tokens">Tokens</a>
-      <a href="/claw">Claw</a>
-      <a href="/scripts">Scripts</a>
-      <button id="logout" type="button">Logout</button>
-    </nav>
-  </div>
-</header>
 <main class="page" id="app"></main>
 <script>
 const TOKEN_KEY = "nest_token";
@@ -395,11 +383,6 @@ async function load() {
     document.getElementById("retry")?.addEventListener("click", load);
   }
 }
-
-document.getElementById("logout").addEventListener("click", () => {
-  clearToken();
-  location.href = "/login";
-});
 
 ensureAuth();
 connectWs();
