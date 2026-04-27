@@ -68,10 +68,17 @@ function parsePageTable() {
       if (inPageTable && line.startsWith('## ')) break; // next section
 
       if (!inPageTable) continue;
-      // Parse markdown table row: | /path | file.html | Title | yes/no |
-      const m = line.match(/^\|\s*`([^`]+)`\s*\|\s*`([^`]+)`\s*\|\s*([^|]+)\|\s*(yes|no)\s*\|/);
+      // Parse markdown table row: | /path | file.html | Title | Topic | yes/no |
+      const m = line.match(/^\|\s*`([^`]+)`\s*\|\s*`([^`]+)`\s*\|\s*([^|]+)\|\s*([^|]+)\|\s*(yes|no)\s*\|/);
       if (m) {
-        pages.push({ path: m[1], file: m[2], title: m[3].trim(), auth: m[4] === 'yes' });
+        const topic = m[4].trim();
+        pages.push({
+          path: m[1],
+          file: m[2],
+          title: m[3].trim(),
+          topic: topic === '—' ? null : topic,
+          auth: m[5] === 'yes',
+        });
       }
     }
 
@@ -88,25 +95,25 @@ function parsePageTable() {
 
 function defaultPageTable() {
   return [
-    { path: '/', file: 'index.html', title: 'Home', auth: true },
-    { path: '/login', file: 'login.html', title: 'Login', auth: false },
-    { path: '/terminal', file: 'terminal.html', title: 'Terminal', auth: true },
-    { path: '/scripts', file: 'scripts.html', title: 'Scripts', auth: true },
-    { path: '/secrets', file: 'secrets.html', title: 'Secrets', auth: true },
-    { path: '/settings', file: 'settings.html', title: 'Settings', auth: true },
-    { path: '/tokens', file: 'tokens.html', title: 'Tokens', auth: true },
-    { path: '/projects', file: 'projects.html', title: 'Projects', auth: true },
-    { path: '/artifacts', file: 'artifacts.html', title: 'Artifacts', auth: true },
-    { path: '/claw', file: 'claw.html', title: 'OpenClaw', auth: true },
-    { path: '/commands', file: 'commands.html', title: 'Commands', auth: true },
-    { path: '/invite', file: 'invite.html', title: 'Invite', auth: false },
-    { path: '/journeys', file: 'journeys.html', title: 'Journeys', auth: true },
-    { path: '/onboarding', file: 'onboarding.html', title: 'Onboarding', auth: false },
-    { path: '/roadmap', file: 'roadmap.html', title: 'Roadmap', auth: true },
-    { path: '/routes', file: 'routes.html', title: 'API Surface', auth: true },
-    { path: '/server/:id', file: 'server.html', title: 'Server Detail', auth: true },
-    { path: '/tasks', file: 'tasks.html', title: 'Tasks', auth: true },
-    { path: '/nest', file: 'nest.html', title: 'Nest Explorer', auth: true },
+    { path: '/', file: 'index.html', title: 'Servers', topic: 'Live', auth: true },
+    { path: '/observability', file: 'observability.html', title: 'Observability', topic: 'Live', auth: true },
+    { path: '/journeys', file: 'journeys.html', title: 'Brood', topic: 'Live', auth: true },
+    { path: '/claw', file: 'claw.html', title: 'OpenClaw', topic: 'Interact', auth: true },
+    { path: '/terminal', file: 'terminal.html', title: 'Terminal', topic: 'Interact', auth: true },
+    { path: '/tasks', file: 'tasks.html', title: 'Sessions', topic: 'Interact', auth: true },
+    { path: '/scripts', file: 'scripts.html', title: 'Scripts', topic: 'Interact', auth: true },
+    { path: '/nest', file: 'nest.html', title: 'Nest Explorer', topic: 'Inspect', auth: true },
+    { path: '/routes', file: 'routes.html', title: 'Routes', topic: 'Inspect', auth: true },
+    { path: '/projects', file: 'projects.html', title: 'Projects', topic: 'Inspect', auth: true },
+    { path: '/artifacts', file: 'artifacts.html', title: 'Artifacts', topic: 'Inspect', auth: true },
+    { path: '/settings', file: 'settings.html', title: 'Settings', topic: 'Configure', auth: true },
+    { path: '/tokens', file: 'tokens.html', title: 'Tokens', topic: 'Configure', auth: true },
+    { path: '/secrets', file: 'secrets.html', title: 'Secrets', topic: 'Configure', auth: true },
+    { path: '/roadmap', file: 'roadmap.html', title: 'Roadmap', topic: 'Plan', auth: true },
+    { path: '/server', file: 'server.html', title: 'Server Detail', topic: null, auth: true },
+    { path: '/login', file: 'login.html', title: 'Login', topic: null, auth: false },
+    { path: '/invite', file: 'invite.html', title: 'Invite', topic: null, auth: false },
+    { path: '/onboarding', file: 'onboarding.html', title: 'Onboarding', topic: null, auth: false },
   ];
 }
 
@@ -203,7 +210,7 @@ observabilityRoutes(api);
 
 // Self-knowledge engine
 const nestState = await scanNest(NEST_ROOT, { pages });
-nestRoutes(api, nestState, router);
+nestRoutes(api, nestState, router, pages);
 
 // Route introspection
 api.get('/routes', (req, res) => {
@@ -233,10 +240,11 @@ for (const page of pages) {
   });
 }
 
-// Static assets (icons, manifest)
+// Static assets (icons, manifest, shared scripts)
 router.get('/icon-192.png', (req, res) => sendFile(res, join(STATIC_DIR, 'icon-192.png')));
 router.get('/icon-512.png', (req, res) => sendFile(res, join(STATIC_DIR, 'icon-512.png')));
 router.get('/manifest.webmanifest', (req, res) => sendFile(res, join(STATIC_DIR, 'manifest.webmanifest')));
+router.get('/sidebar.js', (req, res) => sendFile(res, join(STATIC_DIR, 'sidebar.js')));
 
 // ── Request logging ─────────────────────────────────────
 

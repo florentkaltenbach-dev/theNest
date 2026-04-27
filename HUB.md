@@ -22,28 +22,29 @@ Browser → Caddy (TLS only) → Hub (everything)
 
 Every page the Hub serves is registered here. A path not listed here returns 404. Adding a page means adding a line to this section and dropping an HTML file in `hub/static/`.
 
-| Path | File | Title | Auth |
-|------|------|-------|------|
-| `/` | `index.html` | Home | yes |
-| `/login` | `login.html` | Login | no |
-| `/terminal` | `terminal.html` | Terminal | yes |
-| `/scripts` | `scripts.html` | Scripts | yes |
-| `/secrets` | `secrets.html` | Secrets | yes |
-| `/settings` | `settings.html` | Settings | yes |
-| `/tokens` | `tokens.html` | Tokens | yes |
-| `/projects` | `projects.html` | Projects | yes |
-| `/artifacts` | `artifacts.html` | Artifacts | yes |
-| `/claw` | `claw.html` | OpenClaw | yes |
-| `/commands` | `commands.html` | Commands | yes |
-| `/invite` | `invite.html` | Invite | no |
-| `/journeys` | `journeys.html` | Journeys | yes |
-| `/onboarding` | `onboarding.html` | Onboarding | no |
-| `/roadmap` | `roadmap.html` | Roadmap | yes |
-| `/routes` | `routes.html` | API Surface | yes |
-| `/server` | `server.html` | Server Detail | yes |
-| `/tasks` | `tasks.html` | Tasks | yes |
-| `/nest` | `nest.html` | Nest Explorer | yes |
-| `/observability` | `observability.html` | Observability | yes |
+The `Topic` column groups pages for the unifying address sidebar. Pages with topic `—` are reachable but not listed in the sidebar (auth flows, detail views).
+
+| Path | File | Title | Topic | Auth |
+|------|------|-------|-------|------|
+| `/` | `index.html` | Servers | Live | yes |
+| `/observability` | `observability.html` | Observability | Live | yes |
+| `/journeys` | `journeys.html` | Brood | Live | yes |
+| `/claw` | `claw.html` | OpenClaw | Interact | yes |
+| `/terminal` | `terminal.html` | Terminal | Interact | yes |
+| `/tasks` | `tasks.html` | Sessions | Interact | yes |
+| `/scripts` | `scripts.html` | Scripts | Interact | yes |
+| `/nest` | `nest.html` | Nest Explorer | Inspect | yes |
+| `/routes` | `routes.html` | Routes | Inspect | yes |
+| `/projects` | `projects.html` | Projects | Inspect | yes |
+| `/artifacts` | `artifacts.html` | Artifacts | Inspect | yes |
+| `/settings` | `settings.html` | Settings | Configure | yes |
+| `/tokens` | `tokens.html` | Tokens | Configure | yes |
+| `/secrets` | `secrets.html` | Secrets | Configure | yes |
+| `/roadmap` | `roadmap.html` | Roadmap | Plan | yes |
+| `/server` | `server.html` | Server Detail | — | yes |
+| `/login` | `login.html` | Login | — | no |
+| `/invite` | `invite.html` | Invite | — | no |
+| `/onboarding` | `onboarding.html` | Onboarding | — | no |
 
 The last entry — `/nest` — is the self-generated interface. One HTML page that fetches from the self-knowledge API and renders the Nest's own structure.
 

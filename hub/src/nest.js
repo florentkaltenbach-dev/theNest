@@ -382,8 +382,10 @@ function validatePath(queryPath, rootDir) {
 /**
  * @param {{ get: Function, routes: Array }} router
  * @param {Object} nestState
+ * @param {Object} fullRouter - root router (for cross-router route lookup)
+ * @param {Array} [pages] - parsed page table from HUB.md, used by /nest/topics
  */
-export function nestRoutes(router, nestState, fullRouter) {
+export function nestRoutes(router, nestState, fullRouter, pages = []) {
   const { files, graph, wiring, conventions, services } = nestState;
 
   // 1. GET /nest/services
@@ -515,7 +517,23 @@ export function nestRoutes(router, nestState, fullRouter) {
     sendJson(res, { wiring });
   }, 'hub/src/nest.js');
 
-  // 8. GET /nest/state
+  // 8. GET /nest/topics
+  router.get('/nest/topics', (req, res) => {
+    const order = [];
+    const groups = new Map();
+    for (const p of pages) {
+      if (!p.topic) continue;
+      if (!groups.has(p.topic)) {
+        groups.set(p.topic, []);
+        order.push(p.topic);
+      }
+      groups.get(p.topic).push({ path: p.path, title: p.title });
+    }
+    const topics = order.map((topic) => ({ topic, pages: groups.get(topic) }));
+    sendJson(res, { topics });
+  }, 'hub/src/nest.js');
+
+  // 9. GET /nest/state
   router.get('/nest/state', async (req, res) => {
     let agentData = [];
     try {
