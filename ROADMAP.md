@@ -233,6 +233,14 @@ Bring the battle-tested stoneshop/Dockbase patterns into Nest as appendages.
 
 ---
 
+## Backlog: appendage ideas
+
+Captured ideas not yet scoped for a sprint. One doc per idea in `docs/`.
+
+- [ ] **mathviz appendage** — ManimCE-based 3D math visualization tool with a web UI to browse and create renders. See [docs/mathviz-appendage.md](docs/mathviz-appendage.md).
+
+---
+
 ## Version Milestones
 
 | Version | What | Phases |
