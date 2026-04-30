@@ -110,6 +110,8 @@ Install OpenClaw in Docker. Authenticate with ChatGPT subscription via Codex OAu
 
 The single biggest gap vs. the Nest.md vision. Without this, the hub is a trust violation — it sees all secrets.
 
+> Acceptance criteria + test plan: [docs/sops-age-vaultwarden-plan.md](docs/sops-age-vaultwarden-plan.md)
+
 ### Client-side encryption
 
 - [ ] **E1: age key derivation from passphrase** — On first setup, passphrase derives an age identity. Store in device secure storage (localStorage for web v1).
@@ -152,6 +154,15 @@ Transform the hardcoded catalog into the pluggable schema-driven architecture fr
 ### Peer APIs
 
 - [ ] **A9: Appendage-to-appendage communication** — Implement `consumes` and `apis` from the contract. Service mesh via hub relay or direct Docker network.
+
+### First appendage: Vaultwarden
+
+- [ ] **V1: appendages/vaultwarden.yaml** — Per Nest.md §8. `vaultwarden/server:latest`, 256 MB declared, `/vault` route, `ADMIN_TOKEN` secret, optional SMTP.
+- [ ] **V2: Wizard end-to-end** — Install via UI, Caddy auto-routes, `ADMIN_TOKEN` injected via E5 pipeline.
+- [ ] **V3: Mobile + restart proof** — Bitwarden app round-trip; survives unattended server restart.
+- [ ] **V4: Uninstall** — Container, volume, route, secret all removed.
+
+> Acceptance criteria: [docs/sops-age-vaultwarden-plan.md](docs/sops-age-vaultwarden-plan.md)
 
 ---
 
