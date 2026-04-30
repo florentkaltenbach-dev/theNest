@@ -21,6 +21,15 @@
 
 ---
 
+## Cross-cutting: Pillars wing (architectural reorganization)
+
+Foundational restructure orthogonal to the phases below. Reorganizes the repo around three layers — pillars (typed interfaces), soil (existing implementations), roof (new short Nest.md). Prepared, not yet executed; status: handoff captured, ground not yet broken.
+
+> Handoff: [docs/pillars-wing-handoff.md](docs/pillars-wing-handoff.md)
+> Branch when implementing: `nest/pillars-wing`
+
+---
+
 ## Phase 1: Harden What Exists ✅
 
 Completed 2026-03-25. All bugs fixed, security hardened, deployed and verified.
