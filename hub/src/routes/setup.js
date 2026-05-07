@@ -29,8 +29,15 @@ export function setupRoutes(router) {
     sendJson(res, { needsSetup: !setup.completed, ...setup });
   });
 
-  // Save provider token during onboarding
+  // Save provider token during first-run onboarding only.
+  // Once setup is complete, this public bootstrap endpoint must not be able to
+  // rewrite credentials; authenticated changes belong in dedicated admin routes.
   router.post("/setup/complete", async (req, res) => {
+    const setup = await loadSetup();
+    if (setup.completed) {
+      return sendError(res, 409, "Setup already completed");
+    }
+
     const { hetznerToken, adminPassword, gitName, gitEmail } = req.body;
     if (!hetznerToken || !adminPassword) {
       return sendError(res, 400, "hetznerToken and adminPassword required");
