@@ -1,0 +1,18 @@
+{
+  "name": "portainer",
+  "version": "1.0.0",
+  "description": "Docker management UI",
+  "category": "tooling",
+  "requirements": {
+    "min_ram_mb": 128,
+    "min_cpu_cores": 0.25
+  },
+  "container": {
+    "image": "portainer/portainer-ce:latest",
+    "ports": ["9443:9443"],
+    "volumes": ["portainer-data:/data", "/var/run/docker.sock:/var/run/docker.sock"]
+  },
+  "routes": [
+    { "path": "/portainer", "port": 9443 }
+  ]
+}

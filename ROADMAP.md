@@ -156,17 +156,17 @@ Transform the hardcoded catalog into the pluggable schema-driven architecture fr
 ### Schema and validation
 
 - [x] **A1: appendage-schema.json** — 2026-04-23. `config/appendage-schema.json` (Draft 2020-12). Validated against Nest.md §8 mail-server example.
-- [ ] **A2: Appendage YAML files** — Create actual YAML definitions for the 5 existing catalog items + Claude Code + OpenClaw + website.
-- [ ] **A3: Schema validation on install** — Agent validates appendage YAML before pulling images.
+- [x] **A2: Appendage definition files** — 2026-05-07. `appendages/{website,uptime-kuma,gitea,portainer,ollama}.json` ship the 5 catalog items as JSON-against-the-schema (Nest.md §8 updated to permit JSON or YAML). Claude Code + OpenClaw appendages still TODO — they live as bespoke install scripts today (Phase 3 C1) and would need a different shape for OAuth onboarding.
+- [/] **A3: Schema validation on install** — 2026-05-07. `hub/src/appendages.js` hand-rolled validator runs at load time; invalid files surface in `GET /api/appendages` under `invalid[]`. Hub-side only — agent does not re-validate (trust boundary: hub). Add agent-side check if/when appendages can come from untrusted sources.
 
 ### Wizard renderer
 
-- [ ] **A4: Client wizard screen** — HTML page reads `wizard.steps` from appendage YAML and renders dynamic form fields.
-- [ ] **A5: Client appendage detail** — HTML page shows status, config, logs, actions.
+- [/] **A4: Client wizard screen** — 2026-05-07. `/appendages` page lists all contracts with install/uninstall buttons. **Wizard step rendering not yet wired** — current install button just dispatches with built-in defaults. Will need to render `wizard.steps` form fields when a contract requires user input (no contract today does).
+- [/] **A5: Client appendage detail** — 2026-05-07. `/appendages` page shows status, mode (container/compose/discovery), host, image/compose source, matched/missing container patterns for discovery appendages, and actions. Logs not surfaced yet (would need an agent `appendage_logs` command).
 
 ### Agent lifecycle
 
-- [ ] **A6: Full lifecycle in agent** — Create `agent/nest_agent/lifecycle.py`. Install, remove, update appendages. Handle volume management, port allocation, route registration.
+- [/] **A6: Full lifecycle in agent** — 2026-05-07. `install_appendage` (single-container) accepts `volumes` + `env`; `install_compose_appendage` clones a git repo or writes inline YAML, runs `docker compose up -d`. `remove_appendage` + `remove_compose_appendage` both idempotent. Missing: `update_appendage`, port-allocation negotiation, Caddy route registration, lifecycle.py extraction. **Note:** the agent install path is for *greenfield* targets; brownfield servers (already running stacks like stoneshop.de) get a different treatment via SSH-driven discovery — see Phase 5 follow-on.
 - [/] **A7: Service discovery** — Pre-existing `agent/nest_agent/discovery.py` does git-repo discovery only. Missing: Docker container, systemd unit, and listening-port discovery per Nest.md spec.
 - [ ] **A8: Git discovery** — Create `agent/nest_agent/git.py`. List repos on server with branch, recent commits.
 
@@ -226,11 +226,11 @@ Polish the client into the distinctive, European aesthetic described in Nest.md.
 
 Bring the battle-tested stoneshop/Dockbase patterns into Nest as appendages.
 
-- [ ] **D1: Mail server appendage** — Based on `DOCKBASE-PLAN-FINAL.md` Mailcow integration. YAML contract + install script.
-- [ ] **D2: Website appendage** — Static site + Matomo analytics. From Dockbase website stack.
-- [ ] **D3: Backup appendage** — Restic backup with retention policies. From Dockbase backup architecture.
-- [ ] **D4: CrowdSec appendage** — IDS/WAF. From Dockbase shared infrastructure.
-- [ ] **D5: WooCommerce appendage** — FrankenPHP + MariaDB + KeyDB. From Dockbase shop stack.
+- [/] **D1: Mail server appendage** — 2026-05-07. Adopted as brownfield via the new `discovery:` contract branch. `appendages/mailcow.json` matches 7 `mailcowdockerized-*` containers on the `stoneshop` SSH host; `/api/appendages` reports `installed:true, status:running`. **Decision (2026-05-07):** nest will *not* run its own mailcow. For automated email sending, nest will authenticate to the existing kaltenbach mailcow as an SMTP relay client (mailbox `nest@<some-domain>`, creds in `config.env` via `env_from_secrets`). Saves ~3GB RAM and avoids duplicate SPF/DKIM/DMARC/TLS work. Lifecycle (restart, update) deferred until SSH command-execution lands alongside the discovery poller.
+- [/] **D2: Website appendage** — 2026-05-07. Static-site half live: `appendages/website.json` boots `nginx:alpine` with `/opt/nest/data/website/public` mounted read-only on host port 8080. End-to-end install/uninstall/reinstall exercised on `ubuntu-4gb-fsn1-1`. Missing: Matomo analytics container + shared mariadb/Caddy from stoneshop's `docker-compose.shared.yml`. Tracking that as D2-extended; basic-static is enough to consider the appendage path *proven* end-to-end.
+- [x] **D3: Backup appendage** — 2026-05-07. `appendages/restic.json` (lobaro/restic-backup-docker) snapshots critical nest state (config.env / users / tokens / canvas / website / openclaw / Caddyfile / agent memory) to a dedicated repo `backups/nest` on the existing Hetzner storage box. Cron `0 4 * * *`, retention `--keep-last 7 --keep-daily 7 --keep-weekly 4 --keep-monthly 6`. First snapshot `832a48ba` landed (43k files / 369 MiB). Password loaded via `env_from_secrets: ["RESTIC_PASSWORD"]` (hub passes through from `config.env` — Phase 4 will replace with age-encrypted delivery).
+- [/] **D4: CrowdSec appendage** — 2026-05-07. `appendages/crowdsec.json` (`crowdsecurity/crowdsec:latest`) installed end-to-end on `ubuntu-4gb-fsn1-1`. Container healthy via `cscli lapi status`. v1 runs in local-only mode (central-API enrollment fails on IPv6-only hosts; deferred until enrollment via `env_from_secrets` is wired through Phase 4 secrets). Bouncer integration with Caddy still TODO.
+- [/] **D5: WooCommerce appendage** — 2026-05-07. Adopted as brownfield via `appendages/stoneshop.json` (`discovery:` contract, matches `dockbase_frankenphp` + `dockbase_mariadb` + `dockbase_keydb` + `dockbase_matomo_(web|shop)`). Reports `installed:true, status:running` against the `stoneshop` SSH host. Same lifecycle gap as D1.
 
 ---
 

@@ -4,7 +4,8 @@
   "title": "Nest Appendage Contract",
   "description": "Schema for appendage YAML files. Canonical spec: Nest.md §8. Appendages are networked peers that communicate via API; there is no dependency hierarchy.",
   "type": "object",
-  "required": ["name", "version", "description", "category", "container"],
+  "required": ["name", "version", "description", "category"],
+  "description": "An appendage definition has exactly one of `container`, `compose`, or `discovery`. `container`/`compose` are *greenfield*: hub instructs an agent to deploy. `discovery` is *brownfield*: hub matches against containers already running on a server (typically reached via SSH, no install command ever fires). Validator enforces the one-of constraint.",
   "additionalProperties": false,
   "properties": {
     "name": {
@@ -67,6 +68,55 @@
           "type": "array",
           "items": { "type": "string", "pattern": "^[A-Z_][A-Z0-9_]*$" },
           "description": "Secret keys injected as env. Agent decrypts locally (age); hub never sees plaintext."
+        },
+        "env": {
+          "type": "object",
+          "patternProperties": { "^[A-Z_][A-Z0-9_]*$": { "type": "string" } },
+          "additionalProperties": false,
+          "description": "Plain-text env vars. Use env_from_secrets for sensitive values once Phase 4 lands."
+        }
+      }
+    },
+    "discovery": {
+      "type": "object",
+      "required": ["host", "containers"],
+      "additionalProperties": false,
+      "description": "Brownfield definition. Appendage is reported `installed` when at least one container on `host` matches each regex in `containers.match_any`.",
+      "properties": {
+        "host": {
+          "type": "string",
+          "description": "Hostname/alias the appendage runs on. Must appear in either an agent's reported hostname or `config/ssh-hosts.json`."
+        },
+        "containers": {
+          "type": "object",
+          "required": ["match_any"],
+          "additionalProperties": false,
+          "properties": {
+            "match_any": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "type": "string", "description": "Regex matched against container name (anchored automatically)." },
+              "description": "Each pattern must have a running container matching it for the appendage to count as installed."
+            }
+          }
+        }
+      }
+    },
+    "compose": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Multi-container path. Source can be a git repo (cloned into /opt/nest/data/appendages/<name>/) OR an inline YAML string (written to docker-compose.yml in the same dir). Agent then runs `docker compose -f <file> up -d`. Exactly one of `git` or `inline` is required.",
+      "properties": {
+        "git": { "type": "string", "format": "uri", "description": "Git URL to clone (used when source is an external repo)." },
+        "inline": { "type": "string", "description": "Compose YAML literal — used for embedded/smoke-test stacks where there's no external repo to clone." },
+        "branch": { "type": "string", "default": "main" },
+        "file": { "type": "string", "default": "docker-compose.yml", "description": "Compose file path relative to the working dir." },
+        "init_script": { "type": "string", "description": "One-time setup script run on first install (relative to repo). Skipped if already present." },
+        "env": {
+          "type": "object",
+          "patternProperties": { "^[A-Z_][A-Z0-9_]*$": { "type": "string" } },
+          "additionalProperties": false,
+          "description": "Env vars passed to docker compose (forwarded to the .env equivalent for variable interpolation)."
         }
       }
     },

@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nest — Appendages</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<style>
+  body{margin:0;background:#f5f5f5;color:#1a1a2e;font:14px/1.45 system-ui,sans-serif}
+  .page{max-width:1040px;margin:0 auto;padding:16px}
+  h1{margin:8px 0 12px 0}
+  .controls{display:flex;gap:8px;align-items:center;margin-bottom:16px;font-size:13px}
+  .controls button{font:inherit;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;background:#1a1a2e;color:#fff;border-color:#1a1a2e;cursor:pointer}
+  .meta{color:#6b7280;font-size:12px;margin-left:auto}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
+  .card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:8px}
+  .card.installed{border-color:#86efac;background:#f0fdf4}
+  .card.partial{border-color:#fcd34d;background:#fefce8}
+  .card.offline{border-color:#fca5a5;background:#fef2f2}
+  .card-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .card-head h3{margin:0;font-size:16px}
+  .pill{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;font-weight:700;background:#e5e7eb;color:#374151;text-transform:uppercase;letter-spacing:0.4px}
+  .pill.mode-container{background:#dbeafe;color:#1e3a8a}
+  .pill.mode-compose{background:#e0e7ff;color:#3730a3}
+  .pill.mode-discovery{background:#fce7f3;color:#9d174d}
+  .pill.status-running{background:#dcfce7;color:#166534}
+  .pill.status-not-installed{background:#f1f5f9;color:#475569}
+  .pill.status-offline,.pill.status-host-offline{background:#fee2e2;color:#991b1b}
+  .pill.status-partial{background:#fef3c7;color:#854d0e}
+  .desc{color:#374151;font-size:13px;line-height:1.4}
+  .meta-line{color:#6b7280;font-size:12px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+  .meta-line span strong{color:#1a1a2e;font-weight:600}
+  .matched{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:#6b7280;line-height:1.5}
+  .matched .ok::before{content:"✓ ";color:#16a34a}
+  .matched .miss::before{content:"✗ ";color:#dc2626}
+  .actions{display:flex;gap:8px;margin-top:auto;padding-top:8px}
+  .actions button{font:inherit;padding:6px 12px;border:1px solid #d1d5db;border-radius:6px;background:#fff;color:#1a1a2e;cursor:pointer;font-weight:600;font-size:13px}
+  .actions button.primary{background:#1a1a2e;color:#fff;border-color:#1a1a2e}
+  .actions button.danger{color:#b91c1c;border-color:#fca5a5}
+  .actions button:disabled{opacity:0.5;cursor:not-allowed}
+  .actions .note{color:#6b7280;font-size:12px;font-style:italic;align-self:center}
+  .err{color:#b91c1c;padding:12px;background:#fee;border:1px solid #fcc;border-radius:6px;margin-bottom:12px}
+  .toast{position:fixed;bottom:16px;right:16px;background:#1a1a2e;color:#fff;padding:10px 14px;border-radius:6px;font-size:13px;box-shadow:0 4px 12px rgba(0,0,0,0.2)}
+  .toast.ok{background:#15803d}
+  .toast.err{background:#b91c1c}
+  .invalid{background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;padding:10px 12px;margin-bottom:12px;font-size:13px}
+  .invalid h3{margin:0 0 4px 0;font-size:13px;color:#854d0e;text-transform:uppercase;letter-spacing:0.4px}
+</style>
+<script src="/sidebar.js"></script>
+</head>
+<body>
+<div class="page">
+  <h1>Appendages</h1>
+  <div class="controls">
+    <button id="refresh">Refresh</button>
+    <button id="test-mail" title="Send a test mail to the address on file">Send test mail</button>
+    <span class="meta" id="meta"></span>
+  </div>
+  <div id="invalid"></div>
+  <div id="app">Loading…</div>
+</div>
+<script>
+const t = localStorage.getItem("nest_token");
+if (!t) location.href = "/login";
+
+const esc = s => String(s ?? "").replace(/[&<>"]/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
+let allHosts = [];
+
+function pillClass(prefix, value) {
+  return `${prefix}-${String(value).replace(/\s+/g, "-").toLowerCase()}`;
+}
+
+function cardClass(a) {
+  if (a.installed) return "installed";
+  if (a.status === "partial") return "partial";
+  if (a.status === "host offline" || a.status === "host not reachable") return "offline";
+  return "";
+}
+
+function renderActions(a) {
+  if (a.mode === "discovery") {
+    return `<div class="note">Brownfield — observed only. No install path.</div>`;
+  }
+  const installable = !a.installed;
+  const removable = a.installed;
+  return `
+    <button class="primary" data-action="install" data-id="${esc(a.id)}" ${installable ? "" : "disabled"}>Install</button>
+    <button class="danger" data-action="uninstall" data-id="${esc(a.id)}" ${removable ? "" : "disabled"}>Uninstall</button>
+  `;
+}
+
+function renderMatched(a) {
+  if (a.mode !== "discovery") return "";
+  const patterns = a.discovery?.containers?.match_any || [];
+  const matched = a.matched || [];
+  return `<div class="matched">${patterns.map((p, i) => {
+    const m = matched[i];
+    return m
+      ? `<div class="ok">${esc(m)}</div>`
+      : `<div class="miss">${esc(p)}</div>`;
+  }).join("")}</div>`;
+}
+
+function renderHostInfo(a) {
+  const parts = [];
+  if (a.mode === "discovery") {
+    parts.push(`<span><strong>Host:</strong> ${esc(a.host || "?")}</span>`);
+  } else {
+    if (a.image) parts.push(`<span><strong>Image:</strong> ${esc(a.image)}</span>`);
+    if (a.compose?.git) parts.push(`<span><strong>Compose:</strong> ${esc(a.compose.git)}</span>`);
+    if (a.compose?.inline) parts.push(`<span><strong>Compose:</strong> inline</span>`);
+  }
+  return parts.join("");
+}
+
+function renderCard(a) {
+  return `
+    <div class="card ${cardClass(a)}">
+      <div class="card-head">
+        <h3>${esc(a.name)}</h3>
+        <span class="pill ${pillClass("mode", a.mode)}">${esc(a.mode)}</span>
+        <span class="pill ${pillClass("status", a.status)}">${esc(a.status)}</span>
+      </div>
+      <div class="desc">${esc(a.description || "")}</div>
+      <div class="meta-line">
+        ${renderHostInfo(a)}
+        ${a.category ? `<span><strong>Category:</strong> ${esc(a.category)}</span>` : ""}
+      </div>
+      ${renderMatched(a)}
+      <div class="actions">${renderActions(a)}</div>
+    </div>`;
+}
+
+function pickHostFor(a) {
+  // Discovery appendages have an explicit host. For container/compose,
+  // pick the first connected agent — there's only one today on most setups.
+  if (a.mode === "discovery") return a.host;
+  const agent = allHosts.find((h) => h.source === "agent" && h.connected);
+  return agent?.hostname || null;
+}
+
+function toast(msg, kind="ok") {
+  const el = document.createElement("div");
+  el.className = `toast ${kind}`;
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+async function load() {
+  document.getElementById("app").innerHTML = "Loading…";
+  try {
+    const headers = { Authorization: "Bearer " + t };
+    const [r1, r2] = await Promise.all([
+      fetch("/api/appendages", { headers }),
+      fetch("/api/appendages/hosts", { headers }),
+    ]);
+    if (r1.status === 401 || r2.status === 401) { localStorage.removeItem("nest_token"); location.href = "/login"; return; }
+    if (!r1.ok) throw new Error(`appendages HTTP ${r1.status}: ${await r1.text()}`);
+    if (!r2.ok) throw new Error(`hosts HTTP ${r2.status}: ${await r2.text()}`);
+    const d1 = await r1.json();
+    const d2 = await r2.json();
+    allHosts = d2.hosts || [];
+
+    const invalidHtml = (d1.invalid || []).length
+      ? `<div class="invalid"><h3>${d1.invalid.length} invalid contract${d1.invalid.length===1?"":"s"}</h3>${
+          d1.invalid.map((i) => `<div><strong>${esc(i.file)}</strong>: ${esc(i.errors.join("; "))}</div>`).join("")
+        }</div>`
+      : "";
+    document.getElementById("invalid").innerHTML = invalidHtml;
+
+    const installedCount = d1.appendages.filter((a) => a.installed).length;
+    document.getElementById("meta").textContent = `${installedCount} of ${d1.appendages.length} installed · ${allHosts.length} host${allHosts.length===1?"":"s"}`;
+
+    document.getElementById("app").innerHTML = `<div class="grid">${
+      d1.appendages.map(renderCard).join("")
+    }</div>`;
+  } catch (e) {
+    document.getElementById("app").innerHTML = `<div class="err">${esc(e.message)}</div>`;
+  }
+}
+
+document.addEventListener("click", async (ev) => {
+  const btn = ev.target.closest("button[data-action]");
+  if (!btn) return;
+  const action = btn.dataset.action;
+  const id = btn.dataset.id;
+  const headers = { Authorization: "Bearer " + t, "Content-Type": "application/json" };
+
+  // Find the appendage in the current list to pick the host.
+  const card = btn.closest(".card");
+  const all = await (await fetch("/api/appendages", { headers })).json();
+  const a = all.appendages.find((x) => x.id === id);
+  if (!a) { toast(`Couldn't find ${id}`, "err"); return; }
+  const host = pickHostFor(a);
+  if (!host) { toast(`No host available for ${id}`, "err"); return; }
+
+  if (action === "uninstall" && !confirm(`Uninstall ${id} on ${host}?`)) return;
+
+  btn.disabled = true;
+  btn.textContent = action === "install" ? "Installing…" : "Uninstalling…";
+  try {
+    const r = await fetch(`/api/appendages/${action}`, {
+      method: "POST", headers,
+      body: JSON.stringify({ appendageId: id, hostname: host }),
+    });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`);
+    toast(body.message || `${action}: ${id}`, "ok");
+    setTimeout(load, 2500);  // refresh after the agent has time to act
+  } catch (e) {
+    toast(`${action} failed: ${e.message}`, "err");
+    load();
+  }
+});
+
+document.getElementById("refresh").addEventListener("click", load);
+document.getElementById("test-mail").addEventListener("click", async () => {
+  const btn = document.getElementById("test-mail");
+  btn.disabled = true;
+  btn.textContent = "Sending…";
+  try {
+    const r = await fetch("/api/mail/test", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + t, "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`);
+    toast(`Test mail sent to ${body.sentTo}`, "ok");
+  } catch (e) {
+    toast(`Mail send failed: ${e.message}`, "err");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Send test mail";
+  }
+});
+load();
+setInterval(load, 30_000);  // periodic refresh so SSH-discovered status stays current
+</script>
+</body>
+</html>

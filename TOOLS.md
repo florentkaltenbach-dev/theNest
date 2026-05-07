@@ -40,3 +40,6 @@ Skills are shared. Your setup is yours. Keeping them apart means you can update 
 ---
 
 Add whatever helps you do your job. This is your cheat sheet.
+
+### Telegram Home
+- OpenClaw Hub → Agent welcome topic: chat `telegram:-1003819028410`, thread/topic `92`. Flo set this via `/sethome@Pomponius_secundus_bot` on 2026-05-07.

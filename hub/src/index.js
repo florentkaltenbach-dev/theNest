@@ -30,6 +30,9 @@ import { tokenRoutes } from './routes/tokens.js';
 import { artifactRoutes } from './routes/artifacts.js';
 import { canvasRoutes } from './routes/canvas.js';
 import { observabilityRoutes } from './routes/observability.js';
+import { mailRoutes } from './routes/mail.js';
+import { startSshDiscovery } from './ssh-discovery.js';
+import { startAlertWatchdog } from './alerts.js';
 import { handleAgentWs, handleClientWs } from './ws/agentHandler.js';
 import { createTerminalHandler } from './ws/terminal.js';
 import { scanNest, nestRoutes } from './nest.js';
@@ -206,6 +209,15 @@ tokenRoutes(api);
 artifactRoutes(api);
 canvasRoutes(api);
 observabilityRoutes(api);
+mailRoutes(api);
+
+// SSH-driven brownfield discovery (Phase 5 follow-on). Polls hosts listed in
+// config/ssh-hosts.json so /api/appendages can mark adopted stacks installed.
+startSshDiscovery();
+
+// Alert watchdog. Tracks host + appendage state; emails ALERT_RECIPIENTS on
+// transition. First tick is silent so steady-state at boot doesn't spam.
+startAlertWatchdog();
 
 // Self-knowledge engine
 const nestState = await scanNest(NEST_ROOT, { pages });

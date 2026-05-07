@@ -1,0 +1,19 @@
+{
+  "name": "website",
+  "version": "0.1.0",
+  "description": "Static website served by nginx-alpine. Content lives at /opt/nest/data/website/public on the host.",
+  "category": "service",
+  "requirements": {
+    "min_ram_mb": 64,
+    "min_cpu_cores": 0.1,
+    "min_disk_mb": 128
+  },
+  "container": {
+    "image": "nginx:alpine",
+    "ports": ["8080:80"],
+    "volumes": ["/opt/nest/data/website/public:/usr/share/nginx/html:ro"]
+  },
+  "routes": [
+    { "path": "/", "port": 8080 }
+  ]
+}

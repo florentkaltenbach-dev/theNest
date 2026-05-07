@@ -424,6 +424,8 @@ The hub generates a skill-specific API token during appendage setup. Each skill 
 
 Every appendage follows a standard schema. Appendages are networked peers that communicate via API — not a dependency hierarchy. If a peer is unavailable, calls degrade gracefully.
 
+> **File format:** the contract is JSON-Schema (`config/appendage-schema.json`). Definitions can be authored as either YAML or JSON; this repo currently ships JSON files in `appendages/` because the hub has no YAML parser dependency. The example below is YAML for readability — see `appendages/website.json` for the JSON form actually loaded at runtime.
+
 ```yaml
 name: mail-server
 version: 1.0.0

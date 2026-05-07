@@ -1,0 +1,19 @@
+{
+  "name": "crowdsec",
+  "version": "0.1.0",
+  "description": "Behavioral IDS/WAF. Reads logs from disk (e.g. /opt/nest/data/logs), bans bad actors. v1 runs in local-only mode without central enrollment.",
+  "category": "service",
+  "requirements": {
+    "min_ram_mb": 256,
+    "min_cpu_cores": 0.5
+  },
+  "container": {
+    "image": "crowdsecurity/crowdsec:latest",
+    "ports": ["8081:8080"],
+    "volumes": [
+      "crowdsec-data:/var/lib/crowdsec/data",
+      "crowdsec-config:/etc/crowdsec",
+      "/var/log:/var/log/host:ro"
+    ]
+  }
+}

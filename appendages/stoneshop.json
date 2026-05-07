@@ -1,0 +1,17 @@
+{
+  "name": "stoneshop",
+  "version": "0.1.0",
+  "description": "WooCommerce shop on stoneshop.de (FrankenPHP + MariaDB + KeyDB + 2x Matomo). Brownfield adoption — already running, status observed via SSH.",
+  "category": "service",
+  "discovery": {
+    "host": "stoneshop",
+    "containers": {
+      "match_any": [
+        "^dockbase_frankenphp$",
+        "^dockbase_mariadb$",
+        "^dockbase_keydb$",
+        "^dockbase_matomo_(web|shop)$"
+      ]
+    }
+  }
+}

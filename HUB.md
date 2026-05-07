@@ -29,6 +29,7 @@ The `Topic` column groups pages for the unifying address sidebar. Pages with top
 | `/` | `index.html` | Dashboard | Live | yes |
 | `/servers` | `servers.html` | Servers | Live | yes |
 | `/observability` | `observability.html` | Observability | Live | yes |
+| `/appendages` | `appendages.html` | Appendages | Live | yes |
 | `/journeys` | `journeys.html` | Brood | Live | yes |
 | `/terminal` | `terminal.html` | Terminal | Interact | yes |
 | `/tasks` | `tasks.html` | Sessions | Interact | yes |

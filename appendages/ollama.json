@@ -1,0 +1,15 @@
+{
+  "name": "ollama",
+  "version": "1.0.0",
+  "description": "Run local LLMs (Llama, Mistral, etc.)",
+  "category": "model",
+  "requirements": {
+    "min_ram_mb": 4096,
+    "min_cpu_cores": 2
+  },
+  "container": {
+    "image": "ollama/ollama:latest",
+    "ports": ["11434:11434"],
+    "volumes": ["ollama-data:/root/.ollama"]
+  }
+}

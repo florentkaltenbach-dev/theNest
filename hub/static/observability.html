@@ -12,6 +12,7 @@
   .nav a.active{color:#fff}
   .page{max-width:1040px;margin:0 auto;padding:16px}
   h1{margin:8px 0 12px 0}
+  h2.section-h{margin:24px 0 8px 0;font-size:13px;text-transform:uppercase;color:#6b7280;letter-spacing:0.5px}
   .controls{display:flex;gap:8px;align-items:center;margin-bottom:16px;font-size:13px}
   .controls select,.controls button{font:inherit;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;background:#fff;cursor:pointer}
   .controls button{background:#1a1a2e;color:#fff;border-color:#1a1a2e}
@@ -21,13 +22,13 @@
   .card .k{font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;font-weight:700}
   .card .v{font-size:28px;font-weight:700;margin-top:6px}
   .card .sub{font-size:12px;color:#6b7280;margin-top:2px}
-  .waste-low{color:#15803d}
-  .waste-mid{color:#b45309}
-  .waste-high{color:#b91c1c}
+  .waste-low,.frac-high{color:#15803d}
+  .waste-mid,.frac-mid{color:#b45309}
+  .waste-high,.frac-low{color:#b91c1c}
   .section{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px;margin-bottom:12px}
   .section h2{margin:0 0 10px 0;font-size:14px;text-transform:uppercase;color:#6b7280;letter-spacing:0.5px}
   table{width:100%;border-collapse:collapse;font-size:13px}
-  th,td{text-align:left;padding:6px 8px;border-bottom:1px solid #f0f0f0}
+  th,td{text-align:left;padding:6px 8px;border-bottom:1px solid #f0f0f0;vertical-align:top}
   th{color:#6b7280;font-weight:700;font-size:11px;text-transform:uppercase}
   td.num{text-align:right;font-variant-numeric:tabular-nums}
   .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
@@ -37,12 +38,19 @@
   .bar-fill > span{display:block;height:100%;background:#1a1a2e}
   .placeholder{color:#9ca3af;font-style:italic}
   .err{color:#b91c1c;padding:12px;background:#fee;border:1px solid #fcc;border-radius:6px}
+  .warn{font-size:12px;color:#b45309;margin-top:4px}
+  .pill{display:inline-block;padding:1px 6px;border-radius:10px;font-size:11px;background:#e5e7eb;color:#374151}
 </style>
 <script src="/sidebar.js"></script>
 </head>
 <body>
 <div class="page">
   <h1>Observability</h1>
+
+  <h2 class="section-h">Token ledger</h2>
+  <div id="ledger">Loading…</div>
+
+  <h2 class="section-h">Hub requests</h2>
   <div class="controls">
     <label>Window:</label>
     <select id="window">
@@ -54,7 +62,7 @@
     <button id="refresh">Refresh</button>
     <span class="meta" id="meta"></span>
   </div>
-  <div id="app">Loading…</div>
+  <div id="requests">Loading…</div>
 </div>
 <script>
 const t = localStorage.getItem("nest_token");
@@ -68,12 +76,71 @@ function wasteClass(pct) {
   if (pct < 15) return "waste-mid";
   return "waste-high";
 }
+function fracClass(frac) {
+  if (frac == null) return "";
+  if (frac >= 0.5) return "frac-high";
+  if (frac >= 0.2) return "frac-mid";
+  return "frac-low";
+}
+function fmtTs(iso) { try { return new Date(iso).toLocaleString(); } catch { return iso; } }
+function fmtNum(n) { return (n ?? 0).toLocaleString(); }
 
-function fmtTs(iso) {
-  try { return new Date(iso).toLocaleString(); } catch { return iso; }
+function renderLedger(d) {
+  const sources = d.sources || [];
+  if (sources.length === 0) {
+    return `<div class="placeholder">No sources reporting yet.</div>`;
+  }
+
+  const totals = d.totals?.remainingByEngine || {};
+  const totalsCards = Object.entries(totals).map(([eng, val]) => {
+    const cls = fracClass(val.fraction);
+    return `<div class="card"><div class="k">${esc(eng)} remaining</div><div class="v ${cls}">${(val.fraction*100).toFixed(0)}%</div><div class="sub">across ${val.sources} source${val.sources===1?"":"s"}</div></div>`;
+  }).join("");
+
+  const sourceRows = sources.map(s => {
+    const used = s.used?.amount ?? 0;
+    const cap = s.cap?.amount;
+    const remPct = s.remaining?.percent;
+    const rem = s.remaining?.amount;
+    const unknown = s.remaining?.unknown !== false;
+    const remCell = unknown
+      ? `<span class="placeholder">unknown</span>`
+      : `${fmtNum(rem)} <span class="pill">${remPct?.toFixed(1)}%</span>`;
+    const capCell = (cap == null) ? `<span class="placeholder">no cap</span>` : `${fmtNum(cap)} ${esc(s.cap?.unit || "")}`;
+    const periodCell = s.period?.start
+      ? `${esc(s.period.start.slice(0,10))} → ${esc(s.period.end.slice(0,10))}`
+      : `<span class="placeholder">n/a</span>`;
+    const warnings = (s.warnings || []).map(w => `<div class="warn">⚠ ${esc(w)}</div>`).join("");
+    const metricsExtra = s.metrics
+      ? `<div class="warn" style="color:#374151">${fmtNum(s.metrics.errors)} errors · waste ${s.metrics.wastePct.toFixed(1)}%</div>`
+      : "";
+    return `<tr>
+      <td><strong>${esc(s.label)}</strong> <span class="pill">${esc(s.kind)}</span>${warnings}${metricsExtra}</td>
+      <td class="num">${fmtNum(used)}</td>
+      <td class="num">${capCell}</td>
+      <td class="num">${remCell}</td>
+      <td>${periodCell}</td>
+    </tr>`;
+  }).join("");
+
+  return `
+    ${totalsCards ? `<div class="cards">${totalsCards}</div>` : ""}
+    <div class="section">
+      <table>
+        <thead><tr>
+          <th>Source</th>
+          <th class="num">Used</th>
+          <th class="num">Cap</th>
+          <th class="num">Remaining</th>
+          <th>Period</th>
+        </tr></thead>
+        <tbody>${sourceRows}</tbody>
+      </table>
+    </div>
+  `;
 }
 
-function render(d) {
+function renderRequests(d) {
   const w = d.hub?.waste || {};
   const r = d.hub?.requests || {};
   const pct = w.wastePct || 0;
@@ -89,7 +156,8 @@ function render(d) {
       <div class="card"><div class="k">p95 latency</div><div class="v">${lat.p95 || 0}<span style="font-size:14px;color:#6b7280"> ms</span></div><div class="sub">p50: ${lat.p50 || 0} · max: ${lat.max || 0}</div></div>
     </div>`;
 
-  const byStatus = Object.entries(r.byStatus || {}).sort().map(([k,v]) => `<tr><td>${esc(k)}</td><td class="num">${v}</td></tr>`).join("") || '<tr><td colspan="2" class="placeholder">No data</td></tr>';
+  const byStatus = Object.entries(r.byStatus || {}).sort().map(([k,v]) =>
+    `<tr><td>${esc(k)}</td><td class="num">${v}</td></tr>`).join("") || '<tr><td colspan="2" class="placeholder">No data</td></tr>';
   const byMethod = Object.entries(r.byMethod || {}).sort().map(([k,v]) =>
     `<tr><td><span class="badge" style="background:${METHOD_COLORS[k] || "#6b7280"}">${esc(k)}</span></td><td class="num">${v}</td></tr>`).join("") || '<tr><td colspan="2" class="placeholder">No data</td></tr>';
 
@@ -101,14 +169,6 @@ function render(d) {
       <td><div class="bar"><div class="bar-fill"><span style="width:${(p.count/topMax*100).toFixed(0)}%"></span></div></div></td>
     </tr>`).join("") || '<tr><td colspan="3" class="placeholder">No data</td></tr>';
 
-  const tokenPeaks = (d.tokens?.windows?.recentPeaks || []).map(p =>
-    `<tr><td class="mono">${esc(fmtTs(p.ended))}</td><td class="num">${p.peak_pct}%</td></tr>`).join("") || '<tr><td colspan="2" class="placeholder">No token windows yet</td></tr>';
-
-  const oc = d.openclaw || {};
-  const openclawSection = oc.available
-    ? `<div class="section"><h2>OpenClaw telemetry</h2><div>${oc.eventCount} events. Providers: <span class="mono">${esc(JSON.stringify(oc.byProvider))}</span></div></div>`
-    : `<div class="section"><h2>OpenClaw telemetry</h2><div class="placeholder">${esc(oc.reason || "Not available yet")}</div></div>`;
-
   return `
     ${cards}
     <div class="section">
@@ -119,26 +179,34 @@ function render(d) {
       <div class="section"><h2>By status</h2><table><tbody>${byStatus}</tbody></table></div>
       <div class="section"><h2>By method</h2><table><tbody>${byMethod}</tbody></table></div>
     </div>
-    <div class="section">
-      <h2>Token windows (recent)</h2>
-      <table><thead><tr><th>Window end</th><th class="num">Peak %</th></tr></thead><tbody>${tokenPeaks}</tbody></table>
-    </div>
-    ${openclawSection}
   `;
 }
 
 async function load() {
   const win = document.getElementById("window").value;
-  document.getElementById("app").innerHTML = "Loading…";
+  document.getElementById("ledger").innerHTML = "Loading…";
+  document.getElementById("requests").innerHTML = "Loading…";
+
+  const headers = { Authorization: "Bearer " + t };
+
   try {
-    const res = await fetch(`/api/observability/tokens?window=${win}`, { headers: { Authorization: "Bearer " + t } });
-    if (res.status === 401) { localStorage.removeItem("nest_token"); location.href = "/login"; return; }
-    if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
-    const d = await res.json();
-    document.getElementById("meta").textContent = `Generated ${fmtTs(d.generatedAt)} · ${d._source || ""}`;
-    document.getElementById("app").innerHTML = render(d);
+    const r1 = await fetch(`/api/observability/tokens`, { headers });
+    if (r1.status === 401) { localStorage.removeItem("nest_token"); location.href = "/login"; return; }
+    if (!r1.ok) throw new Error(`tokens HTTP ${r1.status}: ${await r1.text()}`);
+    const d1 = await r1.json();
+    document.getElementById("ledger").innerHTML = renderLedger(d1);
   } catch (e) {
-    document.getElementById("app").innerHTML = `<div class="err">${esc(e.message)}</div>`;
+    document.getElementById("ledger").innerHTML = `<div class="err">${esc(e.message)}</div>`;
+  }
+
+  try {
+    const r2 = await fetch(`/api/observability/requests?window=${win}`, { headers });
+    if (!r2.ok) throw new Error(`requests HTTP ${r2.status}: ${await r2.text()}`);
+    const d2 = await r2.json();
+    document.getElementById("meta").textContent = `Generated ${fmtTs(d2.generatedAt)} · ${d2._source || ""}`;
+    document.getElementById("requests").innerHTML = renderRequests(d2);
+  } catch (e) {
+    document.getElementById("requests").innerHTML = `<div class="err">${esc(e.message)}</div>`;
   }
 }
 

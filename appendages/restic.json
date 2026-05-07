@@ -1,0 +1,39 @@
+{
+  "name": "restic",
+  "version": "0.2.0",
+  "description": "Cron-driven Restic backups via lobaro/restic-backup-docker. Snapshots critical nest state to a Hetzner storage box. Password is loaded from RESTIC_PASSWORD in config.env.",
+  "category": "tooling",
+  "requirements": {
+    "min_ram_mb": 128,
+    "min_cpu_cores": 0.25,
+    "min_disk_mb": 256
+  },
+  "container": {
+    "image": "lobaro/restic-backup-docker:latest",
+    "volumes": [
+      "restic-cache:/cache",
+      "/opt/nest/data/restic-ssh:/root/.ssh",
+      "/opt/nest/config.env:/data/nest-config.env:ro",
+      "/opt/nest/users.json:/data/nest-users.json:ro",
+      "/opt/nest/tokens.json:/data/nest-tokens.json:ro",
+      "/opt/nest/setup.json:/data/nest-setup.json:ro",
+      "/opt/nest/data/canvas.json:/data/canvas.json:ro",
+      "/opt/nest/data/website/public:/data/website-public:ro",
+      "/home/claude/.openclaw:/data/openclaw:ro",
+      "/etc/caddy/Caddyfile:/data/Caddyfile:ro",
+      "/opt/nest/memory:/data/memory:ro",
+      "/opt/nest/IDENTITY.md:/data/IDENTITY.md:ro",
+      "/opt/nest/HEARTBEAT.md:/data/HEARTBEAT.md:ro",
+      "/opt/nest/USER.md:/data/USER.md:ro",
+      "/opt/nest/TOOLS.md:/data/TOOLS.md:ro"
+    ],
+    "env": {
+      "RESTIC_REPOSITORY": "sftp:storagebox:backups/nest",
+      "BACKUP_CRON": "0 4 * * *",
+      "RESTIC_FORGET_ARGS": "--keep-last 7 --keep-daily 7 --keep-weekly 4 --keep-monthly 6"
+    },
+    "env_from_secrets": [
+      "RESTIC_PASSWORD"
+    ]
+  }
+}

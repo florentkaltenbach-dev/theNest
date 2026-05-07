@@ -1,6 +1,6 @@
 // hub/src/routes/observability.js
 //
-// Serves telemetry summary from /opt/nest/data/telemetry-summary.json. Regenerates via scripts/tasks/aggregate-telemetry.sh if stale. Exports: observabilityRoutes(router). Depends: jq in PATH, scripts/tasks/aggregate-telemetry.sh.
+// Two endpoints: /observability/tokens (C10 multi-source ledger) and /observability/requests (hub request stats / waste). Each regenerates its source via aggregate-*.sh if older than 5min. Exports: observabilityRoutes(router). Depends: jq, scripts/tasks/aggregate-tokens.sh, scripts/tasks/aggregate-telemetry.sh.
 
 import { readFile, stat } from "fs/promises";
 import { existsSync } from "fs";
@@ -11,18 +11,22 @@ import { sendJson, sendError } from '../server.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const NEST_ROOT = join(__dirname, "../../..");
-const SUMMARY_FILE = process.env.NEST_TELEMETRY_SUMMARY || join(NEST_ROOT, "data/telemetry-summary.json");
-const AGGREGATOR = process.env.NEST_TELEMETRY_AGGREGATOR || join(NEST_ROOT, "scripts/tasks/aggregate-telemetry.sh");
 const STALE_AFTER_MS = 5 * 60 * 1000;
 
+const TOKENS_FILE = process.env.NEST_TOKEN_LEDGER || join(NEST_ROOT, "data/token-ledger.json");
+const TOKENS_AGGREGATOR = process.env.NEST_TOKEN_AGGREGATOR || join(NEST_ROOT, "scripts/tasks/aggregate-tokens.sh");
+const SUMMARY_FILE = process.env.NEST_TELEMETRY_SUMMARY || join(NEST_ROOT, "data/telemetry-summary.json");
+const SUMMARY_AGGREGATOR = process.env.NEST_TELEMETRY_AGGREGATOR || join(NEST_ROOT, "scripts/tasks/aggregate-telemetry.sh");
+
 /**
- * Run the aggregator, piping JSON args on stdin. Resolves with parsed JSON from stdout.
+ * Run an aggregator script, piping a JSON args object on stdin.
+ * @param {string} script
  * @param {Object} args
  * @returns {Promise<Object>}
  */
-function runAggregator(args) {
+function runAggregator(script, args) {
   return new Promise((resolve, reject) => {
-    const child = spawn(AGGREGATOR, [], { stdio: ["pipe", "pipe", "pipe"] });
+    const child = spawn(script, [], { stdio: ["pipe", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (d) => { stdout += d; });
@@ -37,25 +41,48 @@ function runAggregator(args) {
   });
 }
 
-async function loadOrRegenerate(windowMinutes) {
-  if (existsSync(SUMMARY_FILE)) {
-    const st = await stat(SUMMARY_FILE);
+/**
+ * Read cached file if fresh (mtime within STALE_AFTER_MS), otherwise re-run aggregator.
+ * Optional `freshIf` predicate gets the parsed cached payload — return false to force regen.
+ * @param {string} cachePath
+ * @param {string} aggregatorPath
+ * @param {Object} args
+ * @param {(payload: Object) => boolean} [freshIf]
+ * @returns {Promise<{ payload: Object, source: string }>}
+ */
+async function loadOrRegenerate(cachePath, aggregatorPath, args, freshIf) {
+  if (existsSync(cachePath)) {
+    const st = await stat(cachePath);
     if (Date.now() - st.mtimeMs < STALE_AFTER_MS) {
-      const raw = await readFile(SUMMARY_FILE, "utf-8");
-      const parsed = JSON.parse(raw);
-      if (!windowMinutes || parsed.windowMinutes === windowMinutes) return { summary: parsed, source: "cache" };
+      const payload = JSON.parse(await readFile(cachePath, "utf-8"));
+      if (!freshIf || freshIf(payload)) return { payload, source: "cache" };
     }
   }
-  const summary = await runAggregator({ windowMinutes });
-  return { summary, source: "regenerated" };
+  const payload = await runAggregator(aggregatorPath, args);
+  return { payload, source: "regenerated" };
 }
 
 export function observabilityRoutes(router) {
+  // C10 multi-source token ledger.
   router.get("/observability/tokens", async (req, res) => {
     try {
+      const { payload, source } = await loadOrRegenerate(TOKENS_FILE, TOKENS_AGGREGATOR, {});
+      sendJson(res, { ...payload, _source: source });
+    } catch (err) {
+      sendError(res, 500, `Token ledger aggregation failed: ${err.message}`);
+    }
+  });
+
+  // Hub request stats / waste-pct / top paths. (Was the body of /tokens before C10.)
+  router.get("/observability/requests", async (req, res) => {
+    try {
       const windowMinutes = req.query?.window ? parseInt(req.query.window, 10) : undefined;
-      const { summary, source } = await loadOrRegenerate(windowMinutes);
-      sendJson(res, { ...summary, _source: source });
+      const { payload, source } = await loadOrRegenerate(
+        SUMMARY_FILE, SUMMARY_AGGREGATOR,
+        { windowMinutes },
+        (p) => !windowMinutes || p.windowMinutes === windowMinutes,
+      );
+      sendJson(res, { ...payload, _source: source });
     } catch (err) {
       sendError(res, 500, `Telemetry aggregation failed: ${err.message}`);
     }

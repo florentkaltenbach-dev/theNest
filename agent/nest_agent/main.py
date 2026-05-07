@@ -76,18 +76,47 @@ async def handle_commands(ws):
                     },
                 }))
             elif cmd == "install_appendage":
+                import os
                 import docker
                 client = docker.from_env()
                 image = msg["image"]
                 name = msg["name"]
                 ports = msg.get("ports", {})
-                log.info("Installing appendage: %s (%s)", name, image)
+                env = msg.get("env", {}) or {}
+                volumes_in = msg.get("volumes", [])
+                # docker-py wants either {host_path: {bind: container_path, mode}} or
+                # named-volume strings via the `volumes` list. We accept the same
+                # short syntax we use in JSON contracts ("NAME:PATH" or "/host:/ct"),
+                # and translate to docker-py's preferred mapping form.
+                volumes_map = {}
+                for v in volumes_in:
+                    parts = v.split(":")
+                    if len(parts) < 2:
+                        continue
+                    host, container_path = parts[0], parts[1]
+                    mode = parts[2] if len(parts) > 2 else "rw"
+                    # Only auto-create host paths that don't yet exist. If the
+                    # path *does* exist (file or dir), trust the operator —
+                    # blindly calling makedirs on an existing file raises.
+                    if host.startswith("/") and not os.path.exists(host):
+                        os.makedirs(host, exist_ok=True)
+                    volumes_map[host] = {"bind": container_path, "mode": mode}
+                log.info("Installing appendage: %s (%s) ports=%s volumes=%s", name, image, ports, list(volumes_map))
                 client.images.pull(image)
+                # If a stale container with this name exists, remove it before re-running.
+                try:
+                    existing = client.containers.get(name)
+                    log.info("Removing existing container %s", name)
+                    existing.remove(force=True)
+                except docker.errors.NotFound:
+                    pass
                 container = client.containers.run(
                     image,
                     name=name,
                     detach=True,
                     ports=ports,
+                    environment=env or None,
+                    volumes=volumes_map or None,
                     restart_policy={"Name": "unless-stopped"},
                 )
                 await ws.send(json.dumps({
@@ -98,6 +127,109 @@ async def handle_commands(ws):
                     "name": name,
                     "requestId": msg.get("requestId"),
                 }))
+            elif cmd == "remove_appendage":
+                import docker
+                client = docker.from_env()
+                name = msg["name"]
+                request_id = msg.get("requestId")
+                result = {"type": "command_result", "command": cmd, "name": name, "success": False}
+                if request_id:
+                    result["requestId"] = request_id
+                try:
+                    container = client.containers.get(name)
+                    log.info("Removing appendage container: %s", name)
+                    container.remove(force=True)
+                    result["success"] = True
+                except docker.errors.NotFound:
+                    # Idempotent: already gone is success.
+                    result["success"] = True
+                    result["already_absent"] = True
+                except Exception as e:
+                    result["error"] = str(e)
+                await ws.send(json.dumps(result))
+            elif cmd in ("install_compose_appendage", "remove_compose_appendage"):
+                import os
+                import shutil
+                import subprocess
+                name = msg["name"]
+                base = f"/opt/nest/data/appendages/{name}"
+                file = msg.get("file") or "docker-compose.yml"
+                request_id = msg.get("requestId")
+                result = {"type": "command_result", "command": cmd, "name": name, "success": False}
+                if request_id:
+                    result["requestId"] = request_id
+
+                # Build subprocess env: inherit current env, layer the explicit
+                # contract env on top (so docker compose interpolates ${VAR}).
+                proc_env = os.environ.copy()
+                for k, v in (msg.get("env") or {}).items():
+                    proc_env[k] = str(v)
+
+                try:
+                    if cmd == "install_compose_appendage":
+                        git_url = msg.get("git")
+                        inline = msg.get("inline")
+                        branch = msg.get("branch") or "main"
+                        init_script = msg.get("init_script")
+                        os.makedirs(os.path.dirname(base), exist_ok=True)
+                        if inline:
+                            # Inline mode: write the compose YAML literal into the
+                            # working dir. Idempotent — just rewrite the file.
+                            os.makedirs(base, exist_ok=True)
+                            with open(os.path.join(base, file), "w") as fh:
+                                fh.write(inline)
+                        elif git_url:
+                            if not os.path.isdir(os.path.join(base, ".git")):
+                                log.info("git clone %s -> %s", git_url, base)
+                                if os.path.isdir(base):
+                                    shutil.rmtree(base)
+                                subprocess.run(
+                                    ["git", "clone", "--depth", "1", "--branch", branch, git_url, base],
+                                    check=True, env=proc_env, timeout=300,
+                                )
+                                if init_script:
+                                    init_path = os.path.join(base, init_script)
+                                    if os.path.isfile(init_path):
+                                        log.info("running init_script %s", init_script)
+                                        os.chmod(init_path, 0o755)
+                                        subprocess.run([init_path], cwd=base, check=True, env=proc_env, timeout=600)
+                                    else:
+                                        log.warning("init_script %s not found in repo", init_script)
+                            else:
+                                log.info("git pull (already cloned)")
+                                subprocess.run(["git", "-C", base, "pull", "--ff-only"], check=False, env=proc_env, timeout=120)
+                        else:
+                            raise ValueError("compose install requires git or inline")
+                        log.info("docker compose -f %s up -d", file)
+                        proc = subprocess.run(
+                            ["docker", "compose", "-f", file, "up", "-d", "--quiet-pull"],
+                            cwd=base, env=proc_env, timeout=900,
+                            capture_output=True, text=True,
+                        )
+                        result["stdout"] = (proc.stdout or "")[-1000:]
+                        result["stderr"] = (proc.stderr or "")[-1000:]
+                        result["success"] = (proc.returncode == 0)
+                    else:  # remove_compose_appendage
+                        if not os.path.isdir(base):
+                            result["success"] = True
+                            result["already_absent"] = True
+                        else:
+                            log.info("docker compose -f %s down", file)
+                            proc = subprocess.run(
+                                ["docker", "compose", "-f", file, "down"],
+                                cwd=base, env=proc_env, timeout=300,
+                                capture_output=True, text=True,
+                            )
+                            result["stdout"] = (proc.stdout or "")[-1000:]
+                            result["stderr"] = (proc.stderr or "")[-1000:]
+                            result["success"] = (proc.returncode == 0)
+                except subprocess.TimeoutExpired as e:
+                    result["error"] = f"timeout: {e.cmd}"
+                except subprocess.CalledProcessError as e:
+                    result["error"] = f"command failed ({e.returncode}): {e.cmd}"
+                except Exception as e:
+                    result["error"] = str(e)
+                await ws.send(json.dumps(result))
             elif cmd == "enhance":
                 import subprocess
                 action = msg.get("action")
