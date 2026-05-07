@@ -36,6 +36,7 @@ import { scanNest, nestRoutes } from './nest.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const STATIC_DIR = join(__dirname, '../static');
+const XTERM_DIR = join(__dirname, '../node_modules/@xterm/xterm');
 const NEST_ROOT = join(__dirname, '../..');
 
 // ── JWT secret ──────────────────────────────────────────
@@ -232,6 +233,8 @@ router.get('/icon-192.png', (req, res) => sendFile(res, join(STATIC_DIR, 'icon-1
 router.get('/icon-512.png', (req, res) => sendFile(res, join(STATIC_DIR, 'icon-512.png')));
 router.get('/manifest.webmanifest', (req, res) => sendFile(res, join(STATIC_DIR, 'manifest.webmanifest')));
 router.get('/sidebar.js', (req, res) => sendFile(res, join(STATIC_DIR, 'sidebar.js')));
+router.get('/vendor/xterm/xterm.js', (req, res) => sendFile(res, join(XTERM_DIR, 'lib/xterm.js')));
+router.get('/vendor/xterm/xterm.css', (req, res) => sendFile(res, join(XTERM_DIR, 'css/xterm.css')));
 
 // ── Request logging ─────────────────────────────────────
 
