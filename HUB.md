@@ -26,10 +26,10 @@ The `Topic` column groups pages for the unifying address sidebar. Pages with top
 
 | Path | File | Title | Topic | Auth |
 |------|------|-------|-------|------|
-| `/` | `index.html` | Servers | Live | yes |
+| `/` | `index.html` | Dashboard | Live | yes |
+| `/servers` | `servers.html` | Servers | Live | yes |
 | `/observability` | `observability.html` | Observability | Live | yes |
 | `/journeys` | `journeys.html` | Brood | Live | yes |
-| `/claw` | `claw.html` | OpenClaw | Interact | yes |
 | `/terminal` | `terminal.html` | Terminal | Interact | yes |
 | `/tasks` | `tasks.html` | Sessions | Interact | yes |
 | `/scripts` | `scripts.html` | Scripts | Interact | yes |
@@ -204,8 +204,7 @@ What each file talks to outside of itself. Extracted by scanning for `fetch(`, `
 {
   "external": [
     { "file": "routes/servers.js", "target": "api.hetzner.cloud", "type": "http" },
-    { "file": "routes/scripts.js", "target": "managed servers", "type": "ssh" },
-    { "file": "routes/chat.js", "target": "OpenClaw", "type": "process" }
+    { "file": "routes/scripts.js", "target": "managed servers", "type": "ssh" }
   ],
   "internal": [
     { "file": "ws/agentHandler.js", "target": "agent", "type": "websocket" },

@@ -533,7 +533,29 @@ export function nestRoutes(router, nestState, fullRouter, pages = []) {
     sendJson(res, { topics });
   }, 'hub/src/nest.js');
 
-  // 9. GET /nest/state
+  // 9. GET /agents — full per-agent data (metrics, containers, repos). Consumed by skills (e.g. server-overview).
+  router.get('/agents', async (req, res) => {
+    try {
+      const mod = await import('./ws/agentHandler.js');
+      sendJson(res, { agents: mod.getAgentData() || [] });
+    } catch (err) {
+      sendError(res, 500, 'agent state unavailable');
+    }
+  }, 'hub/src/nest.js');
+
+  // 10. GET /agents/:hostname — single agent
+  router.get('/agents/:hostname', async (req, res) => {
+    try {
+      const mod = await import('./ws/agentHandler.js');
+      const agent = mod.getAgentData(req.params.hostname);
+      if (!agent) return sendError(res, 404, 'Agent not found');
+      sendJson(res, agent);
+    } catch (err) {
+      sendError(res, 500, 'agent state unavailable');
+    }
+  }, 'hub/src/nest.js');
+
+  // 11. GET /nest/state
   router.get('/nest/state', async (req, res) => {
     let agentData = [];
     try {

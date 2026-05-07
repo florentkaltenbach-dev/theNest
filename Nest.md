@@ -392,7 +392,7 @@ Claude Code runs in a Docker container. The agent manages its filesystem access:
 
 OpenClaw is **one** conversational backend among potentially several. It routes user intents to the appropriate appendages via skills (molts). It does not perform tasks directly.
 
-As of 2026-04-23 the Nest also runs a second backend — a direct Codex CLI integration in `hub/src/routes/chat.js` — good at hub-context reasoning and workspace-write flows. A custom Nest chat interface will route between backends based on request type; the routing logic itself is an open thread (see §16 → Chat backends). See `docs/ADR-001-chat-pathway.md` for the full rationale.
+As of 2026-05-06, OpenClaw is the only live backend. The earlier direct-Codex-CLI integration in `hub/src/routes/chat.js` was retired — once OpenClaw was authenticated against ChatGPT OAuth, the two paths reached the same backend and the in-house one was redundant. The reusable Codex auth introspection (plan, account, expiry) is preserved at `hub/src/codex-status.js` for the C10 token ledger. A future Nest-owned router (Step 4.5) will pick among *agent scaffolds* — OpenClaw plus a second one yet to be selected — not among LLM backends.
 
 For the OpenClaw-routed case:
 
@@ -541,7 +541,6 @@ nest/
 │   │   ├── index.html              # Home — server overview
 │   │   ├── login.html              # Login
 │   │   ├── tokens.html             # Token telemetry
-│   │   ├── claw.html               # OpenClaw chat
 │   │   ├── scripts.html            # Script browser and executor
 │   │   ├── secrets.html            # Secret management
 │   │   ├── settings.html           # Auth, users, API tokens
@@ -582,7 +581,6 @@ nest/
 │   │   │   ├── servers.ts
 │   │   │   ├── projects.ts
 │   │   │   ├── scripts.ts
-│   │   │   ├── claw.ts
 │   │   │   ├── secrets.ts         # Opaque blob relay only
 │   │   │   └── auth.ts
 │   │   └── ws/

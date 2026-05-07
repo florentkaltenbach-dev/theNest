@@ -15,25 +15,27 @@ export function sendToAgent(hostname, message) {
   return true;
 }
 
-export function getAgentData(hostname) {
-  if (hostname) {
-    const agent = agents.get(hostname);
-    if (!agent) return null;
-    return {
-      hostname: agent.hostname,
-      metrics: agent.lastMetrics,
-      containers: agent.lastContainers,
-      discoveredRepos: agent.discoveredRepos || [],
-      connectedAt: agent.connectedAt,
-    };
-  }
-  return Array.from(agents.values()).map((a) => ({
+function projectAgent(a) {
+  const lastSeen = a.lastMessageAt || a.connectedAt;
+  return {
     hostname: a.hostname,
     metrics: a.lastMetrics,
     containers: a.lastContainers,
     discoveredRepos: a.discoveredRepos || [],
     connectedAt: a.connectedAt,
-  }));
+    lastMessageAt: lastSeen,
+    lastSeen,
+    connected: a.ws?.readyState === 1,
+  };
+}
+
+export function getAgentData(hostname) {
+  if (hostname) {
+    const agent = agents.get(hostname);
+    if (!agent) return null;
+    return projectAgent(agent);
+  }
+  return Array.from(agents.values()).map(projectAgent);
 }
 
 export function subscribeClient(ws) {
@@ -70,19 +72,21 @@ export function handleAgentWs(socket) {
           lastContainers: [],
           discoveredRepos: [],
           connectedAt: Date.now(),
+          lastMessageAt: Date.now(),
         });
         console.log(`Agent connected: ${hostname}`);
         broadcastToClients({ type: "agent_connected", hostname });
       }
 
+      const agent = agents.get(hostname);
+      if (agent) agent.lastMessageAt = Date.now();
+
       if (msg.type === "metrics") {
-        const agent = agents.get(hostname);
         if (agent) agent.lastMetrics = msg.data;
         broadcastToClients({ type: "metrics", hostname, data: msg.data });
       }
 
       if (msg.type === "containers") {
-        const agent = agents.get(hostname);
         if (agent) agent.lastContainers = msg.data;
         broadcastToClients({ type: "containers", hostname, data: msg.data });
       }

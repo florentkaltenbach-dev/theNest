@@ -16,3 +16,5 @@ hub/dist/
 *.png
 !hub/static/icon-192.png
 !hub/static/icon-512.png
+
+tokens.json

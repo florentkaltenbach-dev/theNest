@@ -63,6 +63,8 @@ Build the measurement and automation layer before adding AI. Scripts do the heav
 
 **Rule:** If it can be a script, it's a script. AI only gets called for decisions.
 
+**Two-sided efficiency (added 2026-05-06):** Tokens are wasted both by *over-spend* (paying for what a script could do) and by *under-use* (paid/free flat-rate quota left idle at month-end, expired promo tokens). Strategic goal: maximize utilization of free/flat capacity (Claude Code sub, Codex sub, OpenRouter promos) before paying per-token. C10 ledger tracks both axes; Step 4.5 router consumes the capacity signal.
+
 ### Scripts layer
 
 - [x] **O1: `scripts/tasks/` directory** — 2026-04-23. README defines JSON-in/JSON-out contract.
@@ -84,11 +86,18 @@ Build the measurement and automation layer before adding AI. Scripts do the heav
 
 ### What counts as "wasted"
 
-A token is wasted if the same result could have been achieved by a script:
+Two flavors of waste (per 2026-05-06 strategic reframe):
+
+**Over-spend** — same result could have been achieved by a script:
 - AI called to fetch data it didn't reason about
 - AI called to format something a template could handle
 - Failed tool calls that retry
 - Repeated identical context within a short window
+
+**Under-use** — paid/free capacity left idle:
+- Flat-rate subscription quota unconsumed at month-end (Claude Code, Codex Pro)
+- OpenRouter promo tokens expiring before use
+- Cheaper engine sitting idle while pricier engine handles routine work
 
 ---
 
@@ -99,22 +108,22 @@ Install OpenClaw in Docker. Authenticate with ChatGPT subscription via Codex OAu
 ### Install
 
 - [x] **C1: OpenClaw gateway running** — 2026-04-23. Native install (not Docker) under `claude` user's `systemd --user`, port 18789, config `/home/claude/.openclaw/`. Docker compose template kept for fresh-provisioning (`scripts/templates/docker-compose.openclaw.yml`, `alpine/openclaw:latest`).
-- [ ] **C2: Codex OAuth authentication** — `HUMAN`. Gateway unauthenticated (`agents/main/models.json` has `provider: null`, `wizard_done: null`). Browser: `https://nest.kaltenbach.dev/claw/` → onboarding → `openai-codex`.
-- [~] **C3: WebChat channel** — PARTIAL. Gateway UI serves but no WebChat channel config in `/home/claude/.openclaw/openclaw.json`. Needs C2 first.
+- [x] **C2: Codex OAuth authentication** — 2026-05-06. OAuth profile `openai-codex:ausfragezeichen@gmail.com` (mode `oauth`) registered under `auth.profiles` in `/home/claude/.openclaw/openclaw.json`.
+- [x] **C3: WebChat channel** — 2026-05-06. Active sessions record `origin.provider: "webchat"` and `deliveryContext.channel: "webchat"`. (No top-level `channels` key in `openclaw.json` — newer OpenClaw stores channel as per-session origin metadata.)
 - [x] **C4: Caddyfile route** — Pre-existing. `/etc/caddy/Caddyfile` routes `/claw/` → `localhost:18789` with WebSocket upgrade.
 
 ### Nest skills
 
-- [~] **C5: `server-overview` skill** — Skeleton drafted 2026-04-23 at `skills/server-overview/SKILL.md`. Real validation requires C2.
+- [~] **C5: `server-overview` skill** — Skeleton drafted 2026-04-23 at `skills/server-overview/SKILL.md`. End-to-end exercise now possible (C2 + C3 done, 2026-05-06). Skill-dispatch mechanism pending ADR-001.
 - [ ] **C6: `container-manager` skill** — SKILL.md for start/stop/restart/logs via hub API.
 - [ ] **C7: `script-runner` skill** — SKILL.md that invokes scripts from `scripts/tasks/`. Claw triggers, script executes, Claw interprets result.
 - [ ] **C8: `token-report` skill** — SKILL.md that reads `/api/observability/tokens`. Claw can report on its own efficiency.
 
 ### Hub integration
 
-- [x] **C9: Codex backend in chat.js** — `hub/src/routes/chat.js` calls local `codex` CLI (model `gpt-5.4`) with agent/Hetzner/history context, supports `/apply` write mode. Per ADR-001 (accepted 2026-04-23), Codex is one of two chat backends. Same `/chat/send` contract.
-- [ ] **C9b: OpenClaw backend wired in** — After C2, add a path that targets OpenClaw's WebChat `send` endpoint. Custom interface (step 4.5 in WORKLIST) decides which backend gets each request.
-- [~] **C10: Telemetry bridge** — Aggregator defaults `OPENCLAW_TELEMETRY=/home/claude/.openclaw/logs/telemetry.jsonl`. File doesn't exist yet (OpenClaw hasn't written telemetry without auth). Activates automatically after C2.
+- [x] **C9: Codex backend in chat.js** — **Retired 2026-05-06.** Deleted `chat.js` + `claw.html`; OpenClaw via OAuth already reaches Codex, so the in-house path was the same backend twice. Reusable Codex auth introspection lifted to `hub/src/codex-status.js` for C10's quota tracker. See ADR-001 Supersession.
+- [~] **C9b: OpenClaw backend reachable** — Caddy `/claw/` proxy already exposes OpenClaw to the browser. The remaining piece (a Nest-owned router that calls OpenClaw alongside a second scaffold) lives in step 4.5 of WORKLIST. C9b folds into that.
+- [/] **C10: Multi-source token ledger + capacity tracker** — Reframed 2026-05-06. Strategic goal: **maximize utilization of free/flat capacity** so paid subscription quota isn't left idle. **User scope (2026-05-06):** OAuth subs + free tokens only, no pay-per-token credits. Sources: Codex Pro via OpenClaw OAuth, Claude Pro/Max via Claude Code OAuth, OpenRouter free promos, plus hub requests for Nest infra. Primary axis is *remaining* (cap − used, or promo expiry). Feeds Step 4.5 router so work flows to the engine with the most idle quota.
 
 ---
 
@@ -240,4 +249,4 @@ Bring the battle-tested stoneshop/Dockbase patterns into Nest as appendages.
 
 ---
 
-*Last updated: 2026-04-03. Phase 1 complete. Refactor complete: Fastify→raw node:http, TypeScript→JSDoc, 9 deps→3, self-knowledge engine live. O5 done. Phase 2 in progress.*
+*Last updated: 2026-05-06. Phase 1 complete. Phase 2 complete. Phase 3: C2 + C3 done (Codex OAuth + WebChat live, sessions flowing). Next actionable: C10 (repoint telemetry aggregator at the real OpenClaw session files), then C5 end-to-end exercise. Telegram channel reactivation requested.*

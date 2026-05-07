@@ -29,8 +29,10 @@ async def send_loop(ws, msg_type: str, collector, interval: int):
             msg = json.dumps({"type": msg_type, "data": data})
             await ws.send(msg)
             log.debug("Sent %s", msg_type)
-        except Exception as e:
-            log.warning("Error collecting %s: %s", msg_type, e)
+        except (websockets.ConnectionClosed, asyncio.CancelledError):
+            raise
+        except Exception:
+            log.exception("Error in %s send loop", msg_type)
         await asyncio.sleep(interval)
 
 
@@ -244,12 +246,27 @@ async def connect():
                 hostname = os.uname().nodename
                 await ws.send(json.dumps({"type": "hello", "hostname": hostname}))
 
-                # Run metric senders and command listener concurrently
-                await asyncio.gather(
-                    send_loop(ws, "metrics", collect_system_metrics, METRICS_INTERVAL),
-                    send_loop(ws, "containers", collect_containers, CONTAINERS_INTERVAL),
-                    handle_commands(ws),
-                )
+                # Run metric senders and command listener concurrently.
+                # FIRST_EXCEPTION + explicit cancel ensures siblings don't orphan
+                # when handle_commands raises ConnectionClosed on disconnect.
+                tasks = [
+                    asyncio.create_task(send_loop(ws, "metrics", collect_system_metrics, METRICS_INTERVAL)),
+                    asyncio.create_task(send_loop(ws, "containers", collect_containers, CONTAINERS_INTERVAL)),
+                    asyncio.create_task(handle_commands(ws)),
+                ]
+                try:
+                    done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
+                    for t in pending:
+                        t.cancel()
+                    await asyncio.gather(*pending, return_exceptions=True)
+                    for t in done:
+                        exc = t.exception()
+                        if exc is not None:
+                            raise exc
+                finally:
+                    for t in tasks:
+                        if not t.done():
+                            t.cancel()
         except (websockets.ConnectionClosed, ConnectionRefusedError, OSError) as e:
             log.warning("Connection lost: %s. Reconnecting in 5s...", e)
             await asyncio.sleep(5)

@@ -1,7 +1,7 @@
 # ADR-001: Chat pathway
 
-> **Status:** accepted (Option C, reframed)
-> **Date:** 2026-04-23
+> **Status:** superseded (2026-05-06) — see "Supersession" at end.
+> **Original status:** accepted (Option C, reframed) on 2026-04-23.
 > **Context:** Phase 3 C9 audit surfaced a gap between the planned architecture and the shipped code.
 
 ## Decision
@@ -105,3 +105,15 @@ Earlier draft of this ADR recommended Option A with a post-C2 Option-C experimen
 - [ ] WORKLIST: C9 `[?]` → `[x]` with "Codex backend" note. Add placeholder for the custom interface.
 - [ ] ROADMAP: C9 `[?]` → `[x]` with same note. Flag C9b as follow-up (OpenClaw backend wiring, post-C2).
 - [ ] `REASSESS` after C2: spend a week using both engines. Only then scope the custom-interface router.
+
+## Supersession (2026-05-06)
+
+This ADR is superseded. Once C2 (OpenClaw OAuth) landed, the planned "two coexisting backends" collapsed: OpenClaw reaches Codex via the same OAuth, so the `chat.js` direct-CLI path was the same backend twice. The Nest-context advantage of `chat.js` (live agent state, Hetzner snapshot in the system prompt) is more naturally delivered by **C5 server-overview skill** — OpenClaw fetches the same context on demand via Nest's API.
+
+Cleanup performed 2026-05-06:
+- Deleted `hub/static/claw.html` and `hub/src/routes/chat.js`.
+- Removed `chatRoutes(api)` and the `/claw` row from `HUB.md` page table + service map.
+- Lifted the reusable Codex auth introspection into `hub/src/codex-status.js` for C10's quota tracker.
+- Nest.md §7 rewritten to reflect OpenClaw-only backend.
+
+The future Nest-owned router (Step 4.5 in WORKLIST) is **not** what this ADR described. It picks among **agent scaffolds** (OpenClaw + a TBD second one like Hermes), not among LLM backends, and routes capacity-aware to maximize free/flat-quota utilization. A new ADR will document that decision when scope solidifies.

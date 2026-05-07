@@ -17,9 +17,8 @@ import {
 
 import { healthRoutes } from './routes/health.js';
 import { serverRoutes } from './routes/servers.js';
-import { authRoutes, loadTokens, hashToken, ensureJwtSecret } from './routes/auth.js';
+import { authRoutes, loadTokens, saveTokens, hashToken, ensureJwtSecret } from './routes/auth.js';
 import { scriptRoutes } from './routes/scripts.js';
-import { chatRoutes } from './routes/chat.js';
 import { secretRoutes } from './routes/secrets.js';
 import { appendageRoutes } from './routes/appendages.js';
 import { setupRoutes } from './routes/setup.js';
@@ -31,7 +30,7 @@ import { tokenRoutes } from './routes/tokens.js';
 import { artifactRoutes } from './routes/artifacts.js';
 import { canvasRoutes } from './routes/canvas.js';
 import { observabilityRoutes } from './routes/observability.js';
-import { handleAgentWs, handleClientWs, getAgentData } from './ws/agentHandler.js';
+import { handleAgentWs, handleClientWs } from './ws/agentHandler.js';
 import { createTerminalHandler } from './ws/terminal.js';
 import { scanNest, nestRoutes } from './nest.js';
 
@@ -95,10 +94,10 @@ function parsePageTable() {
 
 function defaultPageTable() {
   return [
-    { path: '/', file: 'index.html', title: 'Servers', topic: 'Live', auth: true },
+    { path: '/', file: 'index.html', title: 'Dashboard', topic: 'Live', auth: true },
+    { path: '/servers', file: 'servers.html', title: 'Servers', topic: 'Live', auth: true },
     { path: '/observability', file: 'observability.html', title: 'Observability', topic: 'Live', auth: true },
     { path: '/journeys', file: 'journeys.html', title: 'Brood', topic: 'Live', auth: true },
-    { path: '/claw', file: 'claw.html', title: 'OpenClaw', topic: 'Interact', auth: true },
     { path: '/terminal', file: 'terminal.html', title: 'Terminal', topic: 'Interact', auth: true },
     { path: '/tasks', file: 'tasks.html', title: 'Sessions', topic: 'Interact', auth: true },
     { path: '/scripts', file: 'scripts.html', title: 'Scripts', topic: 'Interact', auth: true },
@@ -195,7 +194,6 @@ authRoutes(api, jwt);
 healthRoutes(api);
 serverRoutes(api);
 scriptRoutes(api);
-chatRoutes(api);
 secretRoutes(api);
 appendageRoutes(api);
 setupRoutes(api);
@@ -218,17 +216,6 @@ api.get('/routes', (req, res) => {
     .map((r) => ({ method: r.method, url: r.pattern }))
     .sort((a, b) => a.url.localeCompare(b.url) || a.method.localeCompare(b.method));
   sendJson(res, { routes: sorted });
-});
-
-// Agent data REST endpoints
-api.get('/agents', (req, res) => {
-  sendJson(res, { agents: getAgentData() });
-});
-
-api.get('/agents/:hostname', (req, res) => {
-  const data = getAgentData(req.params.hostname);
-  if (!data) return sendError(res, 404, 'Agent not found');
-  sendJson(res, data);
 });
 
 // ── Register page routes from page table ────────────────
@@ -328,21 +315,50 @@ const server = createServer(async (req, res) => {
 const wss = new WebSocketServer({ noServer: true });
 const handleTerminalWs = createTerminalHandler(jwtSecret);
 
+// Heartbeat: ping each peer every 30s; terminate if 2 consecutive intervals
+// pass without any liveness signal. Covers /ws/agent, /ws/client, /ws/terminal.
+// Liveness = pong frame OR any incoming message. setupHeartbeat() must be
+// called from each handleUpgrade callback so listeners are attached before
+// any frames arrive (the wss 'connection' event fires too late for that).
+const HEARTBEAT_MS = 30000;
+const HEARTBEAT_MISS_LIMIT = 2;
+function setupHeartbeat(ws) {
+  ws.missCount = 0;
+  const ack = () => { ws.missCount = 0; };
+  ws.on('pong', ack);
+  ws.on('message', ack);
+}
+const heartbeatTimer = setInterval(() => {
+  for (const ws of wss.clients) {
+    try {
+      if ((ws.missCount ?? 0) >= HEARTBEAT_MISS_LIMIT) {
+        try { ws.terminate(); } catch {}
+        continue;
+      }
+      ws.missCount = (ws.missCount ?? 0) + 1;
+      ws.ping();
+    } catch {
+      // One bad socket must not break heartbeat for the rest.
+    }
+  }
+}, HEARTBEAT_MS);
+heartbeatTimer.unref();
+
 server.on('upgrade', (req, socket, head) => {
   const url = req.url.split('?')[0];
 
   if (url === '/ws/agent') {
-    wss.handleUpgrade(req, socket, head, (ws) => handleAgentWs(ws));
+    wss.handleUpgrade(req, socket, head, (ws) => { setupHeartbeat(ws); handleAgentWs(ws); });
     return;
   }
 
   if (url === '/ws/client') {
-    wss.handleUpgrade(req, socket, head, (ws) => handleClientWs(ws));
+    wss.handleUpgrade(req, socket, head, (ws) => { setupHeartbeat(ws); handleClientWs(ws); });
     return;
   }
 
   if (url === '/ws/terminal') {
-    wss.handleUpgrade(req, socket, head, (ws) => handleTerminalWs(ws, req));
+    wss.handleUpgrade(req, socket, head, (ws) => { setupHeartbeat(ws); handleTerminalWs(ws, req); });
     return;
   }
 
