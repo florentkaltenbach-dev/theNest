@@ -57,7 +57,7 @@ Per 2026-04-23 audit: the C-chain was mostly already done (some pre-existing, so
 - [x] C1: gateway running — native install, port 18789 (2026-04-23).
 - [x] C2: Codex OAuth — 2026-05-06. Profile `openai-codex:ausfragezeichen@gmail.com` (mode `oauth`) registered under `auth.profiles` in `openclaw.json`.
 - [x] C3: WebChat channel — 2026-05-06. Active and in use: live sessions `f0fe28fa-…` and `6115710e-…` both record `origin.provider: "webchat"` and `deliveryContext.channel: "webchat"`. (No `channels` key in `openclaw.json` — newer OpenClaw stores channel as per-session origin metadata, not as a top-level config block.)
-- [x] C4: Caddyfile — pre-existing, `/claw/` → `localhost:18789`.
+- [x] C4: Caddyfile — updated 2026-05-08. Caddy sends all traffic to Hub; Hub gates `/claw` with Nest auth, enforces same-origin WS upgrades, then proxies to OpenClaw on `127.0.0.1:18789`.
 - [x] C9: Codex CLI backend — **retired 2026-05-06**. Deleted `hub/src/routes/chat.js` and `hub/static/claw.html`; removed wiring from `index.js` and `HUB.md`. Reusable Codex OAuth introspection lifted to `hub/src/codex-status.js` (consumer: C10). Rationale in `docs/ADR-001-chat-pathway.md` Supersession.
 - [x] C10: 2026-05-07. Multi-source token ledger live. Sources: `codex-pro` (OpenClaw `.usage-cost-cache.json`), `claude-pro` (`~/.claude/projects/*/*.jsonl` aggregation), `openrouter-promo` (opt-in via `OPENROUTER_API_KEY`), `nest-infra` (hub `requests.jsonl`). Aggregator: `scripts/tasks/aggregate-tokens.sh` + `scripts/tasks/sources/*.sh`. Endpoint: `GET /api/observability/tokens` (multi-source shape per `docs/C10-token-ledger-design.md`). Sibling endpoint `GET /api/observability/requests` retains hub waste/path stats. `/observability` page renders both. Caps configured via `config.env` (`NEST_CAP_CODEX_PRO_TOKENS` etc.); without caps, `remaining.unknown=true` per design. **Pending user action:** populate caps in `config.env` to unlock `totals.remainingByEngine` for Step 4.5 router consumption.
 - [x] C5: 2026-05-06. SKILL.md written + symlinked into `~/.openclaw/plugin-skills/`; `openclaw skills info server-overview` reports ✓ Ready. Round-trip validated end-to-end via Telegram DM (per 2026-05-06 log); `lastSeen`/`connected` bug fixed in `agentHandler.js`.
@@ -119,7 +119,7 @@ One-line verification per `[x]`. All confirmed live; no demotions to `[?]`.
 | Step 3 read waste data | Commit `589f0b3` records per-window numbers (1h/6h/24h/7d). |
 | Step 3 verdict | `589f0b3` records 7d=3.9% < 5% → skip O3/O4. |
 | C1 gateway running | `ss -tlnp \| grep 18789` → `openclaw-gateway` PID 323664. `curl 127.0.0.1:18789/` → 200. Pre-existing. |
-| C4 Caddyfile /claw/ | `systemctl is-active caddy` → active. `/etc/caddy/Caddyfile` contains `handle_path /claw/* { reverse_proxy localhost:18789 }`. Pre-existing. |
+| C4 Caddyfile /claw/ | `systemctl is-active caddy` → active. `/etc/caddy/Caddyfile` proxies all traffic to Hub; Hub owns `/claw` and proxies authenticated traffic to OpenClaw on `127.0.0.1:18789`. Updated 2026-05-08. |
 
 ## Log
 
@@ -134,6 +134,7 @@ One-line verification per `[x]`. All confirmed live; no demotions to `[?]`.
 - 2026-05-06 — C9 slated for retirement (Codex via OpenClaw is the same backend twice). Step 4.5 reframed: backends are OpenClaw vs Hermes, not Codex vs OpenClaw. C8 token-report rewired to consume the multi-source ledger.
 - 2026-05-06 — Strategic goal recorded: maximize utilization of free/flat capacity (Claude Code sub, Codex sub, OpenRouter promos). C10 grows a "remaining capacity" axis that Step 4.5's router consumes — route to the engine with the most idle free quota. Hermes generalized to "second agent scaffold, TBD"; OpenRouter added as a token source.
 - 2026-05-06 — Cleanup: deleted dead `chat.js` + `claw.html` (Caddy had been swallowing `/claw` and `/claw/*` to OpenClaw, orphaning the in-house page). Lifted Codex OAuth introspection to `hub/src/codex-status.js` for C10. ADR-001 superseded; Nest.md §7, HUB.md, index.js updated.
+- 2026-05-08 — `/claw` moved behind the Hub perimeter. Caddy now forwards all traffic to Hub; `hub/src/openclawProxy.js` requires Nest auth for HTTP, rejects cross-origin WS upgrades before proxying, strips `/claw`, and optionally injects `Authorization: Bearer $HUB_OPENCLAW_UPSTREAM_PASSWORD` upstream without parsing OpenClaw's app frames.
 - 2026-05-06 — C10 scope locked: user only uses OAuth subscriptions (Codex Pro, Claude Pro/Max) + free tokens (OpenRouter promos). No pay-per-token API credits. Ledger optimizes for *remaining-capacity* axis; over-spend axis is essentially N/A.
 - 2026-05-06 — C5 finished: SKILL.md rewritten with OpenClaw frontmatter, references new `/api/agents` endpoint (added to `nest.js`), symlinked into `~/.openclaw/plugin-skills/`. `openclaw skills info server-overview` shows ✓ Ready. Pending: user mints `NEST_HUB_TOKEN` and tests in chat.
 - 2026-05-06 — C10 design doc written at `docs/C10-token-ledger-design.md`. Schema, source list, aggregator strategy, open questions.

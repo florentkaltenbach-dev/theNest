@@ -83,6 +83,7 @@ export function createRouter() {
     post:   (p, h, s) => add('POST', p, h, s),
     put:    (p, h, s) => add('PUT', p, h, s),
     delete: (p, h, s) => add('DELETE', p, h, s),
+    all:    (p, h, s) => add('ALL', p, h, s),
     match,
     routes,
     withPrefix,

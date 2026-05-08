@@ -51,6 +51,8 @@ The last entry — `/nest` — is the self-generated interface. One HTML page th
 
 Static assets (icons, manifest) are served from `hub/static/` by filename. No directory listing. No path traversal.
 
+Proxy routes are registered in code, not the page table. `/claw` and `/claw/*` are Hub-owned reverse-proxy routes to OpenClaw: Nest auth is required before proxying, WebSocket upgrades must be same-origin, and the Hub remains a transparent infrastructure layer (no OpenClaw app-frame parsing).
+
 ---
 
 ## 3. The self-knowledge API

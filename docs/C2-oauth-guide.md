@@ -8,7 +8,7 @@ Everything except the OAuth handshake is pre-configured. There is one path — t
 
 - Gateway running on `127.0.0.1:18789` under `claude` user's systemd
 - Wizard already ran 2026-04-02; gateway config complete
-- Caddy routes `https://nest.kaltenbach.dev/claw/` → gateway
+- Caddy routes `https://nest.kaltenbach.dev/claw/` → Hub; Hub gates with Nest auth, then proxies to the local OpenClaw gateway
 - Workspace: `/opt/nest`
 - Gateway auth: token mode (rotatable — see Step 0)
 - Control UI allowed origin: `https://nest.kaltenbach.dev`
@@ -78,7 +78,7 @@ Also refresh `/claw/` → **Settings → Models** — `openai-codex` should now 
 
 ## If something goes wrong
 
-- **404 on `/claw/`** — check `systemctl is-active caddy` and `ss -tlnp | grep 18789`; both should report healthy.
+- **404/502 on `/claw/`** — check `systemctl is-active caddy`, `systemctl is-active nest-hub`, and `ss -tlnp | grep 18789`; Caddy, Hub, and the OpenClaw gateway should all be healthy.
 - **Models still empty after OAuth succeeds** — restart the gateway: `sudo -u claude systemctl --user restart openclaw-gateway`.
 - **"wizard.lastRunAt was already set" warning** — safe; re-entrant `onboard` updates only the auth slot.
 - **Connect fails with "gateway auth failed"** — token typo, or the token was rotated after you copied it. Re-fetch from `openclaw.json` (via `sudo`) and retry.

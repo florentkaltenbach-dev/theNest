@@ -35,6 +35,7 @@ import { startSshDiscovery } from './ssh-discovery.js';
 import { startAlertWatchdog } from './alerts.js';
 import { handleAgentWs, handleClientWs } from './ws/agentHandler.js';
 import { createTerminalHandler } from './ws/terminal.js';
+import { registerOpenClawProxy, handleOpenClawUpgrade } from './openclawProxy.js';
 import { scanNest, nestRoutes } from './nest.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -211,6 +212,9 @@ canvasRoutes(api);
 observabilityRoutes(api);
 mailRoutes(api);
 
+// Authenticated OpenClaw WebChat proxy. Must be registered before page routes.
+registerOpenClawProxy(router);
+
 // SSH-driven brownfield discovery (Phase 5 follow-on). Polls hosts listed in
 // config/ssh-hosts.json so /api/appendages can mark adopted stacks installed.
 startSshDiscovery();
@@ -289,8 +293,10 @@ const server = createServer(async (req, res) => {
   if (handleCors(req, res)) return;
   corsHeaders(res);
 
-  // Parse body for POST/PUT/DELETE
-  if (req.method !== 'GET' && req.method !== 'HEAD') {
+  const url = req.url.split('?')[0];
+
+  // Parse body for POST/PUT/DELETE. /claw is proxied as a stream.
+  if (req.method !== 'GET' && req.method !== 'HEAD' && !url.startsWith('/claw')) {
     try {
       req.body = await parseBody(req);
     } catch {
@@ -303,7 +309,6 @@ const server = createServer(async (req, res) => {
   if (!allowed) return;
 
   // Route matching
-  const url = req.url.split('?')[0];
   const match = router.match(req.method, url);
   if (match) {
     req.params = match.params;
@@ -359,8 +364,15 @@ const heartbeatTimer = setInterval(() => {
 }, HEARTBEAT_MS);
 heartbeatTimer.unref();
 
-server.on('upgrade', (req, socket, head) => {
+server.on('upgrade', async (req, socket, head) => {
   const url = req.url.split('?')[0];
+
+  if (await handleOpenClawUpgrade(req, socket, head, async (upgradeReq) => {
+    const authHeader = upgradeReq.headers.authorization;
+    const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    const cookieToken = parseCookie(upgradeReq.headers.cookie, 'nest_token');
+    return tryAuth(upgradeReq, bearerToken || cookieToken);
+  })) return;
 
   if (url === '/ws/agent') {
     wss.handleUpgrade(req, socket, head, (ws) => { setupHeartbeat(ws); handleAgentWs(ws); });

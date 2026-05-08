@@ -31,8 +31,10 @@ button[disabled] { opacity: .55; cursor: default; }
 </main>
 <script>
 const n=document.getElementById("name"),p=document.getElementById("password"),st=document.getElementById("st"),btn=document.getElementById("go");
-if(localStorage.getItem("nest_token"))fetch("/api/auth/me",{headers:{Authorization:"Bearer "+localStorage.getItem("nest_token")}}).then(r=>{if(r.ok)location.href="/"}).catch(()=>{});
-async function login(){const name=n.value.trim(),pw=p.value.trim();if(!name||!pw){st.textContent="Enter name and password.";st.className="status error";return}btn.disabled=true;st.textContent="";try{const r=await fetch("/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name,password:pw})});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"Login failed");localStorage.setItem("nest_token",d.token);location.href="/"}catch(e){st.textContent=e.message;st.className="status error";btn.disabled=false}}
+const nextParam=new URLSearchParams(location.search).get("next")||"/";
+const next=(nextParam.startsWith("/")&&!nextParam.startsWith("//"))?nextParam:"/";
+if(localStorage.getItem("nest_token"))fetch("/api/auth/me",{headers:{Authorization:"Bearer "+localStorage.getItem("nest_token")}}).then(r=>{if(r.ok)location.href=next}).catch(()=>{});
+async function login(){const name=n.value.trim(),pw=p.value.trim();if(!name||!pw){st.textContent="Enter name and password.";st.className="status error";return}btn.disabled=true;st.textContent="";try{const r=await fetch("/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name,password:pw})});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"Login failed");localStorage.setItem("nest_token",d.token);location.href=next}catch(e){st.textContent=e.message;st.className="status error";btn.disabled=false}}
 btn.onclick=login;p.onkeydown=n.onkeydown=e=>{if(e.key==="Enter")login()};
 </script>
 </body>
