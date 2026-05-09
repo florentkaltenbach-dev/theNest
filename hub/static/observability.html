@@ -119,7 +119,11 @@ function renderLedger(d) {
       }
       if (s.metrics.monthlyTokens != null) bits.push(`${fmtNum(s.metrics.monthlyTokens)} monthly tokens`);
       if (s.metrics.periodTokens != null) bits.push(`${fmtNum(s.metrics.periodTokens)} monthly tokens`);
+      if (s.metrics.tokens5h != null) bits.push(`${fmtNum(s.metrics.tokens5h)} tokens / 5h`);
+      if (s.metrics.calls5h != null) bits.push(`${fmtNum(s.metrics.calls5h)} calls / 5h`);
       if (s.metrics.periodCostUsdEquivalent != null) bits.push(`$${Number(s.metrics.periodCostUsdEquivalent).toFixed(2)} API-rate equivalent`);
+      if (s.metrics.openrouterTotalCredits != null) bits.push(`${fmtNum(s.metrics.openrouterTotalCredits)} OpenRouter credits purchased`);
+      if (s.metrics.openrouterTotalUsageUsd != null) bits.push(`$${Number(s.metrics.openrouterTotalUsageUsd).toFixed(2)} OpenRouter paid usage`);
       if (s.metrics.plan) bits.push(`plan: ${esc(s.metrics.plan)}`);
       if (s.metrics.capSource) bits.push(`cap: ${esc(s.metrics.capSource)}`);
       metricsExtra = bits.length ? `<div class="warn" style="color:#374151">${bits.join(" · ")}</div>` : "";

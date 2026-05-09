@@ -45,8 +45,9 @@ If a cap is unknown (user hasn't told Nest yet), `cap.amount=null`, `remaining.u
 
 | id | kind | acquisition |
 |----|------|-------------|
-| `codex-pro` | oauth-sub | `agents/main/sessions/.usage-cost-cache.json` for `used`; `hub/src/codex-status.js` for plan tier; cap from user-supplied config (`config.env`: `NEST_CAP_CODEX_PRO`). |
+| `codex-pro` | oauth-sub | Fresh OpenClaw session JSONL `message.usage` records for token totals. OAuth subscriber remaining quota is not exposed locally, so remaining stays unknown. |
 | `claude-pro` | oauth-sub | TBD — Claude Code's local usage log/cache (research). Cap from `NEST_CAP_CLAUDE_PRO`. |
+| `openrouter-hermes` | free-promo | Hermes `gateway.log` daily `api_calls` count for `openrouter/free`, plus OpenRouter `/credits` to choose the researched free-model daily cap (50/day normally, 1000/day after $10 purchased credits). |
 | `openrouter-promo-<model>` | free-promo | OpenRouter dashboard / API (`/credits`, `/keys/<id>`). One source row per active promo with its expiry as `period.end`. |
 | `nest-infra` | infra | `requests.jsonl` — for the over-spend axis on Nest's own request layer. Doesn't have a cap. |
 
@@ -126,7 +127,7 @@ Decision: **replace**, since the new shape supersedes the old. The waste-pct axi
 ## Implementation order
 
 1. Define `config.env` keys and have user supply caps for Codex Pro + Claude Pro.
-2. Implement the OpenClaw-Codex source (`scripts/tasks/sources/codex-pro.sh`).
+2. Implement the OpenClaw-Codex source (`scripts/tasks/sources/codex-pro.sh`). It reads fresh OpenClaw session JSONL `message.usage`; do not rely on `.usage-cost-cache.json` because it can go stale.
 3. Implement the Claude Code source — research the local data path first.
 4. Implement the nest-infra source (mostly a port of existing `aggregate-telemetry.sh`).
 5. Wire `aggregate-tokens.sh` and replace the current `/api/observability/tokens` payload.
