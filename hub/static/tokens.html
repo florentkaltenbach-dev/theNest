@@ -221,9 +221,21 @@ function formatPlan(plan) {
   return plan || 'unknown';
 }
 
+function formatNum(n) {
+  if (n == null || Number.isNaN(Number(n))) return 'unknown';
+  return Number(n).toLocaleString();
+}
+
+function formatUnit(unit) {
+  if (unit === 'requests_day') return 'requests/day';
+  if (unit === 'prompts_5h') return 'prompts/5h';
+  if (unit === 'tokens') return 'tokens';
+  return unit || '';
+}
+
 // ── State ──
-let limits = null, waste = null, codex = null;
-let limitsError = null, codexError = null;
+let limits = null, waste = null, codex = null, ledger = null;
+let limitsError = null, codexError = null, ledgerError = null;
 let loading = true;
 let fetchedAt = Date.now();
 
@@ -277,6 +289,47 @@ function renderScopeChips(scopes) {
     '<div class="chip-row">' + chips + '</div></div>';
 }
 
+function renderLedgerSource(source) {
+  const cap = source.cap || {};
+  const remaining = source.remaining || {};
+  const pct = remaining.unknown === false && remaining.percent != null ? clampPercent(remaining.percent) : null;
+  const title = source.id === 'openrouter-hermes' ? 'Hermes / OpenRouter' :
+    source.id === 'codex-pro' ? 'Codex / OpenClaw' : source.label;
+  let detail = '';
+  if (source.id === 'codex-pro') {
+    detail = formatNum(source.used?.amount) + ' monthly tokens · ' +
+      formatNum(source.metrics?.tokens5h) + ' tokens / 5h · ' +
+      formatNum(source.metrics?.calls5h) + ' calls / 5h · remaining quota not exposed by OAuth';
+  } else if (source.id === 'openrouter-hermes') {
+    detail = formatNum(source.used?.amount) + ' / ' + formatNum(cap.amount) + ' ' + formatUnit(cap.unit) +
+      ' · ' + formatNum(remaining.amount) + ' left today · ' +
+      formatNum(source.metrics?.openrouterTotalCredits) + ' OpenRouter credits purchased';
+  } else if (pct != null) {
+    detail = formatNum(source.used?.amount) + ' / ' + formatNum(cap.amount) + ' ' + formatUnit(cap.unit);
+  } else {
+    detail = formatNum(source.used?.amount) + ' ' + formatUnit(cap.unit || source.cap?.unit);
+  }
+  if (pct != null) {
+    return renderMeter(title, pct, detail, pct >= 60 ? 'var(--green)' : pct >= 20 ? 'var(--amber)' : 'var(--red)');
+  }
+  return '<div class="card"><div class="row-spread"><span class="card-title">' + esc(title) +
+    '</span><span class="percent-text" style="color:var(--muted)">—</span></div>' +
+    '<div class="card-meta">' + esc(detail) + '</div></div>';
+}
+
+function renderLedgerSection() {
+  if (ledgerError && !ledger) {
+    return '<div class="card"><div class="error-text">' + esc(ledgerError) + '</div></div>';
+  }
+  if (!ledger || !ledger.sources) return '';
+  const wanted = ['openrouter-hermes', 'codex-pro'];
+  const sources = wanted.map(id => ledger.sources.find(s => s.id === id)).filter(Boolean);
+  let html = renderSectionTitle('Ledger', 'Actual usage counters',
+    'This is the multi-source ledger: Hermes/OpenRouter daily free requests and fresh Codex/OpenClaw token totals.');
+  html += sources.map(renderLedgerSource).join('');
+  return html;
+}
+
 // ── Countdown drift correction ──
 function adjustedCountdown(remainingSeconds) {
   const elapsed = (Date.now() - fetchedAt) / 1000;
@@ -312,13 +365,15 @@ function render() {
 
   // Hero
   html += '<div class="hero"><div class="hero-title">Token Control</div>' +
-    '<div class="hero-subtitle">Dense telemetry for Claude windows and Codex auth health.</div>' +
+    '<div class="hero-subtitle">Claude pressure, Codex usage, and Hermes/OpenRouter free quota.</div>' +
     '<div class="hero-stats">' +
     renderStatPill('Claude session', sessionPct + '%', toneForPercent(sessionPct)) +
     renderStatPill('Claude weekly', weeklyPct + '%', toneForPercent(weeklyPct)) +
     renderStatPill('Codex', codex ? (codexHealthy ? 'active' : 'expired') : 'unknown',
       codexHealthy ? 'var(--green)' : 'var(--red)') +
     '</div><button class="refresh-btn" onclick="load()">Refresh</button></div>';
+
+  html += renderLedgerSection();
 
   // Claude section
   html += renderSectionTitle('Claude', 'Window pressure',
@@ -396,10 +451,11 @@ function render() {
 
 // ── Data loading ──
 async function load() {
-  const [lResult, wResult, cResult] = await Promise.allSettled([
+  const [lResult, wResult, cResult, ledgerResult] = await Promise.allSettled([
     api('/tokens/limits'),
     api('/tokens/waste'),
     api('/tokens/codex/status'),
+    api('/observability/tokens'),
   ]);
 
   if (lResult.status === 'fulfilled' && lResult.value) {
@@ -418,6 +474,13 @@ async function load() {
     codexError = null;
   } else {
     codexError = (cResult.reason && cResult.reason.message) || 'Codex not configured';
+  }
+
+  if (ledgerResult.status === 'fulfilled' && ledgerResult.value) {
+    ledger = ledgerResult.value;
+    ledgerError = null;
+  } else {
+    ledgerError = (ledgerResult.reason && ledgerResult.reason.message) || 'Token ledger unavailable';
   }
 
   fetchedAt = Date.now();
