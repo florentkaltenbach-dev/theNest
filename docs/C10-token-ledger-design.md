@@ -1,7 +1,7 @@
 # C10: Multi-source token ledger — design
 
-> **Status:** design draft (2026-05-06). To be reviewed before implementation.
-> **Constraint:** user uses OAuth subscriptions + free tokens only; no pay-per-token API credits. Primary axis is *remaining capacity*. (See `user_token_economy.md` memory.)
+> **Status:** implemented (2026-05-09). Source rows use live local usage caches where available and researched/conservative plan floors when providers do not expose exact remaining quota.
+> **Constraint:** user uses OAuth subscriptions + free tokens only; no pay-per-token API credits. Primary axis is *remaining capacity*. Provider-reported exact remaining quota is preferred; otherwise the ledger marks `metrics.capSource="researched-floor"`.
 
 ## Goal
 

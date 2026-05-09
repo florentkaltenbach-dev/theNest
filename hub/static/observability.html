@@ -111,9 +111,19 @@ function renderLedger(d) {
       ? `${esc(s.period.start.slice(0,10))} → ${esc(s.period.end.slice(0,10))}`
       : `<span class="placeholder">n/a</span>`;
     const warnings = (s.warnings || []).map(w => `<div class="warn">⚠ ${esc(w)}</div>`).join("");
-    const metricsExtra = s.metrics
-      ? `<div class="warn" style="color:#374151">${fmtNum(s.metrics.errors)} errors · waste ${s.metrics.wastePct.toFixed(1)}%</div>`
-      : "";
+    let metricsExtra = "";
+    if (s.metrics) {
+      const bits = [];
+      if (s.metrics.errors != null && s.metrics.wastePct != null) {
+        bits.push(`${fmtNum(s.metrics.errors)} errors · waste ${Number(s.metrics.wastePct).toFixed(1)}%`);
+      }
+      if (s.metrics.monthlyTokens != null) bits.push(`${fmtNum(s.metrics.monthlyTokens)} monthly tokens`);
+      if (s.metrics.periodTokens != null) bits.push(`${fmtNum(s.metrics.periodTokens)} monthly tokens`);
+      if (s.metrics.periodCostUsdEquivalent != null) bits.push(`$${Number(s.metrics.periodCostUsdEquivalent).toFixed(2)} API-rate equivalent`);
+      if (s.metrics.plan) bits.push(`plan: ${esc(s.metrics.plan)}`);
+      if (s.metrics.capSource) bits.push(`cap: ${esc(s.metrics.capSource)}`);
+      metricsExtra = bits.length ? `<div class="warn" style="color:#374151">${bits.join(" · ")}</div>` : "";
+    }
     return `<tr>
       <td><strong>${esc(s.label)}</strong> <span class="pill">${esc(s.kind)}</span>${warnings}${metricsExtra}</td>
       <td class="num">${fmtNum(used)}</td>
