@@ -30,6 +30,7 @@ import { tokenRoutes } from './routes/tokens.js';
 import { artifactRoutes } from './routes/artifacts.js';
 import { canvasRoutes } from './routes/canvas.js';
 import { observabilityRoutes } from './routes/observability.js';
+import { routerRoutes } from './routes/router.js';
 import { mailRoutes } from './routes/mail.js';
 import { startSshDiscovery } from './ssh-discovery.js';
 import { startAlertWatchdog } from './alerts.js';
@@ -210,6 +211,7 @@ tokenRoutes(api);
 artifactRoutes(api);
 canvasRoutes(api);
 observabilityRoutes(api);
+routerRoutes(api);
 mailRoutes(api);
 
 // Authenticated OpenClaw WebChat proxy. Must be registered before page routes.
