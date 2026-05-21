@@ -219,46 +219,56 @@ This is a starting point. Add your own conventions, style, and rules as you figu
 
 When working on Nest code (not assistant duties), these are load-bearing. Read them at the start of every session and before every step.
 
-### The plan lives in WORKLIST.md
+### The plan lives in Linear (since 2026-05-21)
 
-`WORKLIST.md` at repo root is the canonical sequence of work. Pick up from the first unchecked item. Do not rewrite the plan from chat history.
+Active task state lives in **Linear**, workspace "AI Kanban Pilot", team key `AI`. Query via the `linear` MCP server (registered in `/opt/nest/.mcp.json`, `~/.claude.json`, and both Codex `config.toml`s).
 
-### Commit per step
+**To find work:** query Linear for issues in state `Spec'd` or `Working` for the active phase project (Phase 3 trailing / Phase 4 / Phase 5 / 6 / 7 / 8). Pick the highest-priority `Spec'd` ticket that's `ai-ready` (suitability label). Don't touch `human-only` or `needs-spec` tickets without permission.
 
-- One step = one commit. Never bundle two steps.
-- Commit message style: match recent `git log --oneline -10`. Short imperative subject; body explains *why* when non-obvious.
-- Always include the `Co-Authored-By` trailer (check recent commits — the project uses it).
+**Workflow states** (left-to-right on the board):
+1. `Backlog` — not yet specified.
+2. `Spec'd` — has goal, context, 2–4 acceptance criteria, suitability label set. Ready to pull.
+3. `Working` — actively in progress. **WIP limit: 2.** Move ticket here when you start.
+4. `Review` — done, awaiting human review. **WIP limit: 2.** Move here when work is done + tests pass.
+5. `Done` — human-approved. Only the human moves tickets here.
+6. `Cancelled` — abandoned.
+
+**Suitability labels** (exactly one per ticket):
+- `ai-ready` — agents can take this end-to-end.
+- `human-only` — needs judgment outside AI scope.
+- `needs-spec` — underspecified; cannot move out of Backlog yet.
+
+**Status modifiers:** `blocked` (external dependency), `kind/feature` | `kind/bug` | `kind/refactor` | `kind/chore`.
+
+**Source-of-truth rule:** ROADMAP.md is strategic plan-of-record (phase decisions, design rationale, history). WORKLIST.md is frozen historical record. **Don't add new entries to either.** New work goes to Linear. Completed work history accrues in Linear's `Done` lane and the structured ticket body — append final commit SHA / verification command to the ticket description on completion.
+
+**Configuration-as-code:** workflow states, labels, and phase projects are defined in `config/linear.yaml` and applied by `scripts/apply-linear-config.py`. Don't edit them in Linear's web UI (escape hatch only — defaults drift back via the script).
+
+### Commit per ticket
+
+- One ticket = one commit (was: one step = one commit). Never bundle two tickets.
+- Commit message references the ticket: subject `<verb> <object> (AI-N)` or include `AI-N` in the body. Match recent `git log --oneline -10` for style.
+- Always include the `Co-Authored-By` trailer.
 - Stage files by name, never `git add -A`.
 
 ### Auto-proceed conditions
 
-Proceed to the next WORKLIST item **without asking** if **all** hold:
+Proceed to the next ticket **without asking** if **all** hold:
 
-1. Prior item is checked `[x]` in WORKLIST with today's date.
-2. `git status` shows only files expected by the prior item (no stray edits).
-3. The step just completed has been committed (`git log -1` is the step's commit).
-4. The next item has no `REASSESS` or `HUMAN` tag.
+1. Prior ticket is in `Review` or `Done` state in Linear with today's date.
+2. `git status` shows only files expected by the prior ticket (no stray edits).
+3. The work just completed has been committed (`git log -1` is the ticket's commit).
+4. The next ticket has `ai-ready` suitability and no `blocked` label.
 5. The touched code runs: if the change is a hub route/page, restart `nest-hub` and smoke-test via `curl` + `/api/routes`.
 
 If any condition fails, **stop and report**. Do not improvise.
 
 ### REASSESS / HUMAN gates
 
-- `REASSESS` — the agent gathers data, presents findings, **user decides**. Example: Phase 2 step 3 (waste-pct vs. skip-O3/O4).
-- `HUMAN` — action requires something only the user can do (browser interaction, credentials, OAuth). Stop and ask.
+- `REASSESS` — agent gathers data, presents findings, **user decides**. Add a comment on the ticket; do not move state.
+- `HUMAN` — action requires something only the user can do (browser interaction, credentials, OAuth). Move ticket to `Review` with a clear question in the comment, or add `blocked` label if waiting longer.
 
-End-of-phase checkpoints are always `REASSESS`.
-
-### Status markers
-
-WORKLIST items and ROADMAP rows use these exact markers — don't improvise new ones:
-
-- `[x]` done. Paired with a date and evidence (commit SHA, file path, or verification command).
-- `[ ]` not started.
-- `[~]` **actively mid-edit.** Someone has a file open or a branch in progress on this. Do not use for "waiting on upstream."
-- `[/]` **partial.** A version of this was shipped but doesn't satisfy the item's full goal. Must include a one-line note about what's missing. Example: `[/] E7 — secrets.html CRUD done; encrypted export/import missing`.
-- `[?]` **needs review.** Evidence for `[x]` is weak, or a prior audit is suspect. Demote to `[ ]` or promote to `[x]` after a fresh check.
-- Suffix `blocked-on: <item>` on a `[ ]` line when the blocker is a specific other item. Better than `[~]` for "we're waiting."
+End-of-phase checkpoints are always `REASSESS` — surface as a ticket in the relevant phase project.
 
 ### Auditing: removal/migration goals
 

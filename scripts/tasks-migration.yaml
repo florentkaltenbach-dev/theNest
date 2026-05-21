@@ -1,0 +1,310 @@
+# scripts/tasks-migration.yaml
+# One-shot migration of nest WORKLIST/ROADMAP open items to Linear (2026-05-21).
+# Source-of-truth shift: from this date, active task state lives in Linear,
+# not in the markdown files. This manifest is the audit trail of what got
+# transferred.
+#
+# Format per ticket:
+#   - title: Linear issue title
+#     project: name in linear.yaml (must match exactly)
+#     labels:  [suitability, kind, needs-spec]  # all entries must exist in linear.yaml
+#     source:  file:line reference for the body footer
+#     body:    verbatim source line as markdown quote
+#
+# The migrator script assembles the final body as:
+#   **Source:** {source}
+#
+#   {body}
+#
+#   ---
+#   _Migrated 2026-05-21. Body is the verbatim source line; please spec
+#   (goal, context, acceptance criteria) before moving to Spec'd._
+
+tickets:
+
+  # ──────────── Phase 3 trailing — Step 4.5 chat router (5) ────────────
+  - title: "Step 4.5 — Pick second LLM scaffold (Hermes-shape)"
+    project: "Phase 3 trailing"
+    labels: ["human-only", "kind/chore", "needs-spec"]
+    source: "WORKLIST.md:76"
+    body: |
+      > Pick the second scaffold — research candidates that fit "Hermes-shape": OAuth/API in front of an LLM, can be self-hosted alongside OpenClaw, supports OpenRouter and/or Anthropic.
+
+  - title: "Step 4.5 — Design routing policy"
+    project: "Phase 3 trailing"
+    labels: ["human-only", "kind/feature", "needs-spec"]
+    source: "WORKLIST.md:77"
+    body: |
+      > Design: routing policy. User toggle? Task type? **Free-quota-first** (consume promo / flat-rate before paying)? Per-slash-command override? Likely a hybrid.
+
+  - title: "Step 4.5 — Decide history carry-over across engine switches"
+    project: "Phase 3 trailing"
+    labels: ["human-only", "kind/feature", "needs-spec"]
+    source: "WORKLIST.md:78"
+    body: |
+      > Design: does history carry across engine switches, or per-engine?
+
+  - title: "Step 4.5 — Router queries C10 for live per-engine capacity"
+    project: "Phase 3 trailing"
+    labels: ["ai-ready", "kind/feature", "needs-spec"]
+    source: "WORKLIST.md:79"
+    body: |
+      > Design: how the router queries C10 for live capacity per engine.
+
+  - title: "Step 4.5 — Implement chat.html + chat.js router (retires C9)"
+    project: "Phase 3 trailing"
+    labels: ["ai-ready", "kind/feature", "needs-spec"]
+    source: "WORKLIST.md:80"
+    body: |
+      > Implementation: `hub/static/chat.html` (new or refactor of `claw.html`) + router in `chat.js`. Router replaces the direct-Codex path (C9 retirement).
+
+  # ──────────── Phase 3 trailing — Skills fan-out (4) ────────────
+  - title: "C5 — server-overview skill (skeleton exists, dispatch pending ADR-001)"
+    project: "Phase 3 trailing"
+    labels: ["ai-ready", "kind/feature", "needs-spec"]
+    source: "ROADMAP.md:117"
+    body: |
+      > **C5: `server-overview` skill** — Skeleton drafted 2026-04-23 at `skills/server-overview/SKILL.md`. End-to-end exercise now possible (C2 + C3 done, 2026-05-06). Skill-dispatch mechanism pending ADR-001.
+
+  - title: "C6 — container-manager skill"
+    project: "Phase 3 trailing"
+    labels: ["ai-ready", "kind/feature", "needs-spec"]
+    source: "ROADMAP.md:118"
+    body: |
+      > **C6: `container-manager` skill** — SKILL.md for start/stop/restart/logs via hub API.
+
+  - title: "C7 — script-runner skill"
+    project: "Phase 3 trailing"
+    labels: ["ai-ready", "kind/feature", "needs-spec"]
+    source: "ROADMAP.md:119"
+    body: |
+      > **C7: `script-runner` skill** — SKILL.md that invokes scripts from `scripts/tasks/`. Claw triggers, script executes, Claw interprets result.
+
+  - title: "C8 — token-report skill"
+    project: "Phase 3 trailing"
+    labels: ["ai-ready", "kind/feature", "needs-spec"]
+    source: "ROADMAP.md:120"
+    body: |
+      > **C8: `token-report` skill** — SKILL.md that reads `/api/observability/tokens`. Claw can report on its own efficiency.
+
+  # ──────────── Phase 4 — Age encryption (7) ────────────
+  - title: "E1 — age key derivation from passphrase"
+    project: "Phase 4 — Age encryption"
+    labels: ["ai-ready", "kind/feature", "needs-spec"]
+    source: "ROADMAP.md:136"
+    body: |
+      > **E1: age key derivation from passphrase** — On first setup, passphrase derives an age identity. Store in device secure storage (localStorage for web v1).
+
+  - title: "E2 — Server key exchange (agent pubkey → hub)"
+    project: "Phase 4 — Age encryption"
+    labels: ["ai-ready", "kind/feature", "needs-spec"]
+    source: "ROADMAP.md:137"
+    body: |
+      > **E2: Server key exchange** — Agent generates age key pair on install. Public key sent to hub. Client fetches public keys.
+
+  - title: "E3 — Client encrypts secrets (age-encryption npm)"
+    project: "Phase 4 — Age encryption"
+    labels: ["ai-ready", "kind/feature", "needs-spec"]
+    source: "ROADMAP.md:138"
+    body: |
+      > **E3: Client encrypts secrets** — `ISecretTransfer.encrypt()` using `age-encryption` npm package. Encrypt for target server's public key.
+
+  - title: "E4 — Hub relays opaque blobs (refactor /api/secrets)"
+    project: "Phase 4 — Age encryption"
+    labels: ["ai-ready", "kind/refactor", "needs-spec"]
+    source: "ROADMAP.md:139"
+    body: |
+      > **E4: Hub relays opaque blobs** — Refactor `/api/secrets` to relay encrypted blobs, not read/write config.env. Hub never sees plaintext.
+
+  - title: "E5 — Agent decrypts and injects (agent/nest_agent/secrets.py)"
+    project: "Phase 4 — Age encryption"
+    labels: ["ai-ready", "kind/feature", "needs-spec"]
+    source: "ROADMAP.md:140"
+    body: |
+      > **E5: Agent decrypts and injects** — Create `agent/nest_agent/secrets.py`. Receive blob, cache on disk, decrypt with own private key, inject into container env.
+
+  - title: "E6 — Move Hetzner API calls from hub to client"
+    project: "Phase 4 — Age encryption"
+    labels: ["ai-ready", "kind/refactor", "needs-spec"]
+    source: "ROADMAP.md:144"
+    body: |
+      > **E6: Move Hetzner API calls to client** — Currently hub proxies Hetzner API (holding the token). Per Nest.md, the client should call Hetzner directly. Hub should never see the provider token.
+
+  - title: "E7 — Encrypted secret export/import (extends secrets.html)"
+    project: "Phase 4 — Age encryption"
+    labels: ["ai-ready", "kind/feature", "needs-spec"]
+    source: "ROADMAP.md:148"
+    body: |
+      > **E7: Secret export/import** — `hub/static/secrets.html` has CRUD UI over `config.env`; encrypted export/import not implemented. Depends on E1/E3 for the encryption primitives.
+
+  # ──────────── Phase 5 — Appendage system (7) ────────────
+  - title: "A3 — Agent-side appendage schema re-validation"
+    project: "Phase 5 — Appendage system"
+    labels: ["ai-ready", "kind/refactor", "needs-spec"]
+    source: "ROADMAP.md:160"
+    body: |
+      > **A3: Schema validation on install** — 2026-05-07. `hub/src/appendages.js` hand-rolled validator runs at load time; invalid files surface in `GET /api/appendages` under `invalid[]`. Hub-side only — agent does not re-validate (trust boundary: hub). Add agent-side check if/when appendages can come from untrusted sources.
+
+  - title: "A4 — Wizard step rendering on /appendages"
+    project: "Phase 5 — Appendage system"
+    labels: ["ai-ready", "kind/feature", "needs-spec"]
+    source: "ROADMAP.md:164"
+    body: |
+      > **A4: Client wizard screen** — 2026-05-07. `/appendages` page lists all contracts with install/uninstall buttons. **Wizard step rendering not yet wired** — current install button just dispatches with built-in defaults. Will need to render `wizard.steps` form fields when a contract requires user input (no contract today does).
+
+  - title: "A5 — Surface appendage logs on detail page"
+    project: "Phase 5 — Appendage system"
+    labels: ["ai-ready", "kind/feature", "needs-spec"]
+    source: "ROADMAP.md:165"
+    body: |
+      > **A5: Client appendage detail** — 2026-05-07. `/appendages` page shows status, mode (container/compose/discovery), host, image/compose source, matched/missing container patterns for discovery appendages, and actions. Logs not surfaced yet (would need an agent `appendage_logs` command).
+
+  - title: "A6 — Agent lifecycle: update + ports + Caddy + lifecycle.py"
+    project: "Phase 5 — Appendage system"
+    labels: ["ai-ready", "kind/feature", "needs-spec"]
+    source: "ROADMAP.md:169"
+    body: |
+      > **A6: Full lifecycle in agent** — Missing: `update_appendage`, port-allocation negotiation, Caddy route registration, lifecycle.py extraction.
+
+  - title: "A7 — Extend discovery.py: Docker / systemd / listening-port"
+    project: "Phase 5 — Appendage system"
+    labels: ["ai-ready", "kind/feature", "needs-spec"]
+    source: "ROADMAP.md:170"
+    body: |
+      > **A7: Service discovery** — Pre-existing `agent/nest_agent/discovery.py` does git-repo discovery only. Missing: Docker container, systemd unit, and listening-port discovery per Nest.md spec.
+
+  - title: "A8 — Git discovery (agent/nest_agent/git.py)"
+    project: "Phase 5 — Appendage system"
+    labels: ["ai-ready", "kind/feature", "needs-spec"]
+    source: "ROADMAP.md:171"
+    body: |
+      > **A8: Git discovery** — Create `agent/nest_agent/git.py`. List repos on server with branch, recent commits.
+
+  - title: "A9 — Appendage-to-appendage communication (consumes/apis)"
+    project: "Phase 5 — Appendage system"
+    labels: ["ai-ready", "kind/feature", "needs-spec"]
+    source: "ROADMAP.md:175"
+    body: |
+      > **A9: Appendage-to-appendage communication** — Implement `consumes` and `apis` from the contract. Service mesh via hub relay or direct Docker network.
+
+  # ──────────── Phase 6 — Client experience (5) ────────────
+  - title: "U5 — Distinctive European-aesthetic UI pass"
+    project: "Phase 6 — Client experience"
+    labels: ["human-only", "kind/refactor", "needs-spec"]
+    source: "ROADMAP.md:190"
+    body: |
+      > **U5: Distinctive UI** — The spec says "European aesthetic, coding agent designs freely." This is the creative phase — make it beautiful.
+
+  - title: "U6 — i18n (English + German string tables)"
+    project: "Phase 6 — Client experience"
+    labels: ["ai-ready", "kind/feature", "needs-spec"]
+    source: "ROADMAP.md:194"
+    body: |
+      > **U6: i18n** — English + German. Lightweight browser-side string tables.
+
+  - title: "U7 — Push notifications"
+    project: "Phase 6 — Client experience"
+    labels: ["ai-ready", "kind/feature", "needs-spec"]
+    source: "ROADMAP.md:195"
+    body: |
+      > **U7: Push notifications** — Web push or server-side notifications for task completion and alerts.
+
+  - title: "U8 — Biometric unlock (WebAuthn / passkey)"
+    project: "Phase 6 — Client experience"
+    labels: ["ai-ready", "kind/feature", "needs-spec"]
+    source: "ROADMAP.md:196"
+    body: |
+      > **U8: Biometric unlock** — Browser-native passkey or WebAuthn flow.
+
+  - title: "U9 — Native builds (TestFlight + Android internal)"
+    project: "Phase 6 — Client experience"
+    labels: ["human-only", "kind/chore", "needs-spec"]
+    source: "ROADMAP.md:197"
+    body: |
+      > **U9: Native builds** — TestFlight (iOS) + internal track (Android).
+
+  # ──────────── Phase 7 — Infrastructure (8) ────────────
+  - title: "I1 — Caddy admin API integration (dynamic routes)"
+    project: "Phase 7 — Infrastructure"
+    labels: ["ai-ready", "kind/feature", "needs-spec"]
+    source: "ROADMAP.md:205"
+    body: |
+      > **I1: Caddy API integration** — Dynamic route add/remove via Caddy's admin API instead of static Caddyfile.
+
+  - title: "I2 — Auto-TLS per appendage"
+    project: "Phase 7 — Infrastructure"
+    labels: ["ai-ready", "kind/feature", "needs-spec"]
+    source: "ROADMAP.md:206"
+    body: |
+      > **I2: Auto-TLS per appendage** — When an appendage declares routes, automatically configure Caddy.
+
+  - title: "I3 — Git webhook handler (auto pull/rebuild/restart)"
+    project: "Phase 7 — Infrastructure"
+    labels: ["ai-ready", "kind/feature", "needs-spec"]
+    source: "ROADMAP.md:210"
+    body: |
+      > **I3: Git webhook handler** — Hub receives GitHub webhook, auto-pulls, rebuilds, restarts.
+
+  - title: "I4 — Deploy from chat (via OpenClaw)"
+    project: "Phase 7 — Infrastructure"
+    labels: ["ai-ready", "kind/feature", "needs-spec"]
+    source: "ROADMAP.md:211"
+    body: |
+      > **I4: Deploy from chat** — "deploy latest" via OpenClaw triggers git pull + rebuild.
+
+  - title: "I5 — WireGuard mesh pre-install"
+    project: "Phase 7 — Infrastructure"
+    labels: ["ai-ready", "kind/feature", "needs-spec"]
+    source: "ROADMAP.md:215"
+    body: |
+      > **I5: WireGuard mesh** — Pre-install WireGuard, activate when second server is added.
+
+  - title: "I6 — Multi-server appendage placement"
+    project: "Phase 7 — Infrastructure"
+    labels: ["ai-ready", "kind/feature", "needs-spec"]
+    source: "ROADMAP.md:216"
+    body: |
+      > **I6: Multi-server appendage placement** — Decide which appendage runs on which server based on resource requirements.
+
+  - title: "I7 — Per-period log archival (7d/30d/delete)"
+    project: "Phase 7 — Infrastructure"
+    labels: ["ai-ready", "kind/feature", "needs-spec"]
+    source: "ROADMAP.md:220"
+    body: |
+      > **I7: Log retention** — `hub/src/index.js` caps `requests.jsonl` at 5 MB and rotates by discarding the oldest 50% of lines. Missing: per-period archival (7d detailed / 30d summaries / delete) per Nest.md spec.
+
+  - title: "I8 — Push-notification alert channel (mail already shipped)"
+    project: "Phase 7 — Infrastructure"
+    labels: ["ai-ready", "kind/feature", "needs-spec"]
+    source: "ROADMAP.md:221"
+    body: |
+      > **I8: Alerting** — Agent detects unhealthy containers, hub notifies client via push notification.
+
+  # ──────────── Phase 8 — Dockbase polish (4) ────────────
+  - title: "D1 — Mailcow update action (mailcow-specific playbook)"
+    project: "Phase 8 — Dockbase polish"
+    labels: ["human-only", "kind/chore", "needs-spec"]
+    source: "ROADMAP.md:229"
+    body: |
+      > **D1: Mail server appendage** — Lifecycle (2026-05-21): logs/inspect/restart shipped; `update` still deferred (mailcow's update flow is its own playbook, not auto-driven from nest).
+
+  - title: "D2 — Website extended: Matomo + shared mariadb/Caddy"
+    project: "Phase 8 — Dockbase polish"
+    labels: ["ai-ready", "kind/feature", "needs-spec"]
+    source: "ROADMAP.md:230"
+    body: |
+      > **D2: Website appendage** — Missing: Matomo analytics container + shared mariadb/Caddy from stoneshop's `docker-compose.shared.yml`. Tracking that as D2-extended.
+
+  - title: "D4 — CrowdSec ↔ Caddy bouncer integration"
+    project: "Phase 8 — Dockbase polish"
+    labels: ["ai-ready", "kind/feature", "needs-spec"]
+    source: "ROADMAP.md:232"
+    body: |
+      > **D4: CrowdSec appendage** — Bouncer integration with Caddy still TODO. (Central-API IPv6 enrollment deferred until Phase 4 secrets land.)
+
+  - title: "D5 — Stoneshop update action via SSH"
+    project: "Phase 8 — Dockbase polish"
+    labels: ["ai-ready", "kind/feature", "needs-spec"]
+    source: "ROADMAP.md:233"
+    body: |
+      > **D5: WooCommerce appendage** — Lifecycle (2026-05-21): logs/inspect/restart shipped. `update` still deferred — each adopted stack uses different orchestration.

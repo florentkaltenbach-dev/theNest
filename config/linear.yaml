@@ -1,0 +1,116 @@
+# config/linear.yaml — Linear workspace configuration
+# Source of truth for workflow states, labels, and methodology metadata.
+# Edit this file, then run scripts/apply-linear-config.py to apply.
+# All script operations are idempotent and additive — never destructive.
+
+team_key: AI  # "AI Kanban Pilot" — confirmed via Linear API 2026-05-21.
+
+workflow_states:
+  # Ordered left-to-right on the board.
+  # type enum: backlog | unstarted | started | completed | canceled
+
+  - name: Backlog
+    type: backlog
+    color: "#95a2b3"
+    description: Not yet specified or prioritized.
+
+  - name: Spec'd
+    type: unstarted
+    color: "#5e6ad2"
+    description: Ready for work. Has goal, context, and acceptance criteria.
+
+  - name: Working
+    type: started
+    color: "#f2c94c"
+    description: Currently being executed. WIP limit (methodology) = 2.
+
+  - name: Review
+    type: started
+    color: "#ef8b2c"
+    description: Awaiting human review. WIP limit (methodology) = 2.
+
+  - name: Done
+    type: completed
+    color: "#5fb37c"
+    description: Acceptance criteria met.
+
+  - name: Cancelled
+    type: canceled
+    color: "#a0a0a0"
+    description: Abandoned or no longer relevant.
+
+labels:
+  # Suitability — exactly one of these on every ticket.
+  - name: ai-ready
+    color: "#5e6ad2"
+    description: AI agents can take this ticket end-to-end.
+
+  - name: human-only
+    color: "#73726c"
+    description: Requires judgment or capabilities outside AI scope.
+
+  # Status modifiers — applied as needed.
+  - name: needs-spec
+    color: "#f2994a"
+    description: In Backlog but underspecified. Blocks move to Spec'd.
+
+  - name: blocked
+    color: "#e24b4a"
+    description: Cannot proceed without external dependency.
+
+  # Kind — optional, useful for retrospective analysis.
+  - name: kind/feature
+    color: "#3b8bd4"
+  - name: kind/bug
+    color: "#e24b4a"
+  - name: kind/refactor
+    color: "#5fb37c"
+  - name: kind/chore
+    color: "#888780"
+
+projects:
+  # One Linear Project per Nest roadmap phase. Active tickets attach to their
+  # phase project. Project `state`: backlog | planned | started | paused |
+  # completed | canceled.
+
+  - name: "Phase 3 trailing"
+    state: started
+    description: |
+      OpenClaw skill fan-out (C5-C8) and the custom Nest chat + multi-engine
+      router (WORKLIST step 4.5). Survived the 2026-05-07 phase close.
+
+  - name: "Phase 4 — Age encryption"
+    state: backlog
+    description: |
+      Client-side encryption + provider-direct calls per Nest.md trust model.
+      Hub must never see plaintext secrets. age key derivation, server key
+      exchange, secret blob relay, agent-side decryption.
+
+  - name: "Phase 5 — Appendage system"
+    state: started
+    description: |
+      Schema validation, lifecycle, wizard rendering, discovery beyond git,
+      appendage-to-appendage communication. Mid-air per 2026-05-07 review.
+
+  - name: "Phase 6 — Client experience"
+    state: backlog
+    description: |
+      Distinctive European-aesthetic UI pass, i18n (English + German),
+      push notifications, WebAuthn biometric unlock, native builds.
+
+  - name: "Phase 7 — Infrastructure"
+    state: backlog
+    description: |
+      Caddy admin API, auto-TLS per appendage, deploy webhooks, WireGuard
+      mesh, multi-server placement, log archival, push-channel alerting.
+
+  - name: "Phase 8 — Dockbase polish"
+    state: started
+    description: |
+      Trailing pieces of the 5 D-appendages: mailcow/stoneshop update flows,
+      Website + Matomo wiring, CrowdSec ↔ Caddy bouncer integration.
+
+# Methodology — not platform-enforced, documented for visibility.
+wip_limits:
+  Working: 2
+  Review: 2

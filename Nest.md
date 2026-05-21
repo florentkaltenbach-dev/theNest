@@ -392,7 +392,9 @@ Claude Code runs in a Docker container. The agent manages its filesystem access:
 
 OpenClaw is **one** conversational backend among potentially several. It routes user intents to the appropriate appendages via skills (molts). It does not perform tasks directly.
 
-As of 2026-05-06, OpenClaw is the only live backend. The earlier direct-Codex-CLI integration in `hub/src/routes/chat.js` was retired — once OpenClaw was authenticated against ChatGPT OAuth, the two paths reached the same backend and the in-house one was redundant. The reusable Codex auth introspection (plan, account, expiry) is preserved at `hub/src/codex-status.js` for the C10 token ledger. A future Nest-owned router (Step 4.5) will pick among *agent scaffolds* — OpenClaw plus a second one yet to be selected — not among LLM backends.
+As of 2026-05-06, OpenClaw is the only conversational backend exposed *through the hub UI* (`/claw/`). Multiple agent scaffolds run on nest in parallel — OpenClaw, Hermes (running since 2026-05-16 as `hermes-gateway.service`), Codex CLI, Claude Code — but each is self-contained: the user picks which to talk to per task. The earlier direct-Codex-CLI integration in `hub/src/routes/chat.js` was retired (OpenClaw via ChatGPT OAuth reaches the same backend). The reusable Codex auth introspection is preserved at `hub/src/codex-status.js` for the C10 token ledger.
+
+*(A 2026-05-06 plan envisioned a Nest-owned router that would pick among scaffolds capacity-aware; that router was cancelled 2026-05-21 — see the "scaffolds are self-contained" framing above. If generic LLM routing ever becomes useful, OpenRouter is already wired up via Hermes.)*
 
 For the OpenClaw-routed case:
 
@@ -776,9 +778,9 @@ Issues identified but not yet resolved. Flagged so the coding agent skips or ask
 - Appendage marketplace: publishing, review, trust, installation
 - Claude Code access granularity (currently: unrestricted)
 
-### Chat backends
-- **Backend routing** — how does the Nest chat interface decide between Codex CLI and OpenClaw for a given request? Candidates: user preference (toggle in UI), task type (write-mode → Codex, skill-dispatch → OpenClaw), explicit selection ("/claw", "/codex"), first-available fallback. No decision yet. Revisit after a week of running both engines (post-C2) with real usage data.
-- **Shared state between backends** — if a user starts a conversation with Codex and switches to OpenClaw mid-thread, does history carry? Probably not for v1; flag in UI when backend changes.
+### Chat backends *(both threads resolved 2026-05-21)*
+- ~~**Backend routing**~~ — **Resolved.** No Nest-wide chat-backend router will be built. The four scaffolds (OpenClaw, Hermes, Codex CLI, Claude Code) are self-contained; the user picks per task. OpenRouter is the escape hatch for any future generic LLM routing.
+- ~~**Shared state between backends**~~ — **Resolved as moot.** No router → no cross-backend session switching to design.
 - **Telemetry unification** — the observability page reads `requests.jsonl` (Codex path) and `~/.openclaw/logs/telemetry.jsonl` (OpenClaw path) separately. A unified view requires normalization.
 
 ### Business

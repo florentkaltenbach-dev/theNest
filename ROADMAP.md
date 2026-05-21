@@ -1,25 +1,10 @@
-# Nest Roadmap
+# Nest Roadmap — strategic plan & phase history
 
-> The canonical plan for closing gaps between what's built and the Nest.md vision.
-> Any Claude Code instance should read this before starting work. Update after completing each item.
-> Visible at nest.kaltenbach.dev/roadmap once Phase 2 is deployed.
-
-## How to Use This File
-
-- Pick up where the last session left off — check the `Current Focus` section
-- Mark items `[x]` when done, add date
-- If a task is in progress, mark `[~]` and note what's left
-- Don't skip phases — they're ordered for a reason
-
----
-
-## Current Focus
-
-> **Phase 2: Observability & Token Efficiency**
-> Status: NOT STARTED
-> Reason: Before adding intelligence (OpenClaw), build the measurement layer. Scripts handle grunt work, AI handles thinking. Measure token waste from day one.
-
----
+> **Active task state lives in Linear** (workspace "AI Kanban Pilot", team key `AI`), queried via the `linear` MCP server. This file is the strategic plan-of-record: phase decisions, design rationale, evidence audits, version milestones, and history of shipped work.
+>
+> As of 2026-05-21, forward-looking checkbox markers (`[ ]`/`[/]`/`[~]`) were removed from items below — those are now Linear tickets (`AI-5`…`AI-44`). Cross-reference via `scripts/tasks-migration.yaml`. `[x]` markers stay as evidence of completed work.
+>
+> **How to use this file:** read for strategic context (why a phase exists, what shipped, what decisions were made). For "what should I work on next" → query Linear: tickets in `Spec'd` or `Working` for the active phase project.
 
 ## Bit-rot Triage — 2026-04-23
 
@@ -38,7 +23,7 @@ Completed 2026-03-25. All bugs fixed, security hardened, deployed and verified.
 
 - [x] B1–B5: All bugs resolved
 - [x] S1–S6: All security issues resolved (S1 was false alarm, S2–S3 fixed in prior session)
-- [ ] S7: Hub should not store secrets — rides with Phase 4 (age encryption). Pull forward *only* if new secrets are added to `hub/src/routes/secrets.js` or `config.env` before Phase 4 starts. As of 2026-04-23: no new secrets being added, stays deferred.
+- S7: Hub should not store secrets — rides with Phase 4 (age encryption). Pull forward *only* if new secrets are added to `hub/src/routes/secrets.js` or `config.env` before Phase 4 starts. As of 2026-04-23: no new secrets being added, stays deferred.
 
 ---
 
@@ -63,14 +48,14 @@ Build the measurement and automation layer before adding AI. Scripts do the heav
 
 **Rule:** If it can be a script, it's a script. AI only gets called for decisions.
 
-**Two-sided efficiency (added 2026-05-06):** Tokens are wasted both by *over-spend* (paying for what a script could do) and by *under-use* (paid/free flat-rate quota left idle at month-end, expired promo tokens). Strategic goal: maximize utilization of free/flat capacity (Claude Code sub, Codex sub, OpenRouter promos) before paying per-token. C10 ledger tracks both axes; Step 4.5 router consumes the capacity signal.
+**Two-sided efficiency (added 2026-05-06):** Tokens are wasted both by *over-spend* (paying for what a script could do) and by *under-use* (paid/free flat-rate quota left idle at month-end, expired promo tokens). Strategic goal: maximize utilization of free/flat capacity (Claude Code sub, Codex sub, OpenRouter promos) before paying per-token. C10 ledger tracks both axes. *(Original 2026-05-06 plan also fed this signal into a "Step 4.5" multi-engine router; that router was cancelled 2026-05-21 — agent scaffolds are self-contained and the user picks one per task. Ledger remains useful as informational dashboard.)*
 
 ### Scripts layer
 
 - [x] **O1: `scripts/tasks/` directory** — 2026-04-23. README defines JSON-in/JSON-out contract.
 - [x] **O2: `aggregate-telemetry.sh`** — 2026-04-23. Reads `requests.jsonl` + token-windows, writes `/opt/nest/data/telemetry-summary.json`. Leaves OpenClaw slot for C10.
-- [~] **O3: `api-surface-snapshot.sh`** — Skipped per step 3 reassessment (2026-04-23). Obviated by existing `/api/nest/wiring` + `/api/nest/surface` self-knowledge endpoints. Re-open if the signal changes.
-- [~] **O4: Cron jobs** — Skipped per step 3 reassessment (7d waste 3.9%, below 5% threshold). Re-open if aggregation-on-demand becomes a bottleneck.
+- **O3: `api-surface-snapshot.sh`** — Skipped per step 3 reassessment (2026-04-23). Obviated by existing `/api/nest/wiring` + `/api/nest/surface` self-knowledge endpoints. Re-open if the signal changes.
+- **O4: Cron jobs** — Skipped per step 3 reassessment (7d waste 3.9%, below 5% threshold). Re-open if aggregation-on-demand becomes a bottleneck.
 
 ### Hub observability endpoints
 
@@ -114,16 +99,16 @@ Install OpenClaw in Docker. Authenticate with ChatGPT subscription via Codex OAu
 
 ### Nest skills
 
-- [~] **C5: `server-overview` skill** — Skeleton drafted 2026-04-23 at `skills/server-overview/SKILL.md`. End-to-end exercise now possible (C2 + C3 done, 2026-05-06). Skill-dispatch mechanism pending ADR-001.
-- [ ] **C6: `container-manager` skill** — SKILL.md for start/stop/restart/logs via hub API.
-- [ ] **C7: `script-runner` skill** — SKILL.md that invokes scripts from `scripts/tasks/`. Claw triggers, script executes, Claw interprets result.
-- [ ] **C8: `token-report` skill** — SKILL.md that reads `/api/observability/tokens`. Claw can report on its own efficiency.
+- **C5: `server-overview` skill** — Skeleton drafted 2026-04-23 at `skills/server-overview/SKILL.md`. The original "skill-dispatch pending ADR-001" framing was retired 2026-05-21 (ADR-001 was about chat-pathway routing, never skill dispatch). The real open question — *how a canonical SKILL.md reaches each scaffold's native skill mechanism* — is now tracked in Linear as `AI-45` (and gates `AI-10` / C5 ticket).
+- **C6: `container-manager` skill** — SKILL.md for start/stop/restart/logs via hub API. Same delivery question as C5 (`AI-11`, gated on `AI-45`).
+- **C7: `script-runner` skill** — SKILL.md that invokes scripts from `scripts/tasks/`. Agent triggers, script executes, agent interprets result. Same delivery question (`AI-12`, gated on `AI-45`).
+- **C8: `token-report` skill** — SKILL.md that reads `/api/observability/tokens`. Agent can report on its own efficiency. Same delivery question (`AI-13`, gated on `AI-45`).
 
 ### Hub integration
 
 - [x] **C9: Codex backend in chat.js** — **Retired 2026-05-06.** Deleted `chat.js` + `claw.html`; OpenClaw via OAuth already reaches Codex, so the in-house path was the same backend twice. Reusable Codex auth introspection lifted to `hub/src/codex-status.js` for C10's quota tracker. See ADR-001 Supersession.
-- [~] **C9b: OpenClaw backend reachable** — Caddy `/claw/` proxy already exposes OpenClaw to the browser. The remaining piece (a Nest-owned router that calls OpenClaw alongside a second scaffold) lives in step 4.5 of WORKLIST. C9b folds into that.
-- [/] **C10: Multi-source token ledger + capacity tracker** — Reframed 2026-05-06. Strategic goal: **maximize utilization of free/flat capacity** so paid subscription quota isn't left idle. **User scope (2026-05-06):** OAuth subs + free tokens only, no pay-per-token credits. Sources: Codex Pro via OpenClaw OAuth, Claude Pro/Max via Claude Code OAuth, OpenRouter free promos, plus hub requests for Nest infra. Primary axis is *remaining* (cap − used, or promo expiry). Feeds Step 4.5 router so work flows to the engine with the most idle quota.
+- **C9b: OpenClaw backend reachable** — Caddy `/claw/` proxy already exposes OpenClaw to the browser. (The original 2026-05-06 plan paired this with a "Nest-owned router that calls OpenClaw alongside a second scaffold (Hermes)" — that router was cancelled 2026-05-21. Agent scaffolds are self-contained; the user picks one per task. OpenRouter is the escape hatch if generic LLM routing is ever needed.)
+- **C10: Multi-source token ledger + capacity tracker** — Reframed 2026-05-06. Strategic goal: **maximize utilization of free/flat capacity** so paid subscription quota isn't left idle. **User scope (2026-05-06):** OAuth subs + free tokens only, no pay-per-token credits. Sources: Codex Pro via OpenClaw OAuth, Claude Pro/Max via Claude Code OAuth, OpenRouter free promos (via Hermes), plus hub requests for Nest infra. Primary axis is *remaining* (cap − used, or promo expiry). *(Original plan also fed a Step 4.5 router; that router was cancelled 2026-05-21 — ledger remains useful as informational dashboard at `/tokens`.)*
 
 ---
 
@@ -133,19 +118,19 @@ The single biggest gap vs. the Nest.md vision. Without this, the hub is a trust 
 
 ### Client-side encryption
 
-- [ ] **E1: age key derivation from passphrase** — On first setup, passphrase derives an age identity. Store in device secure storage (localStorage for web v1).
-- [ ] **E2: Server key exchange** — Agent generates age key pair on install. Public key sent to hub. Client fetches public keys.
-- [ ] **E3: Client encrypts secrets** — `ISecretTransfer.encrypt()` using `age-encryption` npm package. Encrypt for target server's public key.
-- [ ] **E4: Hub relays opaque blobs** — Refactor `/api/secrets` to relay encrypted blobs, not read/write config.env. Hub never sees plaintext.
-- [ ] **E5: Agent decrypts and injects** — Create `agent/nest_agent/secrets.py`. Receive blob, cache on disk, decrypt with own private key, inject into container env.
+- **E1: age key derivation from passphrase** — On first setup, passphrase derives an age identity. Store in device secure storage (localStorage for web v1).
+- **E2: Server key exchange** — Agent generates age key pair on install. Public key sent to hub. Client fetches public keys.
+- **E3: Client encrypts secrets** — `ISecretTransfer.encrypt()` using `age-encryption` npm package. Encrypt for target server's public key.
+- **E4: Hub relays opaque blobs** — Refactor `/api/secrets` to relay encrypted blobs, not read/write config.env. Hub never sees plaintext.
+- **E5: Agent decrypts and injects** — Create `agent/nest_agent/secrets.py`. Receive blob, cache on disk, decrypt with own private key, inject into container env.
 
 ### Client-side provider calls
 
-- [ ] **E6: Move Hetzner API calls to client** — Currently hub proxies Hetzner API (holding the token). Per Nest.md, the client should call Hetzner directly. Hub should never see the provider token.
+- **E6: Move Hetzner API calls to client** — Currently hub proxies Hetzner API (holding the token). Per Nest.md, the client should call Hetzner directly. Hub should never see the provider token.
 
 ### Backup
 
-- [/] **E7: Secret export/import** — `hub/static/secrets.html` has CRUD UI over `config.env`; encrypted export/import not implemented. Depends on E1/E3 for the encryption primitives.
+- **E7: Secret export/import** — `hub/static/secrets.html` has CRUD UI over `config.env`; encrypted export/import not implemented. Depends on E1/E3 for the encryption primitives.
 
 ---
 
@@ -157,22 +142,22 @@ Transform the hardcoded catalog into the pluggable schema-driven architecture fr
 
 - [x] **A1: appendage-schema.json** — 2026-04-23. `config/appendage-schema.json` (Draft 2020-12). Validated against Nest.md §8 mail-server example.
 - [x] **A2: Appendage definition files** — 2026-05-07. `appendages/{website,uptime-kuma,gitea,portainer,ollama}.json` ship the 5 catalog items as JSON-against-the-schema (Nest.md §8 updated to permit JSON or YAML). Claude Code + OpenClaw appendages still TODO — they live as bespoke install scripts today (Phase 3 C1) and would need a different shape for OAuth onboarding.
-- [/] **A3: Schema validation on install** — 2026-05-07. `hub/src/appendages.js` hand-rolled validator runs at load time; invalid files surface in `GET /api/appendages` under `invalid[]`. Hub-side only — agent does not re-validate (trust boundary: hub). Add agent-side check if/when appendages can come from untrusted sources.
+- **A3: Schema validation on install** — 2026-05-07. `hub/src/appendages.js` hand-rolled validator runs at load time; invalid files surface in `GET /api/appendages` under `invalid[]`. Hub-side only — agent does not re-validate (trust boundary: hub). Add agent-side check if/when appendages can come from untrusted sources.
 
 ### Wizard renderer
 
-- [/] **A4: Client wizard screen** — 2026-05-07. `/appendages` page lists all contracts with install/uninstall buttons. **Wizard step rendering not yet wired** — current install button just dispatches with built-in defaults. Will need to render `wizard.steps` form fields when a contract requires user input (no contract today does).
-- [/] **A5: Client appendage detail** — 2026-05-07. `/appendages` page shows status, mode (container/compose/discovery), host, image/compose source, matched/missing container patterns for discovery appendages, and actions. Logs not surfaced yet (would need an agent `appendage_logs` command).
+- **A4: Client wizard screen** — 2026-05-07. `/appendages` page lists all contracts with install/uninstall buttons. **Wizard step rendering not yet wired** — current install button just dispatches with built-in defaults. Will need to render `wizard.steps` form fields when a contract requires user input (no contract today does).
+- **A5: Client appendage detail** — 2026-05-07. `/appendages` page shows status, mode (container/compose/discovery), host, image/compose source, matched/missing container patterns for discovery appendages, and actions. Logs not surfaced yet (would need an agent `appendage_logs` command).
 
 ### Agent lifecycle
 
-- [/] **A6: Full lifecycle in agent** — 2026-05-07. `install_appendage` (single-container) accepts `volumes` + `env`; `install_compose_appendage` clones a git repo or writes inline YAML, runs `docker compose up -d`. `remove_appendage` + `remove_compose_appendage` both idempotent. Missing: `update_appendage`, port-allocation negotiation, Caddy route registration, lifecycle.py extraction. **Note:** the agent install path is for *greenfield* targets; brownfield servers (already running stacks like stoneshop.de) get a different treatment via SSH-driven discovery — see Phase 5 follow-on.
-- [/] **A7: Service discovery** — Pre-existing `agent/nest_agent/discovery.py` does git-repo discovery only. Missing: Docker container, systemd unit, and listening-port discovery per Nest.md spec.
-- [ ] **A8: Git discovery** — Create `agent/nest_agent/git.py`. List repos on server with branch, recent commits.
+- **A6: Full lifecycle in agent** — 2026-05-07. `install_appendage` (single-container) accepts `volumes` + `env`; `install_compose_appendage` clones a git repo or writes inline YAML, runs `docker compose up -d`. `remove_appendage` + `remove_compose_appendage` both idempotent. Missing: `update_appendage`, port-allocation negotiation, Caddy route registration, lifecycle.py extraction. **Note:** the agent install path is for *greenfield* targets; brownfield servers (already running stacks like stoneshop.de) get a different treatment via SSH-driven discovery — see Phase 5 follow-on.
+- **A7: Service discovery** — Pre-existing `agent/nest_agent/discovery.py` does git-repo discovery only. Missing: Docker container, systemd unit, and listening-port discovery per Nest.md spec.
+- **A8: Git discovery** — Create `agent/nest_agent/git.py`. List repos on server with branch, recent commits.
 
 ### Peer APIs
 
-- [ ] **A9: Appendage-to-appendage communication** — Implement `consumes` and `apis` from the contract. Service mesh via hub relay or direct Docker network.
+- **A9: Appendage-to-appendage communication** — Implement `consumes` and `apis` from the contract. Service mesh via hub relay or direct Docker network.
 
 ---
 
@@ -187,14 +172,14 @@ Polish the client into the distinctive, European aesthetic described in Nest.md.
 ### Design
 
 - [x] **U4: Design tokens** — 2026-04-23. `DESIGN.md` — palette, method badges, typography, spacing, patterns. Dark mode deferred to U5.
-- [ ] **U5: Distinctive UI** — The spec says "European aesthetic, coding agent designs freely." This is the creative phase — make it beautiful.
+- **U5: Distinctive UI** — The spec says "European aesthetic, coding agent designs freely." This is the creative phase — make it beautiful.
 
 ### Features
 
-- [ ] **U6: i18n** — English + German. Lightweight browser-side string tables.
-- [ ] **U7: Push notifications** — Web push or server-side notifications for task completion and alerts.
-- [ ] **U8: Biometric unlock** — Browser-native passkey or WebAuthn flow.
-- [ ] **U9: Native builds** — TestFlight (iOS) + internal track (Android).
+- **U6: i18n** — English + German. Lightweight browser-side string tables.
+- **U7: Push notifications** — Web push or server-side notifications for task completion and alerts.
+- **U8: Biometric unlock** — Browser-native passkey or WebAuthn flow.
+- **U9: Native builds** — TestFlight (iOS) + internal track (Android).
 
 ---
 
@@ -202,23 +187,23 @@ Polish the client into the distinctive, European aesthetic described in Nest.md.
 
 ### IProxy (Caddy management)
 
-- [ ] **I1: Caddy API integration** — Dynamic route add/remove via Caddy's admin API instead of static Caddyfile.
-- [ ] **I2: Auto-TLS per appendage** — When an appendage declares routes, automatically configure Caddy.
+- **I1: Caddy API integration** — Dynamic route add/remove via Caddy's admin API instead of static Caddyfile.
+- **I2: Auto-TLS per appendage** — When an appendage declares routes, automatically configure Caddy.
 
 ### IRepoSync
 
-- [ ] **I3: Git webhook handler** — Hub receives GitHub webhook, auto-pulls, rebuilds, restarts.
-- [ ] **I4: Deploy from chat** — "deploy latest" via OpenClaw triggers git pull + rebuild.
+- **I3: Git webhook handler** — Hub receives GitHub webhook, auto-pulls, rebuilds, restarts.
+- **I4: Deploy from chat** — "deploy latest" via OpenClaw triggers git pull + rebuild.
 
 ### INetwork
 
-- [ ] **I5: WireGuard mesh** — Pre-install WireGuard, activate when second server is added.
-- [ ] **I6: Multi-server appendage placement** — Decide which appendage runs on which server based on resource requirements.
+- **I5: WireGuard mesh** — Pre-install WireGuard, activate when second server is added.
+- **I6: Multi-server appendage placement** — Decide which appendage runs on which server based on resource requirements.
 
 ### Monitoring
 
-- [/] **I7: Log retention** — `hub/src/index.js` caps `requests.jsonl` at 5 MB and rotates by discarding the oldest 50% of lines. Missing: per-period archival (7d detailed / 30d summaries / delete) per Nest.md spec.
-- [ ] **I8: Alerting** — Agent detects unhealthy containers, hub notifies client via push notification.
+- **I7: Log retention** — `hub/src/index.js` caps `requests.jsonl` at 5 MB and rotates by discarding the oldest 50% of lines. Missing: per-period archival (7d detailed / 30d summaries / delete) per Nest.md spec.
+- **I8: Alerting** — Agent detects unhealthy containers, hub notifies client via push notification.
 
 ---
 
@@ -226,11 +211,11 @@ Polish the client into the distinctive, European aesthetic described in Nest.md.
 
 Bring the battle-tested stoneshop/Dockbase patterns into Nest as appendages.
 
-- [/] **D1: Mail server appendage** — 2026-05-07. Adopted as brownfield via the new `discovery:` contract branch. `appendages/mailcow.json` matches 7 `mailcowdockerized-*` containers on the `stoneshop` SSH host; `/api/appendages` reports `installed:true, status:running`. **Decision (2026-05-07):** nest will *not* run its own mailcow. For automated email sending, nest will authenticate to the existing kaltenbach mailcow as an SMTP relay client (mailbox `nest@<some-domain>`, creds in `config.env` via `env_from_secrets`). Saves ~3GB RAM and avoids duplicate SPF/DKIM/DMARC/TLS work. Lifecycle (restart, update) deferred until SSH command-execution lands alongside the discovery poller.
-- [/] **D2: Website appendage** — 2026-05-07. Static-site half live: `appendages/website.json` boots `nginx:alpine` with `/opt/nest/data/website/public` mounted read-only on host port 8080. End-to-end install/uninstall/reinstall exercised on `ubuntu-4gb-fsn1-1`. Missing: Matomo analytics container + shared mariadb/Caddy from stoneshop's `docker-compose.shared.yml`. Tracking that as D2-extended; basic-static is enough to consider the appendage path *proven* end-to-end.
+- **D1: Mail server appendage** — 2026-05-07. Adopted as brownfield via the new `discovery:` contract branch. `appendages/mailcow.json` matches 7 `mailcowdockerized-*` containers on the `stoneshop` SSH host; `/api/appendages` reports `installed:true, status:running`. **Decision (2026-05-07):** nest will *not* run its own mailcow. For automated email sending, nest will authenticate to the existing kaltenbach mailcow as an SMTP relay client (mailbox `nest@<some-domain>`, creds in `config.env` via `env_from_secrets`). Saves ~3GB RAM and avoids duplicate SPF/DKIM/DMARC/TLS work. **Lifecycle (2026-05-21):** logs/inspect/restart over SSH command-execution shipped (`/api/appendages/:name/{logs,inspect,restart}`, admin-only on restart); `update` still deferred (mailcow's update flow is its own playbook, not auto-driven from nest).
+- **D2: Website appendage** — 2026-05-07. Static-site half live: `appendages/website.json` boots `nginx:alpine` with `/opt/nest/data/website/public` mounted read-only on host port 8080. End-to-end install/uninstall/reinstall exercised on `ubuntu-4gb-fsn1-1`. Missing: Matomo analytics container + shared mariadb/Caddy from stoneshop's `docker-compose.shared.yml`. Tracking that as D2-extended; basic-static is enough to consider the appendage path *proven* end-to-end.
 - [x] **D3: Backup appendage** — 2026-05-07. `appendages/restic.json` (lobaro/restic-backup-docker) snapshots critical nest state (config.env / users / tokens / canvas / website / openclaw / Caddyfile / agent memory) to a dedicated repo `backups/nest` on the existing Hetzner storage box. Cron `0 4 * * *`, retention `--keep-last 7 --keep-daily 7 --keep-weekly 4 --keep-monthly 6`. First snapshot `832a48ba` landed (43k files / 369 MiB). Password loaded via `env_from_secrets: ["RESTIC_PASSWORD"]` (hub passes through from `config.env` — Phase 4 will replace with age-encrypted delivery).
-- [/] **D4: CrowdSec appendage** — 2026-05-07. `appendages/crowdsec.json` (`crowdsecurity/crowdsec:latest`) installed end-to-end on `ubuntu-4gb-fsn1-1`. Container healthy via `cscli lapi status`. v1 runs in local-only mode (central-API enrollment fails on IPv6-only hosts; deferred until enrollment via `env_from_secrets` is wired through Phase 4 secrets). Bouncer integration with Caddy still TODO.
-- [/] **D5: WooCommerce appendage** — 2026-05-07. Adopted as brownfield via `appendages/stoneshop.json` (`discovery:` contract, matches `dockbase_frankenphp` + `dockbase_mariadb` + `dockbase_keydb` + `dockbase_matomo_(web|shop)`). Reports `installed:true, status:running` against the `stoneshop` SSH host. Same lifecycle gap as D1.
+- **D4: CrowdSec appendage** — 2026-05-07. `appendages/crowdsec.json` (`crowdsecurity/crowdsec:latest`) installed end-to-end on `ubuntu-4gb-fsn1-1`. Container healthy via `cscli lapi status`. v1 runs in local-only mode (central-API enrollment fails on IPv6-only hosts; deferred until enrollment via `env_from_secrets` is wired through Phase 4 secrets). Bouncer integration with Caddy still TODO.
+- **D5: WooCommerce appendage** — 2026-05-07. Adopted as brownfield via `appendages/stoneshop.json` (`discovery:` contract, matches `dockbase_frankenphp` + `dockbase_mariadb` + `dockbase_keydb` + `dockbase_matomo_(web|shop)`). Reports `installed:true, status:running` against the `stoneshop` SSH host. **Lifecycle (2026-05-21):** logs/inspect/restart routes shipped; `dockbase_keydb` restart proven end-to-end via Nest API (792ms round-trip; container cycled `starting → healthy` in 12s).
 
 ---
 

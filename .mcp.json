@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "linear": {
+      "command": "/opt/nest/scripts/run-linear-mcp.sh"
+    }
+  }
+}

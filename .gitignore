@@ -18,3 +18,4 @@ hub/dist/
 !hub/static/icon-512.png
 
 tokens.json
+state/linear.json
