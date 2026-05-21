@@ -34,7 +34,20 @@ GET http://127.0.0.1:3000/api/agents
 Authorization: Bearer $NEST_HUB_TOKEN
 ```
 
-(`NEST_HUB_TOKEN` is provisioned in OpenClaw's environment; if it isn't, see "Fallback".)
+`NEST_HUB_TOKEN` is normally provisioned in OpenClaw's environment. In Claude
+Code, the token may not be visible as a plain session environment variable even
+when it exists on disk. Use a shell command that sources the env file and calls
+the hub without printing the token:
+
+```sh
+set -a
+. /home/claude/.openclaw/.env
+set +a
+curl -sS -H "Authorization: Bearer ${NEST_HUB_TOKEN:?}" \
+  http://127.0.0.1:3000/api/agents
+```
+
+Never echo, print, summarize, or paste the token itself.
 
 Response shape:
 
@@ -84,6 +97,6 @@ A short natural-language summary. Rules:
 
 ## Fallback
 
-- If `NEST_HUB_TOKEN` is unset: reply "I can't reach the Nest hub — `NEST_HUB_TOKEN` isn't set in my env. Mint one at /tokens and add it to `~/.openclaw/.env`."
+- If `NEST_HUB_TOKEN` is unavailable after sourcing `/home/claude/.openclaw/.env`: reply "I can't reach the Nest hub — `NEST_HUB_TOKEN` isn't available in `/home/claude/.openclaw/.env`. Mint one at /tokens and add it there."
 - If `/api/agents` returns 5xx or times out: reply "Hub can't reach the agents right now. Try again in a minute, or check `journalctl -u nest-hub` for connection errors." Do not invent a stale picture from memory.
 - If `/api/agents` returns 401: the token is invalid or expired — tell the user to mint a new one.
