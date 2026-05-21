@@ -1,0 +1,1 @@
+- 2026‑05‑21: Nest planning moved to Linear (AI Kanban Pilot). AI‑45, AI‑10, AI‑13 placed in Review; Review lane at capacity, so further progression paused. Token‑report flagged 26.3 % hub request waste for future investigation.
