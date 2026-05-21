@@ -321,6 +321,7 @@ Caught in the wild: `docs/C2-oauth-guide.md` Path A prescribed "Providers → Si
 
 - **This server is IPv6-only.** No default IPv4 route, no NAT64/DNS64. IPv4-only hosts (ghcr.io) fail with "network is unreachable". `registry-1.docker.io` and `github.com` both have AAAA and work. See the "route around" checklist above before treating an IPv4-only dep as a blocker.
 - **OpenClaw is installed natively under the `claude` user** (not Docker). Runs via `systemd --user`, binary name `openclaw-gateway`, port 18789, config at `/home/claude/.openclaw/`. Hub runs as `claude` too, so it can read `logs/telemetry.jsonl` directly.
+- **Nest skills are canonical in `/opt/nest/skills/<name>/SKILL.md`.** Claude Code gets them via the local `nest-skills` wrapper marketplace under `integrations/claude/marketplace`; run `scripts/apply-skills.py --install-claude` after adding or renaming skills.
 - **Docker compose template is for *fresh* provisioning**, not this host. `scripts/templates/docker-compose.openclaw.yml` exists so a new nest can bootstrap cleanly.
 - **Hub reloads via `sudo systemctl restart nest-hub`.** Not `node --watch` in prod. After any `hub/src/**` edit, restart + check `journalctl -u nest-hub -n 5` for the "Hub listening" line and the page count (should match `HUB.md` page-table rows).
 - **VPS Nests should not run printing services.** CUPS/snap CUPS may appear from desktop/browser dependencies and listen on `:631`; disable it on VPS hosts unless printing is explicitly needed. Bootstrap verification includes a "VPS no CUPS listener" check.

@@ -1,0 +1,14 @@
+{
+  "name": "nest-local",
+  "description": "Local Claude Code marketplace for Nest-owned skills and tooling.",
+  "owner": {
+    "name": "Nest"
+  },
+  "plugins": [
+    {
+      "name": "nest-skills",
+      "description": "Nest-owned Claude Code skills delivered from /opt/nest/skills.",
+      "source": "./plugins/nest-skills"
+    }
+  ]
+}

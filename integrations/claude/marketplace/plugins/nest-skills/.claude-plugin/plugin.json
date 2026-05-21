@@ -1,0 +1,8 @@
+{
+  "name": "nest-skills",
+  "description": "Nest-owned Claude Code skills delivered from /opt/nest/skills.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Nest"
+  }
+}
