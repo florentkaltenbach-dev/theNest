@@ -17,6 +17,15 @@ Pre-Phase-2 cleanup pass. Findings:
 
 ---
 
+## Cross-cutting: Pillars wing (architectural reorganization)
+
+Foundational restructure orthogonal to the phases below. Reorganizes the repo around three layers — pillars (typed interfaces), soil (existing implementations), roof (new short Nest.md). Prepared, not yet executed; status: handoff captured, ground not yet broken.
+
+> Handoff: [docs/pillars-wing-handoff.md](docs/pillars-wing-handoff.md)
+> Branch when implementing: `nest/pillars-wing`
+
+---
+
 ## Phase 1: Harden What Exists ✅
 
 Completed 2026-03-25. All bugs fixed, security hardened, deployed and verified.
@@ -116,6 +125,8 @@ Install OpenClaw in Docker. Authenticate with ChatGPT subscription via Codex OAu
 
 The single biggest gap vs. the Nest.md vision. Without this, the hub is a trust violation — it sees all secrets.
 
+> Acceptance criteria + test plan: [docs/sops-age-vaultwarden-plan.md](docs/sops-age-vaultwarden-plan.md)
+
 ### Client-side encryption
 
 - **E1: age key derivation from passphrase** — On first setup, passphrase derives an age identity. Store in device secure storage (localStorage for web v1).
@@ -158,6 +169,15 @@ Transform the hardcoded catalog into the pluggable schema-driven architecture fr
 ### Peer APIs
 
 - **A9: Appendage-to-appendage communication** — Implement `consumes` and `apis` from the contract. Service mesh via hub relay or direct Docker network.
+
+### First appendage: Vaultwarden
+
+- [ ] **V1: appendages/vaultwarden.yaml** — Per Nest.md §8. `vaultwarden/server:latest`, 256 MB declared, `/vault` route, `ADMIN_TOKEN` secret, optional SMTP.
+- [ ] **V2: Wizard end-to-end** — Install via UI, Caddy auto-routes, `ADMIN_TOKEN` injected via E5 pipeline.
+- [ ] **V3: Mobile + restart proof** — Bitwarden app round-trip; survives unattended server restart.
+- [ ] **V4: Uninstall** — Container, volume, route, secret all removed.
+
+> Acceptance criteria: [docs/sops-age-vaultwarden-plan.md](docs/sops-age-vaultwarden-plan.md)
 
 ---
 
@@ -216,6 +236,14 @@ Bring the battle-tested stoneshop/Dockbase patterns into Nest as appendages.
 - [x] **D3: Backup appendage** — 2026-05-07. `appendages/restic.json` (lobaro/restic-backup-docker) snapshots critical nest state (config.env / users / tokens / canvas / website / openclaw / Caddyfile / agent memory) to a dedicated repo `backups/nest` on the existing Hetzner storage box. Cron `0 4 * * *`, retention `--keep-last 7 --keep-daily 7 --keep-weekly 4 --keep-monthly 6`. First snapshot `832a48ba` landed (43k files / 369 MiB). Password loaded via `env_from_secrets: ["RESTIC_PASSWORD"]` (hub passes through from `config.env` — Phase 4 will replace with age-encrypted delivery).
 - **D4: CrowdSec appendage** — 2026-05-07. `appendages/crowdsec.json` (`crowdsecurity/crowdsec:latest`) installed end-to-end on `ubuntu-4gb-fsn1-1`. Container healthy via `cscli lapi status`. v1 runs in local-only mode (central-API enrollment fails on IPv6-only hosts; deferred until enrollment via `env_from_secrets` is wired through Phase 4 secrets). Bouncer integration with Caddy still TODO.
 - **D5: WooCommerce appendage** — 2026-05-07. Adopted as brownfield via `appendages/stoneshop.json` (`discovery:` contract, matches `dockbase_frankenphp` + `dockbase_mariadb` + `dockbase_keydb` + `dockbase_matomo_(web|shop)`). Reports `installed:true, status:running` against the `stoneshop` SSH host. **Lifecycle (2026-05-21):** logs/inspect/restart routes shipped; `dockbase_keydb` restart proven end-to-end via Nest API (792ms round-trip; container cycled `starting → healthy` in 12s).
+
+---
+
+## Backlog: appendage ideas
+
+Captured ideas not yet scoped for a sprint. One doc per idea in `docs/`.
+
+- [ ] **mathviz appendage** — ManimCE-based 3D math visualization tool with a web UI to browse and create renders. See [docs/mathviz-appendage.md](docs/mathviz-appendage.md).
 
 ---
 
