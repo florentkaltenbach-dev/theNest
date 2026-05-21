@@ -36,9 +36,32 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      flex: 1;
     }
+    .tools {
+      height: 44px;
+      padding: 6px 8px;
+      background: #111125;
+      border-bottom: 1px solid #2a2a4a;
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .tool {
+      border: 1px solid #2a2a4a;
+      border-radius: 8px;
+      background: #1f1f36;
+      color: #e0e0e0;
+      min-width: 38px;
+      height: 32px;
+      padding: 0 10px;
+      font: 700 13px/1 system-ui, sans-serif;
+      white-space: nowrap;
+    }
+    .tool:active { background: #2a2a4a; }
     #term {
-      height: calc(100vh - 49px);
+      height: calc(100vh - 93px);
       width: 100vw;
       padding: 8px;
       background: #0d0d1a;
@@ -53,6 +76,16 @@
     <a href="/tasks">Back</a>
     <div class="title" id="title">Terminal</div>
   </header>
+  <div class="tools" aria-label="Terminal controls">
+    <button class="tool" data-send="&#x1b;[A" title="Up arrow">↑</button>
+    <button class="tool" data-send="&#x1b;[B" title="Down arrow">↓</button>
+    <button class="tool" data-send="&#x1b;[D" title="Left arrow">←</button>
+    <button class="tool" data-send="&#x1b;[C" title="Right arrow">→</button>
+    <button class="tool" data-send="&#x09;" title="Tab">Tab</button>
+    <button class="tool" data-send="&#x03;" title="Ctrl-C">Ctrl-C</button>
+    <button class="tool" id="paste" title="Paste from clipboard">Paste</button>
+    <button class="tool" id="copy" title="Copy selected terminal text">Copy</button>
+  </div>
   <div id="term"></div>
 
   <script src="/vendor/xterm/xterm.js"></script>
@@ -89,6 +122,11 @@
     if (session) url += '&session=' + encodeURIComponent(session);
 
     const ws = new WebSocket(url);
+
+    function send(data) {
+      if (ws.readyState === WebSocket.OPEN) ws.send(data);
+      term.focus();
+    }
 
     function measureCell() {
       const probe = document.createElement('span');
@@ -127,7 +165,43 @@
     ws.onerror = () => term.writeln('\r\nWebSocket error');
 
     term.onData((data) => {
-      if (ws.readyState === WebSocket.OPEN) ws.send(data);
+      send(data);
+    });
+
+    document.querySelectorAll('[data-send]').forEach((btn) => {
+      btn.addEventListener('click', () => send(btn.dataset.send));
+    });
+
+    document.getElementById('paste').addEventListener('click', async () => {
+      try {
+        let text = '';
+        if (navigator.clipboard && window.isSecureContext) {
+          text = await navigator.clipboard.readText();
+        } else {
+          text = prompt('Paste text') || '';
+        }
+        if (text) send(text.replace(/\r\n/g, '\n'));
+      } catch {
+        const text = prompt('Paste text') || '';
+        if (text) send(text.replace(/\r\n/g, '\n'));
+      }
+    });
+
+    document.getElementById('copy').addEventListener('click', async () => {
+      const selected = term.getSelection();
+      if (!selected) return;
+      try {
+        await navigator.clipboard.writeText(selected);
+      } catch {
+        const ta = document.createElement('textarea');
+        ta.value = selected;
+        ta.style.cssText = 'position:fixed;left:-9999px;top:0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+      }
+      term.focus();
     });
 
     window.addEventListener('resize', resize);
