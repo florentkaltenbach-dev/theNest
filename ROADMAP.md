@@ -17,7 +17,7 @@ Pre-Phase-2 cleanup pass. Findings:
 
 ---
 
-## Cross-cutting: Pillars wing (architectural reorganization)
+## Cross-cutting: Pillars wing (architectural reorganization)  *(Linear: AI-46)*
 
 Foundational restructure orthogonal to the phases below. Reorganizes the repo around three layers — pillars (typed interfaces), soil (existing implementations), roof (new short Nest.md). Prepared, not yet executed; status: handoff captured, ground not yet broken.
 
@@ -172,10 +172,10 @@ Transform the hardcoded catalog into the pluggable schema-driven architecture fr
 
 ### First appendage: Vaultwarden
 
-- [ ] **V1: appendages/vaultwarden.yaml** — Per Nest.md §8. `vaultwarden/server:latest`, 256 MB declared, `/vault` route, `ADMIN_TOKEN` secret, optional SMTP.
-- [ ] **V2: Wizard end-to-end** — Install via UI, Caddy auto-routes, `ADMIN_TOKEN` injected via E5 pipeline.
-- [ ] **V3: Mobile + restart proof** — Bitwarden app round-trip; survives unattended server restart.
-- [ ] **V4: Uninstall** — Container, volume, route, secret all removed.
+- **V1 (Linear: AI-47):** appendages/vaultwarden.yaml** — Per Nest.md §8. `vaultwarden/server:latest`, 256 MB declared, `/vault` route, `ADMIN_TOKEN` secret, optional SMTP.
+- **V2 (Linear: AI-48):** Wizard end-to-end** — Install via UI, Caddy auto-routes, `ADMIN_TOKEN` injected via E5 pipeline.
+- **V3 (Linear: AI-49):** Mobile + restart proof** — Bitwarden app round-trip; survives unattended server restart.
+- **V4 (Linear: AI-50):** Uninstall** — Container, volume, route, secret all removed.
 
 > Acceptance criteria: [docs/sops-age-vaultwarden-plan.md](docs/sops-age-vaultwarden-plan.md)
 
@@ -243,7 +243,7 @@ Bring the battle-tested stoneshop/Dockbase patterns into Nest as appendages.
 
 Captured ideas not yet scoped for a sprint. One doc per idea in `docs/`.
 
-- [ ] **mathviz appendage** — ManimCE-based 3D math visualization tool with a web UI to browse and create renders. See [docs/mathviz-appendage.md](docs/mathviz-appendage.md).
+- **mathviz appendage** (Linear: AI-51) — ManimCE-based 3D math visualization tool with a web UI to browse and create renders. See [docs/mathviz-appendage.md](docs/mathviz-appendage.md).
 
 ---
 
