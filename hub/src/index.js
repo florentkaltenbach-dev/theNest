@@ -36,6 +36,7 @@ import { startAlertWatchdog } from './alerts.js';
 import { handleAgentWs, handleClientWs } from './ws/agentHandler.js';
 import { createTerminalHandler } from './ws/terminal.js';
 import { registerOpenClawProxy, handleOpenClawUpgrade } from './openclawProxy.js';
+import { registerHermesProxy, handleHermesUpgrade, isHermesProxyUrl } from './hermesProxy.js';
 import { scanNest, nestRoutes } from './nest.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -212,8 +213,10 @@ canvasRoutes(api);
 observabilityRoutes(api);
 mailRoutes(api);
 
-// Authenticated OpenClaw WebChat proxy. Must be registered before page routes.
+// Authenticated OpenClaw WebChat and Hermes dashboard proxies. Must be
+// registered before page routes.
 registerOpenClawProxy(router);
+registerHermesProxy(router);
 
 // SSH-driven brownfield discovery (Phase 5 follow-on). Polls hosts listed in
 // config/ssh-hosts.json so /api/appendages can mark adopted stacks installed.
@@ -295,8 +298,8 @@ const server = createServer(async (req, res) => {
 
   const url = req.url.split('?')[0];
 
-  // Parse body for POST/PUT/DELETE. /claw is proxied as a stream.
-  if (req.method !== 'GET' && req.method !== 'HEAD' && !url.startsWith('/claw')) {
+  // Parse body for POST/PUT/DELETE. /claw and /hermes are proxied as streams.
+  if (req.method !== 'GET' && req.method !== 'HEAD' && !url.startsWith('/claw') && !isHermesProxyUrl(url)) {
     try {
       req.body = await parseBody(req);
     } catch {
@@ -368,6 +371,13 @@ server.on('upgrade', async (req, socket, head) => {
   const url = req.url.split('?')[0];
 
   if (await handleOpenClawUpgrade(req, socket, head, async (upgradeReq) => {
+    const authHeader = upgradeReq.headers.authorization;
+    const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    const cookieToken = parseCookie(upgradeReq.headers.cookie, 'nest_token');
+    return tryAuth(upgradeReq, bearerToken || cookieToken);
+  })) return;
+
+  if (await handleHermesUpgrade(req, socket, head, async (upgradeReq) => {
     const authHeader = upgradeReq.headers.authorization;
     const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
     const cookieToken = parseCookie(upgradeReq.headers.cookie, 'nest_token');
