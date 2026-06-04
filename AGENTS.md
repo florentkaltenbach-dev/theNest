@@ -244,6 +244,10 @@ Active task state lives in **Linear**, workspace "AI Kanban Pilot", team key `AI
 
 **Configuration-as-code:** workflow states, labels, and phase projects are defined in `config/linear.yaml` and applied by `scripts/apply-linear-config.py`. Don't edit them in Linear's web UI (escape hatch only — defaults drift back via the script).
 
+### Branch per ticket
+
+- Branch on **Linear's own `gitBranchName`** for the ticket (copy it from the issue, e.g. `git checkout -b <gitBranchName>`). The old `nest/<feature>` handoff convention is **retired** — don't invent branch names.
+
 ### Commit per ticket
 
 - One ticket = one commit (was: one step = one commit). Never bundle two tickets.

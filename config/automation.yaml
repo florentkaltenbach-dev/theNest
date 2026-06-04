@@ -1,0 +1,57 @@
+# config/automation.yaml — Self-running board tuning (AI-55, Lab)
+#
+# Knobs for the groomer, executor, auto-Done gate, and janitor. Plain data,
+# read by scripts/tasks/*.sh and the janitor. Edit here, no apply step — the
+# jobs read this file on each invocation. Keep it conservative; widen dials
+# (especially auto_done_allow_kinds) only after the loop is proven.
+
+# How many tickets the groomer keeps stocked in Spec'd. The buffer the
+# executor drains from. Janitor's buffer-keeper tops this up when low.
+buffer_target: 3
+
+# Topics the groomer must NOT auto-spec. A Backlog ticket whose title or
+# description matches any of these (case-insensitive substring) is left in
+# Backlog with `needs-human` + a comment. Judgment-heavy or trust-boundary
+# work stays with a person. Matched as plain substrings, not regex.
+spec_deny_list:
+  - secret
+  - credential
+  - password
+  - auth          # authentication / authorization
+  - age           # Phase 4 client-side encryption
+  - encryption
+  - phase 4
+  - architecture refactor
+  - trust boundary
+  - security model
+
+# Auto-Done may advance a Review ticket to Done only if its single kind/*
+# label is in this list (AND all other gates pass — see auto-done.sh).
+# Start with the cheapest, lowest-blast-radius kinds. kind/feature, security,
+# secrets, and auth always stay human-gated regardless of this list.
+auto_done_allow_kinds:
+  - kind/chore
+  - kind/refactor
+
+# Circuit-breaker thresholds. The janitor trips the breaker (writes the pause
+# flag + mails) on ANY breach. It never auto-clears — a human removes the flag.
+circuit_breaker:
+  # Spec'd buffer below this for a full janitor pass = starvation signal.
+  buffer_min: 1
+  # A ticket sitting in Working longer than this = stuck executor.
+  working_max_age_hours: 6
+  # Window (hours) over which cancel/rework churn is counted.
+  cancel_rate_window: 24
+  # Max cancels+reworks allowed within that window before tripping.
+  cancel_rate_max: 3
+  # Token-waste percentage ceiling (from /api/observability/tokens). Above
+  # this, the loop is burning quota without shipping — trip.
+  token_waste_pct_max: 40
+
+# Pause flag. When this file exists, the groomer, executor, and auto-Done jobs
+# no-op (the janitor still runs, so it can report and the breaker can hold).
+# Gitignored (data/ is). A human removes it to resume.
+pause_flag: /opt/nest/data/automation.paused
+
+# Where each job appends its JSONL decision log (one object per run/decision).
+log_dir: /opt/nest/data/automation

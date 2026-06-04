@@ -58,6 +58,10 @@ labels:
     color: "#e24b4a"
     description: Cannot proceed without external dependency.
 
+  - name: needs-human
+    color: "#d4a72c"
+    description: Automation deferred this to a human (flagged spec, risky Review→Done, or stuck executor). The exceptions queue.
+
   # Kind — optional, useful for retrospective analysis.
   - name: kind/feature
     color: "#3b8bd4"
@@ -109,6 +113,13 @@ projects:
     description: |
       Trailing pieces of the 5 D-appendages: mailcow/stoneshop update flows,
       Website + Matomo wiring, CrowdSec ↔ Caddy bouncer integration.
+
+  - name: "Lab"
+    state: started
+    description: |
+      Home for automation, meta-work, and experiments. The self-running board
+      (AI-55: groomer · executor · auto-Done · janitor) and its component
+      tickets live here. Not a roadmap phase — a standing workshop.
 
 # Methodology — not platform-enforced, documented for visibility.
 wip_limits:
