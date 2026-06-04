@@ -1,0 +1,18 @@
+# scripts/setup/systemd/nest-auto-done.service
+# Single-shot Review→Done gate for low-risk kinds. Driven by nest-auto-done.timer.
+[Unit]
+Description=Nest auto-Done gate — advance low-risk Review tickets to Done
+After=network-online.target nest-hub.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=claude
+Group=claude
+WorkingDirectory=/opt/nest
+Environment=HOME=/home/claude
+Environment=PATH=/home/claude/.local/bin:/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=-/opt/nest/config.env
+ExecStart=/opt/nest/scripts/tasks/auto-done.sh
+StandardInput=null
+TimeoutStartSec=600

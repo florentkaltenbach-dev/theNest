@@ -66,9 +66,12 @@ circuit_breaker:
   cancel_rate_window: 24
   # Max cancels+reworks allowed within that window before tripping.
   cancel_rate_max: 3
-  # Token-waste percentage ceiling (from /api/observability/tokens). Above
-  # this, the loop is burning quota without shipping — trip.
-  token_waste_pct_max: 40
+  # Token-waste percentage ceiling. NOTE: currently sourced from
+  # telemetry-summary.json `hub.waste.wastePct`, which is HUB REQUEST waste, a
+  # proxy — not true AI-token waste. Set conservatively high until a real
+  # AI-token-waste metric exists, so the breaker doesn't insta-pause on a
+  # signal that doesn't mean what it should. Tune down once the metric is real.
+  token_waste_pct_max: 80
 
 # Pause flag. When this file exists, the groomer, executor, and auto-Done jobs
 # no-op (the janitor still runs, so it can report and the breaker can hold).
@@ -77,3 +80,8 @@ pause_flag: /opt/nest/data/automation.paused
 
 # Where each job appends its JSONL decision log (one object per run/decision).
 log_dir: /opt/nest/data/automation
+
+# Where the janitor's circuit-breaker + weekly-digest mail goes. Empty = send
+# to SMTP_FROM (the nest mailbox itself). Set to a human address (e.g. your
+# inbox) to receive the alerts directly.
+alert_email: ""

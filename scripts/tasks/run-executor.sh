@@ -18,9 +18,9 @@ DRY=$(echo "$ARGS" | jq -r '.dry_run // false')
 WANT=$(echo "$ARGS" | jq -r '.issue // empty')   # optional: force one ticket
 LOGDIR=$(automation_cfg log_dir "$NEST_ROOT/data/automation"); mkdir -p "$LOGDIR"
 
-# --- single-flight lock: a timer firing mid-run must not start a 2nd ticket -
-exec 9>"$LOGDIR/executor.lock"
-flock -n 9 || { jq -n '{skipped:"another executor run holds the lock"}'; exit 0; }
+# --- single-flight lock (shared with auto-done: both mutate the working tree)-
+exec 9>"$LOGDIR/repo.lock"
+flock -n 9 || { jq -n '{skipped:"repo lock held (another executor/auto-done run)"}'; exit 0; }
 
 # --- pause gate ------------------------------------------------------------
 if is_paused; then jq -n '{paused:true}'; exit 0; fi

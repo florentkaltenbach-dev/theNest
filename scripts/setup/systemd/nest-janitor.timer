@@ -1,0 +1,12 @@
+# scripts/setup/systemd/nest-janitor.timer
+# Enable with: sudo systemctl enable --now nest-janitor.timer
+[Unit]
+Description=Run the Nest janitor periodically
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=30min
+Persistent=false
+
+[Install]
+WantedBy=timers.target

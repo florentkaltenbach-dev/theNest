@@ -56,7 +56,7 @@ gql() {
 alog() {
   local dir; dir=$(automation_cfg log_dir "$NEST_ROOT/data/automation")
   mkdir -p "$dir"
-  printf '%s\n' "$2" >> "$dir/$1"
+  printf '%s\n' "$(printf '%s' "$2" | jq -c .)" >> "$dir/$1"   # force one line (JSONL)
 }
 
 # hub_jwt — mint a short-lived admin JWT for hub API calls, signed with
@@ -76,4 +76,24 @@ conventions_fail_count() {
   resp=$(curl -s --max-time 10 -H "Authorization: Bearer $tok" \
     "http://localhost:$port/api/nest/health/conventions") || { echo 9999; return 1; }
   echo "$resp" | jq '[.conventions.checks[] | select(.pass==false)] | length' 2>/dev/null || echo 9999
+}
+
+# conventions_status — print the overall status (green|yellow|red|unknown).
+conventions_status() {
+  local tok port resp
+  tok=$(hub_jwt) || { echo unknown; return 1; }
+  port="${NEST_PORT:-3000}"
+  resp=$(curl -s --max-time 10 -H "Authorization: Bearer $tok" \
+    "http://localhost:$port/api/nest/health/conventions") || { echo unknown; return 1; }
+  echo "$resp" | jq -r '.conventions.status // "unknown"' 2>/dev/null || echo unknown
+}
+
+# send_alert <subject> <body> — send mail via the hub's SMTP relay (mail.js).
+# Recipient: automation.yaml `alert_email`, else SMTP_FROM. Returns mail.js exit.
+send_alert() {
+  local to; to=$(automation_cfg alert_email "")
+  [ -z "$to" ] && to="${SMTP_FROM:-}"
+  ALERT_TO="$to" node --input-type=module -e \
+    "import {sendMail} from '$NEST_ROOT/hub/src/mail.js'; sendMail({to:process.env.ALERT_TO, subject:process.argv[1], body:process.argv[2]}).then(()=>process.exit(0)).catch(e=>{console.error(e.message);process.exit(1)});" \
+    "$1" "$2"
 }

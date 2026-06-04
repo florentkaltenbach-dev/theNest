@@ -1,0 +1,21 @@
+# scripts/setup/systemd/nest-janitor.service
+# Single-shot janitor: health signals, circuit-breaker, buffer-keeper, weekly
+# reconcile. Safe to run always (it reports even when paused). Driven by
+# nest-janitor.timer. The janitor is the safety net — enabling its timer first
+# (before the executor's) is the recommended order.
+[Unit]
+Description=Nest janitor — board health, circuit-breaker, weekly reconcile
+After=network-online.target nest-hub.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=claude
+Group=claude
+WorkingDirectory=/opt/nest
+Environment=HOME=/home/claude
+Environment=PATH=/home/claude/.local/bin:/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=-/opt/nest/config.env
+ExecStart=/opt/nest/scripts/tasks/nest-janitor.sh
+StandardInput=null
+TimeoutStartSec=600
