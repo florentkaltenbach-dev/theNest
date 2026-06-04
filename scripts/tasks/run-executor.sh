@@ -71,12 +71,20 @@ if [ "$DRY" = "true" ]; then
   exit 0
 fi
 
-# --- branch FIRST, from current HEAD ---------------------------------------
-# Branch off HEAD (not main) so the automation code travels with the ticket
-# branch and the running script isn't pulled out from under us; and do it
+# --- branch FIRST, from main -----------------------------------------------
+# Branch off main (the automation lives there now) so each ticket branch is a
+# clean fork of main — no stacking, and prod stays on main between runs. Done
 # before the Linear move so a git failure can't orphan the ticket in Working.
+# The EXIT trap returns the working tree to main (discarding any uncommitted
+# leftovers on the ticket branch) so a blocked/failed run never leaves prod on
+# a feature branch. Only armed once we actually leave main.
+RETURN_TO_MAIN=0
+cleanup_branch(){ [ "$RETURN_TO_MAIN" = 1 ] && { git reset -q --hard >/dev/null 2>&1; git checkout -q main >/dev/null 2>&1; } || true; }
+trap cleanup_branch EXIT
+git checkout -q main
 git branch -D "$BRANCH" >/dev/null 2>&1 || true
-git checkout -q -b "$BRANCH"
+git checkout -q -b "$BRANCH" main
+RETURN_TO_MAIN=1
 START_SHA=$(git rev-parse HEAD)
 
 # --- now move to Working ---------------------------------------------------
