@@ -1,0 +1,24 @@
+# scripts/setup/systemd/nest-executor.service
+#
+# Oneshot executor: handles exactly one Spec'd ticket per activation, then
+# exits. Driven by nest-executor.timer. Install: copy both units to
+# /etc/systemd/system, `systemctl daemon-reload`. Leave the TIMER disabled
+# until a human opts into the autonomous loop.
+[Unit]
+Description=Nest executor — implement one Spec'd ticket then exit
+After=network-online.target nest-hub.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=claude
+Group=claude
+WorkingDirectory=/opt/nest
+# HOME so claude/codex find their auth + the linear MCP; PATH so node/claude/
+# codex/jq/git resolve under systemd's minimal environment.
+Environment=HOME=/home/claude
+Environment=PATH=/home/claude/.local/bin:/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=-/opt/nest/config.env
+ExecStart=/opt/nest/scripts/tasks/run-executor.sh
+StandardInput=null
+TimeoutStartSec=1800

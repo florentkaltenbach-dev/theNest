@@ -1,0 +1,16 @@
+# scripts/setup/systemd/nest-executor.timer
+#
+# Fires the oneshot executor periodically. The executor self-guards with a
+# flock + WIP≤2 + pause-flag check, so overlapping/extra fires are harmless.
+# Enable only when opting into the autonomous loop:
+#   sudo systemctl enable --now nest-executor.timer
+[Unit]
+Description=Run the Nest executor periodically
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=20min
+Persistent=false
+
+[Install]
+WantedBy=timers.target

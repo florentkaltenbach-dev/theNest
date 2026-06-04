@@ -58,3 +58,22 @@ alog() {
   mkdir -p "$dir"
   printf '%s\n' "$2" >> "$dir/$1"
 }
+
+# hub_jwt — mint a short-lived admin JWT for hub API calls, signed with
+# NEST_JWT_SECRET via the hub's own signer (no token stored anywhere).
+hub_jwt() {
+  node --input-type=module -e \
+    "import {signJwt} from '$NEST_ROOT/hub/src/server.js'; process.stdout.write(signJwt({id:'automation',role:'admin',name:'automation'}, process.env.NEST_JWT_SECRET, '1h'))"
+}
+
+# conventions_fail_count — number of failing checks at the conventions
+# self-audit (the regression baseline the executor gates on). Prints 9999 on
+# error so a broken probe never reads as "green".
+conventions_fail_count() {
+  local tok port resp
+  tok=$(hub_jwt) || { echo 9999; return 1; }
+  port="${NEST_PORT:-3000}"
+  resp=$(curl -s --max-time 10 -H "Authorization: Bearer $tok" \
+    "http://localhost:$port/api/nest/health/conventions") || { echo 9999; return 1; }
+  echo "$resp" | jq '[.conventions.checks[] | select(.pass==false)] | length' 2>/dev/null || echo 9999
+}
