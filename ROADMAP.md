@@ -263,3 +263,8 @@ Captured ideas not yet scoped for a sprint. One doc per idea in `docs/`.
 ---
 
 *Last updated: 2026-05-06. Phase 1 complete. Phase 2 complete. Phase 3: C2 + C3 done (Codex OAuth + WebChat live, sessions flowing). Next actionable: C10 (repoint telemetry aggregator at the real OpenClaw session files), then C5 end-to-end exercise. Telegram channel reactivation requested.*
+
+## Shipped 2026-W23 (auto-reconciled 2026-06-04)
+
+- **AI-12** — C7 — script-runner skill
+- **AI-11** — C6 — container-manager skill
