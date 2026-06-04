@@ -15,6 +15,7 @@ TS=$(date -Iseconds)
 
 ARGS=$(cat || true); [ -z "$ARGS" ] && ARGS='{}'
 DRY=$(echo "$ARGS" | jq -r '.dry_run // false')
+WANT=$(echo "$ARGS" | jq -r '.issue // empty')   # optional: force one ticket
 LOGDIR=$(automation_cfg log_dir "$NEST_ROOT/data/automation"); mkdir -p "$LOGDIR"
 
 # --- single-flight lock: a timer firing mid-run must not start a 2nd ticket -
@@ -42,7 +43,7 @@ if [ "$WIPC" -ge 2 ]; then
 fi
 
 # --- pick: highest-priority Spec'd + ai-ready, skip the rest ---------------
-PICK=$(gql 'query($t:ID!){ issues(first:50, filter:{ team:{id:{eq:$t}},
+ELIG=$(gql 'query($t:ID!){ issues(first:50, filter:{ team:{id:{eq:$t}},
   state:{name:{eq:"Spec'"'"'d"}} }){ nodes{ id identifier title description
   branchName priority labels{ nodes{ id name } } } } }' \
   "$(jq -n --arg t "$TID" '{t:$t}')" \
@@ -50,9 +51,14 @@ PICK=$(gql 'query($t:ID!){ issues(first:50, filter:{ team:{id:{eq:$t}},
       | select([.labels.nodes[].name] | index("ai-ready"))
       | select(([.labels.nodes[].name] | index("human-only")) | not)
       | select(([.labels.nodes[].name] | index("needs-spec")) | not)
-      | select(([.labels.nodes[].name] | index("blocked")) | not)]
-      | sort_by(if .priority==0 then 999 else .priority end) | .[0] // empty')
-if [ -z "$PICK" ]; then jq -n '{skipped:"no eligible Spec'"'"'d ticket"}'; exit 0; fi
+      | select(([.labels.nodes[].name] | index("blocked")) | not)]')
+if [ -n "$WANT" ]; then
+  PICK=$(echo "$ELIG" | jq -c --arg w "$WANT" '[.[]|select(.identifier==$w)] | .[0] // empty')
+  [ -z "$PICK" ] && { jq -n --arg w "$WANT" '{skipped:("requested ticket "+$w+" is not an eligible Spec'"'"'d+ai-ready ticket")}'; exit 0; }
+else
+  PICK=$(echo "$ELIG" | jq -c 'sort_by(if .priority==0 then 999 else .priority end) | .[0] // empty')
+  [ -z "$PICK" ] && { jq -n '{skipped:"no eligible Spec'"'"'d ticket"}'; exit 0; }
+fi
 
 ID=$(echo "$PICK" | jq -r .id);    IDENT=$(echo "$PICK" | jq -r .identifier)
 TITLE=$(echo "$PICK" | jq -r .title); DESC=$(echo "$PICK" | jq -r '.description // ""')
@@ -65,14 +71,18 @@ if [ "$DRY" = "true" ]; then
   exit 0
 fi
 
-# --- move to Working + branch ----------------------------------------------
+# --- branch FIRST, from current HEAD ---------------------------------------
+# Branch off HEAD (not main) so the automation code travels with the ticket
+# branch and the running script isn't pulled out from under us; and do it
+# before the Linear move so a git failure can't orphan the ticket in Working.
+git branch -D "$BRANCH" >/dev/null 2>&1 || true
+git checkout -q -b "$BRANCH"
+START_SHA=$(git rev-parse HEAD)
+
+# --- now move to Working ---------------------------------------------------
 gql 'mutation($id:String!,$i:IssueUpdateInput!){issueUpdate(id:$id,input:$i){success}}' \
   "$(jq -n --arg id "$ID" --arg s "$WORKING" '{id:$id,i:{stateId:$s}}')" >/dev/null
 alog executor.jsonl "$(jq -n --arg id "$IDENT" --arg t "$TS" '{ts:$t,issue:$id,action:"working"}')"
-
-git checkout -q main
-git branch -D "$BRANCH" >/dev/null 2>&1 || true
-git checkout -q -b "$BRANCH"
 BASE_FAILS=$(conventions_fail_count)
 
 # --- hand to headless Claude (the engine) ----------------------------------
@@ -98,7 +108,7 @@ set -e
 
 # --- verify (never trust the agent's word) ---------------------------------
 NEW_SHA=$(git rev-parse HEAD)
-MADE_COMMIT=$([ "$(git rev-list --count main..HEAD)" -gt 0 ] && echo true || echo false)
+MADE_COMMIT=$([ "$(git rev-list --count "$START_SHA"..HEAD)" -gt 0 ] && echo true || echo false)
 BLOCKED_MARK=$(grep -oE 'EXECUTOR_BLOCKED:.*' "$RUNLOG" | head -1 || true)
 node --test >>"$RUNLOG" 2>&1 && TESTS_OK=true || TESTS_OK=false
 NOW_FAILS=$(conventions_fail_count)
