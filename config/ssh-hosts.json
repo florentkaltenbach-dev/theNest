@@ -1,9 +1,3 @@
 {
-  "hosts": [
-    {
-      "alias": "stoneshop",
-      "label": "stoneshop.de",
-      "poll_seconds": 60
-    }
-  ]
+  "hosts": []
 }
