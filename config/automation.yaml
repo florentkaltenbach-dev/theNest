@@ -5,25 +5,47 @@
 # jobs read this file on each invocation. Keep it conservative; widen dials
 # (especially auto_done_allow_kinds) only after the loop is proven.
 
+# --- Spec-drafting engine (groomer) -------------------------------------
+# The groomer drafts specs with `spec_engine`; if that engine errors (auth,
+# entitlement, model-not-supported, quota), it falls back to `spec_fallback`
+# automatically and logs that it did. Codex is preferred (flat-rate, keeps
+# drafting off the Anthropic quota per the token pyramid); Claude is the
+# always-available safety net.
+spec_engine: codex          # codex | claude
+spec_fallback: claude       # used automatically when spec_engine errors
+# Model for the codex engine. Leave "" to INHERIT ~/.codex/config.toml's
+# `model =` — that file is the single source of truth for the codex model,
+# so the groomer never pins its own copy. Set a value here only to override.
+codex_model: ""
+
 # How many tickets the groomer keeps stocked in Spec'd. The buffer the
 # executor drains from. Janitor's buffer-keeper tops this up when low.
 buffer_target: 3
 
 # Topics the groomer must NOT auto-spec. A Backlog ticket whose title or
-# description matches any of these (case-insensitive substring) is left in
-# Backlog with `needs-human` + a comment. Judgment-heavy or trust-boundary
-# work stays with a person. Matched as plain substrings, not regex.
+# description matches any of these is left in Backlog with `needs-human` + a
+# comment. Judgment-heavy or trust-boundary work stays with a person.
+# Matched as WHOLE words/phrases (\bterm\b, case-insensitive) — so list plural
+# variants explicitly. Never use a short fragment like "age" or "auth": they
+# would hit "appendage"/"author" everywhere in this project.
 spec_deny_list:
   - secret
+  - secrets
   - credential
+  - credentials
   - password
-  - auth          # authentication / authorization
-  - age           # Phase 4 client-side encryption
+  - passwords
+  - authentication
+  - authorization
   - encryption
+  - age encryption
+  - age-encryption
   - phase 4
   - architecture refactor
   - trust boundary
   - security model
+  - vault          # secrets-manager domain (Vaultwarden)
+  - vaultwarden
 
 # Auto-Done may advance a Review ticket to Done only if its single kind/*
 # label is in this list (AND all other gates pass — see auto-done.sh).

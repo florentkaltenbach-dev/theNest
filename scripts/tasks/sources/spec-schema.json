@@ -1,0 +1,23 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["goal", "context", "priority", "acceptance_criteria"],
+  "properties": {
+    "goal": { "type": "string" },
+    "context": { "type": "string" },
+    "priority": { "type": "integer" },
+    "acceptance_criteria": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["text", "verifiable", "command"],
+        "properties": {
+          "text": { "type": "string" },
+          "verifiable": { "type": "boolean" },
+          "command": { "type": ["string", "null"] }
+        }
+      }
+    }
+  }
+}
