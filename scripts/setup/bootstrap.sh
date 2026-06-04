@@ -61,6 +61,14 @@ apt-get update -qq
 # Essentials missing from base image
 apt-get install -y -qq build-essential jq unzip fail2ban python3-pip python3-venv > /dev/null
 
+# WireGuard mesh — PRE-INSTALL ONLY (I5). Installs the `wg` / `wg-quick` tooling
+# on every node so a future mesh needs no network retrofit. The mesh stays
+# DORMANT on single-server installs: we deliberately do NOT create /etc/wireguard/wg0.conf
+# and do NOT enable wg-quick@wg0 here, so no wg0 interface comes up by default.
+# Activation is gated on a second server being added — see scripts/setup/wireguard-mesh.sh
+# and docs/wireguard-mesh.md.
+apt-get install -y -qq wireguard wireguard-tools > /dev/null
+
 # Node.js 22 LTS
 if ! node --version 2>/dev/null | grep -q "v22"; then
   curl -fsSL https://deb.nodesource.com/setup_22.x | bash - > /dev/null 2>&1
@@ -298,6 +306,8 @@ check "docker"                  "docker --version"
 check "gh"                      "gh --version"
 check "claude"                  "command -v claude"
 check "python3"                 "python3 --version"
+check "wireguard tools"         "command -v wg && command -v wg-quick"
+check "wg0 mesh dormant"        "! ip link show wg0"
 check "ufw active"              "sudo ufw status | grep -q active"
 check "fail2ban running"        "sudo systemctl is-active fail2ban"
 check "VPS no CUPS listener"    "! sudo ss -ltnup | grep -q ':631\\b'"
