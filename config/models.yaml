@@ -1,0 +1,24 @@
+# config/models.yaml — Single source of truth for AI model selection.
+#
+# Model IDs used to be hardcoded independently in ~/.codex/config.toml and
+# ~/.openclaw/openclaw.json. They drifted: openclaw pointed at `gpt-5.5`
+# (needs a newer codex CLI than is installed) and `gpt-5.3-codex` (API-billing
+# only, rejected on a ChatGPT account) — both unusable. This file is the one
+# place to set the model; `scripts/apply-models-config.py` propagates it into
+# each tool's native config, idempotently. Edit here, run the script.
+
+# The codex-runtime model — used by BOTH the `codex` CLI (spec drafting, the
+# groomer) and openclaw's codex agent. Must be a model the *installed* codex
+# CLI accepts on the current auth.
+#   gpt-5.4        confirmed working 2026-06-04 (ChatGPT account)
+#   gpt-5.5        needs a newer codex CLI than 0.118.0 — bump the CLI first
+#   *-codex / gpt-5 / o-series   API-billing only, rejected on ChatGPT auth
+# To change the model: edit this value, run apply-models-config.py, then
+# restart the openclaw gateway (`openclaw gateway restart`) for it to take hold.
+codex_model: gpt-5.4
+
+# Token-ledger display label in hub/src/routes/tokens.js — the cap bucket
+# Claude usage is tracked under, NOT a runtime selector. Recorded here so the
+# full model surface lives in one file; the apply script does not edit JS
+# source, so keep this in sync by hand if tokens.js changes.
+claude_cap_label: claude-haiku-4-5-20251001
