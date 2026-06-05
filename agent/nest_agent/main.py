@@ -344,14 +344,19 @@ async def handle_commands(ws):
 
                 await ws.send(json.dumps(result))
             elif cmd == "discover":
-                from .discovery import find_git_repos
+                from .discovery import discover_all
                 request_id = msg.get("requestId")
-                repos = await asyncio.get_event_loop().run_in_executor(None, find_git_repos)
+                discovered = await asyncio.get_event_loop().run_in_executor(None, discover_all)
                 result = {
                     "type": "command_result",
                     "command": cmd,
                     "success": True,
-                    "repos": repos,
+                    # `repos` kept top-level for backward compat with the hub;
+                    # docker/systemd/ports are the extended service inventory.
+                    "repos": discovered["repos"],
+                    "docker": discovered["docker"],
+                    "systemd": discovered["systemd"],
+                    "ports": discovered["ports"],
                 }
                 if request_id:
                     result["requestId"] = request_id
