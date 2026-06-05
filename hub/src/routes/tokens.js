@@ -11,6 +11,9 @@ const CACHE_TTL_MS = 60_000;
 const SAMPLE_INTERVAL_MS = 15 * 60 * 1000;
 const WINDOWS_FILE = "/opt/nest/data/token-windows.jsonl";
 const STATE_FILE = "/opt/nest/data/token-state.json";
+// Latest normalized Claude rate-limit snapshot, written every sample so the C10
+// ledger's claude-pro source can read real utilization instead of re-estimating.
+const CLAUDE_LATEST_FILE = "/opt/nest/data/token-claude-latest.json";
 const CODEX_AUTH_PATH = "/home/claude/.codex/auth.json";
 
 // ── Claude state (persisted across restarts) ─────────
@@ -115,6 +118,12 @@ async function sampleLimits() {
     fetchedAt: lastSampledAt,
   };
   cache = { result, at: now };
+  // Persist the snapshot for the C10 ledger's claude-pro source (no auth, no HTTP loop).
+  try {
+    writeFileSync(CLAUDE_LATEST_FILE, JSON.stringify(result));
+  } catch (e) {
+    console.warn('token-claude-latest save failed:', e.message);
+  }
   return result;
 }
 

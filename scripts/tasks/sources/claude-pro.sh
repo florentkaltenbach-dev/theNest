@@ -2,91 +2,99 @@
 # scripts/tasks/sources/claude-pro.sh
 #
 # Emits a C10 source-row for the Claude Pro/Max OAuth subscription consumed via Claude Code.
-# Primary capacity is a calculated/researched 5h Claude Code prompt window, because
-# Anthropic's live OAuth rate-limit headers are not reliably available from local logs.
-# Monthly token totals are still reported under metrics.monthlyTokens.
+# Remaining capacity comes from the REAL Anthropic unified rate-limit headers, which the hub's
+# tokens.js samples every 15min and persists to token-claude-latest.json. Anthropic does not
+# publish the absolute 5h/7d caps, so capacity is expressed as percent-of-window (the only
+# correct model). Monthly token volume is still reported from local Claude Code logs as a metric.
 
 set -Eeuo pipefail
 
+LATEST_FILE="${NEST_CLAUDE_LATEST:-/opt/nest/data/token-claude-latest.json}"
 PROJECTS_DIR="${CLAUDE_CODE_PROJECTS_DIR:-/home/claude/.claude/projects}"
 RESET_DAY="${NEST_CAP_CLAUDE_PRO_RESET_DAY:-1}"
-PROMPT_CAP_5H="${NEST_CAP_CLAUDE_CODE_PROMPTS_5H:-50}"
-CAP_SOURCE="${NEST_CAP_CLAUDE_CODE_PROMPTS_5H:+config}"
-CAP_SOURCE="${CAP_SOURCE:-researched-floor}"
+STALE_AFTER_S="${NEST_CLAUDE_STALE_AFTER_S:-1500}"   # 25min; sampler runs every 15min
 
 NOW_ISO=$(date -u -Iseconds)
-NOW_MS=$(date +%s%3N)
-FIVE_HOURS_AGO_ISO=$(date -u -d '5 hours ago' -Iseconds)
+NOW_S=$(date +%s)
 
+# Monthly token volume (secondary metric) from local Claude Code session logs.
 period_start_ms=$(date -u -d "$(date -u +%Y-%m-)$RESET_DAY 00:00:00" +%s%3N 2>/dev/null || echo 0)
-if [ "$period_start_ms" -gt "$NOW_MS" ]; then
+if [ "$period_start_ms" -gt "$((NOW_S * 1000))" ]; then
   period_start_ms=$(date -u -d "$(date -u -d '1 month ago' +%Y-%m-)$RESET_DAY 00:00:00" +%s%3N)
 fi
-period_end_ms=$(date -u -d "$(date -u -d "@$((period_start_ms/1000))" +%Y-%m-%d) +1 month" +%s%3N)
 period_start_iso=$(date -u -d "@$((period_start_ms/1000))" -Iseconds)
-period_end_iso=$(date -u -d "@$((period_end_ms/1000))" -Iseconds)
+period_end_iso=$(date -u -d "$(date -u -d "@$((period_start_ms/1000))" +%Y-%m-%d) +1 month" -Iseconds)
 
 shopt -s nullglob
 JSONLS=()
-for p in "$PROJECTS_DIR"/*/*.jsonl; do
-  JSONLS+=("$p")
-done
+for p in "$PROJECTS_DIR"/*/*.jsonl; do JSONLS+=("$p"); done
+MONTHLY_TOKENS=0
+if [ "${#JSONLS[@]}" -gt 0 ]; then
+  MONTHLY_TOKENS=$(jq -cs --arg cutoff "$period_start_iso" '
+    [ .[]
+      | select(.timestamp != null and .timestamp >= $cutoff)
+      | (.message.usage // {})
+      | ((.input_tokens // 0) + (.output_tokens // 0) + (.cache_creation_input_tokens // 0))
+    ] | add // 0
+  ' "${JSONLS[@]}" 2>/dev/null || echo 0)
+fi
 
-if [ "${#JSONLS[@]}" -eq 0 ]; then
-  jq -n --arg now "$NOW_ISO" --arg ps "$period_start_iso" --arg pe "$period_end_iso" '{
+# No live snapshot yet → remaining unknown (do NOT fall back to a meaningless estimate).
+if [ ! -f "$LATEST_FILE" ]; then
+  jq -n --arg now "$NOW_ISO" --arg ps "$period_start_iso" --arg pe "$period_end_iso" \
+        --argjson monthlyTokens "$MONTHLY_TOKENS" '{
     id: "claude-pro", kind: "oauth-sub", label: "Claude Max 5x (Claude Code)", engine: "claude-code",
     period: { start: $ps, end: $pe, resetCadence: "rolling-5h" },
-    cap: { unit: "prompts_5h", amount: null },
-    used: { amount: 0, asOf: $now },
+    cap: { unit: "pct_5h", amount: 100 },
+    used: { amount: null, asOf: $now },
     remaining: { amount: null, percent: null, unknown: true },
-    warnings: ["no Claude Code session logs found"]
+    metrics: { monthlyTokens: $monthlyTokens, capSource: "anthropic-unified-headers" },
+    warnings: ["no Claude rate-limit snapshot yet; hub tokens.js sampler has not written token-claude-latest.json"]
   }'
   exit 0
 fi
 
-MONTHLY_TOKENS=$(jq -cs --arg cutoff "$period_start_iso" '
-  [ .[]
-    | select(.timestamp != null and .timestamp >= $cutoff)
-    | (.message.usage // {})
-    | ((.input_tokens // 0) + (.output_tokens // 0) + (.cache_creation_input_tokens // 0))
-  ] | add // 0
-' "${JSONLS[@]}" 2>/dev/null)
-
-PROMPTS_5H=$(jq -cs --arg cutoff "$FIVE_HOURS_AGO_ISO" '
-  [ .[]
-    | select(.timestamp != null and .timestamp >= $cutoff)
-    | select(.type == "user" and (.userType // "") == "external")
-  ] | length
-' "${JSONLS[@]}" 2>/dev/null)
-
 jq -n \
   --arg now "$NOW_ISO" \
-  --arg ps "$FIVE_HOURS_AGO_ISO" \
-  --arg pe "$NOW_ISO" \
+  --argjson nowS "$NOW_S" \
+  --argjson staleAfter "$STALE_AFTER_S" \
   --arg monthlyStart "$period_start_iso" \
   --arg monthlyEnd "$period_end_iso" \
-  --arg capSource "$CAP_SOURCE" \
-  --argjson used "$PROMPTS_5H" \
-  --argjson cap "$PROMPT_CAP_5H" \
-  --argjson monthlyTokens "$MONTHLY_TOKENS" '
-  ($cap - $used) as $rem
+  --argjson monthlyTokens "$MONTHLY_TOKENS" \
+  --slurpfile snap "$LATEST_FILE" '
+  ($snap[0]) as $s
+  | ($s.session.utilization_pct // 0) as $used5h
+  | (100 - $used5h) as $rem5h
+  | ($s.weekly.utilization_pct // 0) as $used7d
+  | ((($s.fetchedAt // "") | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601?) // 0) as $fetchedS
+  | (($nowS - $fetchedS) > $staleAfter) as $stale
   | {
     id: "claude-pro", kind: "oauth-sub", label: "Claude Max 5x (Claude Code)", engine: "claude-code",
-    period: { start: $ps, end: $pe, resetCadence: "rolling-5h" },
-    cap: { unit: "prompts_5h", amount: $cap },
-    used: { amount: $used, asOf: $now },
-    remaining: {
-      amount: (if $rem < 0 then 0 else $rem end),
-      percent: (if $cap > 0 then ((if $rem < 0 then 0 else $rem end) * 100 / $cap) else null end),
-      unknown: false
+    period: {
+      start: ($s.fetchedAt // $now),
+      end: ($s.session.remaining_seconds as $r | if $r then (($nowS + $r) | todateiso8601) else null end),
+      resetCadence: "rolling-5h"
     },
+    cap: { unit: "pct_5h", amount: 100 },
+    used: { amount: $used5h, asOf: ($s.fetchedAt // $now) },
+    remaining: { amount: $rem5h, percent: $rem5h, unknown: false },
     metrics: {
+      weekly: {
+        usedPct: $used7d,
+        remainingPct: (100 - $used7d),
+        remainingSeconds: ($s.weekly.remaining_seconds // null),
+        status: ($s.weekly.status // null)
+      },
+      sessionStatus: ($s.session.status // null),
+      overallStatus: ($s.status // null),
+      overageAvailable: ($s.overage_available // null),
       monthlyTokens: $monthlyTokens,
       monthlyPeriod: { start: $monthlyStart, end: $monthlyEnd },
-      capSource: $capSource
+      capSource: "anthropic-unified-headers",
+      snapshotAt: ($s.fetchedAt // null)
     },
-    warnings: ([
-      "calculated from local Claude Code logs; live Anthropic OAuth rate-limit headers unavailable here",
-      "Claude Max 5x researched floor is 50 Claude Code prompts per 5h; official range is about 50-200 depending on task/context"
-    ] + (if $rem < 0 then ["over conservative floor by \($used - $cap) prompts"] else [] end))
+    warnings: (
+      [ "remaining is % of an undisclosed 5h window cap from live Anthropic unified rate-limit headers" ]
+      + (if $stale then ["Claude snapshot is stale (>\($staleAfter)s old); hub sampler may be down"] else [] end)
+    )
   }'

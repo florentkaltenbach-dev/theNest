@@ -48,15 +48,17 @@ The endpoint returns:
       "id": "claude-pro",
       "label": "Claude Max 5x (Claude Code)",
       "engine": "claude-code",
-      "cap": { "unit": "prompts_5h", "amount": 50 },
-      "used": { "amount": 432, "asOf": "..." },
-      "remaining": { "amount": 0, "percent": 0, "unknown": false },
-      "metrics": {},
+      "cap": { "unit": "pct_5h", "amount": 100 },
+      "used": { "amount": 88, "asOf": "..." },
+      "remaining": { "amount": 12, "percent": 12, "unknown": false },
+      "metrics": { "weekly": { "usedPct": 17, "remainingPct": 83 }, "monthlyTokens": 7265384 },
       "warnings": []
     }
   ],
   "totals": {
     "remainingByEngine": {
+      "claude-code": { "fraction": 0.12, "sources": 1 },
+      "openclaw": { "fraction": 0.92, "sources": 1 },
       "hermes": { "fraction": 1, "sources": 1 }
     }
   }
@@ -66,12 +68,19 @@ The endpoint returns:
 `sources[]` is authoritative. `totals.remainingByEngine` is a routing summary
 only and omits unknown remaining capacity.
 
+Capacity model: for `claude-pro` and `codex-pro`, `remaining.percent` is the
+percentage of an undisclosed rolling-5h window cap (providers don't publish the
+absolute number) read from live rate-limit data — Anthropic unified headers for
+Claude, the ChatGPT `wham/usage` endpoint for Codex. `metrics.weekly.remainingPct`
+carries the 7-day window. Treat these percentages as authoritative remaining
+capacity, not estimates.
+
 ## Output
 
-Lead with one compact headline:
-- "Hermes has the clearest remaining capacity; Claude is at/over its conservative floor; Codex remaining is unknown."
+Lead with one compact headline naming the tightest engine, e.g.:
+- "Claude's 5h window is the tightest at 12% remaining; Codex and Hermes have ample headroom."
 - "All tracked sources have comfortable remaining capacity."
-- "One tracked source is at a limit and one source has elevated request waste."
+- "One tracked source is near its limit and one source has elevated request waste."
 
 Then include only useful bullets:
 - For each quota source, show `label`, used, remaining, unit, and warning status.

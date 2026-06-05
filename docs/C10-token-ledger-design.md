@@ -1,5 +1,20 @@
 # C10: Multi-source token ledger — design
 
+> **Update (2026-06-05):** the two "unknown remaining" gaps are closed with live data.
+> - **Claude (`claude-pro`)** now reads real utilization from the Anthropic unified rate-limit
+>   headers that `hub/src/routes/tokens.js` already samples every 15min (persisted to
+>   `data/token-claude-latest.json`). The old log-counted "50 prompts/5h researched floor"
+>   estimate is gone — it produced a meaningless "0% / over floor" while the real number sat
+>   unused in the sampler.
+> - **Codex (`codex-pro`)** now reads real 5h/7d `used_percent` live from the ChatGPT backend
+>   `GET /backend-api/wham/usage` endpoint (same token+endpoint the Codex CLI polls). Remaining
+>   is no longer "unknown." Rollout-log `rate_limits` were rejected as a source — they are `null`
+>   in exec mode. OpenClaw token totals remain a secondary metric.
+> - Both use `cap.unit: "pct_5h"` (providers don't publish absolute caps). The `NEST_CAP_*_TOKENS`
+>   envs in `config.env` are now unused and can be removed.
+> - The orphan `hub/src/codex-status.js` (zero consumers, duplicated the JWT decode in `tokens.js`)
+>   was deleted. OpenRouter free-model counter stays log-counted — no API exposes it (researched).
+>
 > **Status:** implemented (2026-05-09). Source rows use live local usage caches where available and researched/conservative plan floors when providers do not expose exact remaining quota.
 > **Constraint:** user uses OAuth subscriptions + free tokens only; no pay-per-token API credits. Primary axis is *remaining capacity*. Provider-reported exact remaining quota is preferred; otherwise the ledger marks `metrics.capSource="researched-floor"`.
 
