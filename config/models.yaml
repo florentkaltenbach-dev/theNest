@@ -8,14 +8,19 @@
 # each tool's native config, idempotently. Edit here, run the script.
 
 # The codex-runtime model — used by BOTH the `codex` CLI (spec drafting, the
-# groomer) and openclaw's codex agent. Must be a model the *installed* codex
-# CLI accepts on the current auth.
-#   gpt-5.4        confirmed working 2026-06-04 (ChatGPT account)
-#   gpt-5.5        needs a newer codex CLI than 0.118.0 — bump the CLI first
+# groomer, the /api/chat/send pathway) and openclaw's codex agent. Must be a
+# model the *installed* codex CLI accepts on the current auth AND one openclaw's
+# codex harness has in its catalog (apply-models-config.py namespaces it as
+# openai/<id>; openclaw rejects an id its codex catalog doesn't know).
+#   gpt-5.5        confirmed working 2026-06-05 — codex CLI 0.137.0 catalog +
+#                  openclaw 2026.6.1 codex harness both accept it (ChatGPT acct)
+#   gpt-5.4        worked on the codex CLI but openclaw 2026.6.1 REJECTS
+#                  openai/gpt-5.4 ("provider is not one of: codex") — broke the
+#                  gateway 2026-06-04 until bumped to gpt-5.5
 #   *-codex / gpt-5 / o-series   API-billing only, rejected on ChatGPT auth
 # To change the model: edit this value, run apply-models-config.py, then
 # restart the openclaw gateway (`openclaw gateway restart`) for it to take hold.
-codex_model: gpt-5.4
+codex_model: gpt-5.5
 
 # Token-ledger display label in hub/src/routes/tokens.js — the cap bucket
 # Claude usage is tracked under, NOT a runtime selector. Recorded here so the

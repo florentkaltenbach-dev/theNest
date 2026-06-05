@@ -37,7 +37,7 @@ This is the `IClawAdapter` interface in Nest.md §5: `webChatUrl()`, `registerSk
 
 `hub/src/routes/chat.js` bypasses OpenClaw entirely.
 
-- `POST /api/chat/send` → `execFile("codex", [...])` → direct Codex CLI call (model `gpt-5.4`).
+- `POST /api/chat/send` → `execFile("codex", [...])` → direct Codex CLI call (model from `config/models.yaml`, currently `gpt-5.5`).
 - Context is *injected* inline: live agent metrics, Hetzner server list, last ~20 messages of history.
 - Response parsed out of Codex CLI's streamed output.
 - Supports a `/apply` write mode that lets the model edit files under `/opt/nest`.
