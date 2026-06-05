@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nest — Auto Coder</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f5f5; color: #1a1a2e; min-height: 100vh; }
+a { color: inherit; }
+.mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+
+.topbar { display: flex; align-items: center; gap: 14px; padding: 12px 18px; background: #1a1a2e; color: #fff; position: sticky; top: 0; z-index: 10; }
+.topbar h1 { font-size: 16px; font-weight: 600; }
+.pill { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 999px; letter-spacing: .4px; text-transform: uppercase; }
+.pill.running { background: #16351f; color: #4ade80; }
+.pill.paused { background: #3a1d1d; color: #f87171; }
+.spacer { flex: 1; }
+.topbar button { background: rgba(255,255,255,.1); border: 0; color: #fff; padding: 6px 13px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.topbar button:hover { background: rgba(255,255,255,.2); }
+.topbar button.danger { background: #7f1d1d; } .topbar button.danger:hover { background: #991b1b; }
+.topbar button.go { background: #166534; } .topbar button.go:hover { background: #15803d; }
+.refreshed { font-size: 11px; color: #8b8fa3; }
+
+.wrap { max-width: 1100px; margin: 0 auto; padding: 18px; display: flex; flex-direction: column; gap: 18px; }
+.section-title { font-size: 11px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: #8b8fa3; margin-bottom: 8px; }
+.card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px; }
+
+.timers { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.timer { border-left: 3px solid #cbd5e1; }
+.timer.on { border-left-color: #22c55e; } .timer.off { border-left-color: #ef4444; }
+.timer h3 { font-size: 14px; display: flex; align-items: center; gap: 8px; }
+.timer .dot { width: 8px; height: 8px; border-radius: 50%; background: #ef4444; }
+.timer.on .dot { background: #22c55e; }
+.timer.busy .dot { background: #f59e0b; animation: pulse 1s infinite; }
+@keyframes pulse { 50% { opacity: .3; } }
+.kv { display: flex; justify-content: space-between; font-size: 12px; margin-top: 6px; color: #555; }
+.kv b { color: #1a1a2e; font-weight: 600; }
+.timer .run { margin-top: 10px; width: 100%; padding: 6px; border: 1px solid #d1d5db; background: #f9fafb; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.timer .run:hover { background: #eef2ff; border-color: #a5b4fc; }
+
+.pipeline { display: flex; gap: 8px; flex-wrap: wrap; }
+.stage { flex: 1; min-width: 90px; text-align: center; background: #fafafa; border: 1px solid #eee; border-radius: 8px; padding: 10px 6px; }
+.stage .n { font-size: 22px; font-weight: 700; }
+.stage .l { font-size: 10px; text-transform: uppercase; letter-spacing: .5px; color: #8b8fa3; margin-top: 2px; }
+.stage.Working .n { color: #f59e0b; } .stage.Review .n { color: #3b82f6; } .stage.Done .n { color: #22c55e; }
+
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 760px) { .cols { grid-template-columns: 1fr; } }
+.tix { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.tix li { display: flex; align-items: center; gap: 8px; padding: 7px 9px; background: #fafafa; border: 1px solid #eee; border-radius: 7px; font-size: 13px; }
+.tix a.id { font-weight: 700; color: #2563eb; text-decoration: none; flex-shrink: 0; }
+.tix .t { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #333; }
+.tag { font-size: 9px; font-weight: 600; padding: 1px 6px; border-radius: 4px; background: #eef2ff; color: #4338ca; }
+.tag.human-only, .tag.needs-human { background: #fef3c7; color: #92400e; }
+.muted { color: #9ca3af; font-size: 12px; }
+
+.dec { list-style: none; display: flex; flex-direction: column; gap: 5px; max-height: 320px; overflow-y: auto; }
+.dec li { display: flex; align-items: baseline; gap: 8px; font-size: 12px; padding: 5px 0; border-bottom: 1px solid #f1f1f1; }
+.dec .badge { font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 4px; flex-shrink: 0; text-transform: uppercase; }
+.badge.done { background: #dcfce7; color: #166534; }
+.badge.hold, .badge.held { background: #fee2e2; color: #991b1b; }
+.badge.run { background: #e0e7ff; color: #3730a3; }
+.dec .when { color: #9ca3af; flex-shrink: 0; font-size: 11px; }
+
+.preview { display: flex; flex-direction: column; gap: 5px; margin-top: 10px; }
+.cfg { font-size: 12px; color: #444; }
+.cfg pre { background: #1a1a2e; color: #d4d4d4; border-radius: 8px; padding: 12px; overflow-x: auto; font-size: 11px; line-height: 1.5; }
+.err { color: #b91c1c; font-size: 12px; }
+.toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: #1a1a2e; color: #fff; padding: 10px 18px; border-radius: 8px; font-size: 13px; opacity: 0; transition: opacity .2s; z-index: 100; }
+.toast.show { opacity: 1; }
+</style>
+<script src="/sidebar.js"></script>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>Auto Coder</h1>
+  <span class="pill" id="statusPill">…</span>
+  <span class="spacer"></span>
+  <span class="refreshed" id="refreshed"></span>
+  <button id="pauseBtn" onclick="togglePause()">…</button>
+  <button onclick="load()">↻ Refresh</button>
+</div>
+
+<div class="wrap" id="wrap">
+  <div class="muted">Loading…</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const TOKEN = localStorage.getItem('nest_token');
+let STATE = null;
+
+function authHeaders(extra) {
+  const h = { ...(extra || {}) };
+  if (TOKEN) h['Authorization'] = 'Bearer ' + TOKEN;
+  return h;
+}
+async function api(path, opts = {}) {
+  const headers = authHeaders(opts.body ? { 'Content-Type': 'application/json', ...(opts.headers || {}) } : opts.headers);
+  const r = await fetch('/api' + path, { credentials: 'same-origin', headers, ...opts });
+  if (r.status === 401) { location.href = '/login'; return null; }
+  return r;
+}
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2600);
+}
+function ago(ms) {
+  if (!ms) return '—';
+  const d = Date.now() - ms, s = Math.round(Math.abs(d) / 1000), fut = d < 0;
+  const v = s < 60 ? s + 's' : s < 3600 ? Math.round(s / 60) + 'm' : s < 86400 ? Math.round(s / 3600) + 'h' : Math.round(s / 86400) + 'd';
+  return fut ? 'in ' + v : v + ' ago';
+}
+function esc(s) { return String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+async function load() {
+  try {
+    const r = await api('/automation/state'); if (!r) return;
+    STATE = await r.json();
+    render();
+  } catch (e) {
+    document.getElementById('wrap').innerHTML = '<div class="err">Failed to load: ' + esc(e.message) + '</div>';
+  }
+}
+
+function render() {
+  const s = STATE;
+  const pill = document.getElementById('statusPill');
+  pill.textContent = s.paused ? 'Paused' : 'Running';
+  pill.className = 'pill ' + (s.paused ? 'paused' : 'running');
+  const pb = document.getElementById('pauseBtn');
+  pb.textContent = s.paused ? '▶ Resume loop' : '⏸ Pause loop';
+  pb.className = s.paused ? 'go' : 'danger';
+  document.getElementById('refreshed').textContent = 'updated ' + new Date().toLocaleTimeString();
+
+  const W = [];
+  W.push(timersCard(s.timers));
+  W.push(pipelineCard(s.pipeline));
+  W.push(previewCard());
+  W.push(decisionsCard(s.decisions));
+  W.push(configCard(s.config));
+  document.getElementById('wrap').innerHTML = W.join('');
+}
+
+function timersCard(timers) {
+  const order = ['executor', 'auto-done', 'janitor'];
+  const cards = order.filter((k) => timers[k]).map((k) => {
+    const t = timers[k];
+    const cls = 'timer card ' + (t.running ? 'busy' : t.enabled ? 'on' : 'off');
+    const result = t.lastResult ? (t.lastResult === 'success' ? '✓ ok' : '✗ ' + t.lastResult) : '—';
+    return `<div class="${cls}">
+      <h3><span class="dot"></span>${esc(k)}</h3>
+      <div class="kv"><span>state</span><b>${t.running ? 'running now' : t.enabled ? 'enabled' : 'disabled'}</b></div>
+      <div class="kv"><span>last run</span><b>${ago(t.lastRun)}</b></div>
+      <div class="kv"><span>next run</span><b>${t.enabled ? ago(t.nextRun) : '—'}</b></div>
+      <div class="kv"><span>last result</span><b>${esc(result)}</b></div>
+      <button class="run" onclick="runJob('${esc(k)}')">Run now</button>
+    </div>`;
+  }).join('');
+  return `<div><div class="section-title">Jobs</div><div class="timers">${cards}</div></div>`;
+}
+
+function pipelineCard(p) {
+  if (!p || p.error) return `<div class="card err">Linear pipeline unavailable: ${esc(p?.error || 'unknown')}</div>`;
+  const stages = (p.order || []).map((st) => `<div class="stage ${esc(st.replace(/\W/g, ''))}"><div class="n">${p.counts[st] || 0}</div><div class="l">${esc(st)}</div></div>`).join('');
+  return `<div>
+    <div class="section-title">Pipeline</div>
+    <div class="card"><div class="pipeline">${stages}</div>
+    <div class="cols" style="margin-top:14px">
+      <div><div class="section-title">Working — building now</div>${tixList(p.working, 'Nothing in flight')}</div>
+      <div><div class="section-title">Review — awaiting you</div>${tixList(p.review, 'Review queue empty')}</div>
+    </div></div></div>`;
+}
+function tixList(items, empty) {
+  if (!items || !items.length) return `<div class="muted">${esc(empty)}</div>`;
+  return '<ul class="tix">' + items.map((i) => {
+    const tags = (i.labels || []).filter((l) => l.startsWith('kind/') || l === 'human-only' || l === 'needs-human')
+      .map((l) => `<span class="tag ${esc(l)}">${esc(l.replace('kind/', ''))}</span>`).join('');
+    return `<li><a class="id" href="${esc(i.url)}" target="_blank" rel="noopener">${esc(i.id)}</a><span class="t">${esc(i.title)}</span>${tags}</li>`;
+  }).join('') + '</ul>';
+}
+
+function previewCard() {
+  return `<div>
+    <div class="section-title">Auto-Done preview</div>
+    <div class="card">
+      <div class="muted">Dry-run the gate — see which Review tickets would auto-close and which would be held for you. Mutates nothing.</div>
+      <button class="run" style="margin-top:10px;max-width:220px" onclick="preview(this)">Run dry preview</button>
+      <div class="preview" id="previewOut"></div>
+    </div></div>`;
+}
+
+function decisionsCard(dec) {
+  if (!dec || !dec.length) return '';
+  const rows = dec.map((d) => {
+    const badge = d.action || 'run';
+    const label = d.source === 'executor' ? 'implemented' : (d.reason || d.action || '');
+    const when = d.ts ? ago(Date.parse(d.ts)) : (d.sha ? d.sha.slice(0, 7) : '');
+    return `<li><span class="badge ${esc(badge)}">${esc(badge)}</span><b>${esc(d.issue || '')}</b><span class="t" style="flex:1;color:#555">${esc(label)}</span><span class="when">${esc(when)}</span></li>`;
+  }).join('');
+  return `<div><div class="section-title">Recent decisions</div><div class="card"><ul class="dec">${rows}</ul></div></div>`;
+}
+
+function configCard(cfg) {
+  if (!cfg) return '';
+  const ad = cfg.auto_done || {}, cb = cfg.circuit_breaker || {};
+  return `<div><div class="section-title">Config — config/automation.yaml</div><div class="card cfg">
+    <div class="kv"><span>spec engine</span><b>${esc(cfg.spec_engine)} → ${esc(cfg.spec_fallback)}</b></div>
+    <div class="kv"><span>Spec'd buffer target</span><b>${esc(cfg.buffer_target)}</b></div>
+    <div class="kv"><span>auto-Done max diff</span><b>${esc(ad.max_files)} files / ${esc(ad.max_diff_lines)} lines</b></div>
+    <div class="kv"><span>auto-Done require tests</span><b>${esc(ad.require_tests_touched)}</b></div>
+    <div class="kv"><span>breaker: stuck Working</span><b>${esc(cb.working_max_age_hours)}h</b></div>
+    <div class="kv"><span>breaker: cancel rate</span><b>${esc(cb.cancel_rate_max)} / ${esc(cb.cancel_rate_window)}h</b></div>
+  </div></div>`;
+}
+
+async function togglePause() {
+  const paused = !STATE.paused;
+  if (!paused && !confirm('Resume the autonomous loop? The executor will start picking up tickets.')) return;
+  const r = await api('/automation/pause', { method: 'POST', body: JSON.stringify({ paused }) });
+  if (!r) return;
+  if (!r.ok) { toast('Failed (admin only?)'); return; }
+  toast(paused ? 'Loop paused' : 'Loop resumed');
+  load();
+}
+async function runJob(job) {
+  if (!confirm(`Trigger one ${job} run now?`)) return;
+  const r = await api('/automation/run/' + encodeURIComponent(job), { method: 'POST', body: '{}' });
+  if (!r) return;
+  const d = await r.json();
+  toast(r.ok ? `Started ${job}` : ('Failed: ' + (d.error || r.status)));
+  setTimeout(load, 1500);
+}
+async function preview(btn) {
+  const out = document.getElementById('previewOut');
+  btn.disabled = true; out.innerHTML = '<div class="muted">Running dry-run (checks out branches + node --test)…</div>';
+  try {
+    const r = await api('/automation/preview-auto-done', { method: 'POST', body: '{}' });
+    const d = await r.json();
+    if (!r.ok) { out.innerHTML = '<div class="err">' + esc(d.error || 'failed') + '</div>'; return; }
+    const dec = d.decisions || [];
+    if (!dec.length) { out.innerHTML = '<div class="muted">No Review tickets to evaluate.</div>'; return; }
+    out.innerHTML = '<ul class="dec">' + dec.map((x) =>
+      `<li><span class="badge ${esc(x.action)}">${esc(x.action)}</span><b>${esc(x.issue)}</b><span style="flex:1;color:#555">${esc(x.reason)}</span></li>`
+    ).join('') + `</ul><div class="muted" style="margin-top:6px">${d.doned} would close · ${d.held} held for you</div>`;
+  } catch (e) {
+    out.innerHTML = '<div class="err">' + esc(e.message) + '</div>';
+  } finally { btn.disabled = false; }
+}
+
+load();
+setInterval(load, 12000);
+</script>
+</body>
+</html>

@@ -35,6 +35,7 @@ The `Topic` column groups pages for the unifying address sidebar. Pages with top
 | `/terminal` | `terminal.html` | Terminal | Interact | yes |
 | `/tasks` | `tasks.html` | Sessions | Interact | yes |
 | `/scripts` | `scripts.html` | Scripts | Interact | yes |
+| `/automation` | `automation.html` | Auto Coder | Interact | yes |
 | `/nest` | `nest.html` | Nest Explorer | Inspect | yes |
 | `/routes` | `routes.html` | Routes | Inspect | yes |
 | `/projects` | `projects.html` | Projects | Inspect | yes |

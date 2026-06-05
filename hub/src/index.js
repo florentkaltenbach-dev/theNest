@@ -31,6 +31,7 @@ import { artifactRoutes } from './routes/artifacts.js';
 import { canvasRoutes } from './routes/canvas.js';
 import { observabilityRoutes } from './routes/observability.js';
 import { mailRoutes } from './routes/mail.js';
+import { automationRoutes } from './routes/automation.js';
 import { startSshDiscovery } from './ssh-discovery.js';
 import { startAlertWatchdog } from './alerts.js';
 import { handleAgentWs, handleClientWs } from './ws/agentHandler.js';
@@ -107,6 +108,7 @@ function defaultPageTable() {
     { path: '/terminal', file: 'terminal.html', title: 'Terminal', topic: 'Interact', auth: true },
     { path: '/tasks', file: 'tasks.html', title: 'Sessions', topic: 'Interact', auth: true },
     { path: '/scripts', file: 'scripts.html', title: 'Scripts', topic: 'Interact', auth: true },
+    { path: '/automation', file: 'automation.html', title: 'Auto Coder', topic: 'Interact', auth: true },
     { path: '/nest', file: 'nest.html', title: 'Nest Explorer', topic: 'Inspect', auth: true },
     { path: '/routes', file: 'routes.html', title: 'Routes', topic: 'Inspect', auth: true },
     { path: '/projects', file: 'projects.html', title: 'Projects', topic: 'Inspect', auth: true },
@@ -212,6 +214,7 @@ artifactRoutes(api);
 canvasRoutes(api);
 observabilityRoutes(api);
 mailRoutes(api);
+automationRoutes(api);
 
 // Authenticated OpenClaw WebChat and Hermes dashboard proxies. Must be
 // registered before page routes.
