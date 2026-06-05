@@ -23,6 +23,8 @@ for part in key.split("."):
         break
 if cur is None:
     print(default)
+elif isinstance(cur, bool):            # bool before the generic scalar branch
+    print("true" if cur else "false")  # JSON/shell-style, not Python's True/False
 elif isinstance(cur, (dict, list)):
     print(json.dumps(cur))
 else:

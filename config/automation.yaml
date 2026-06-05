@@ -3,7 +3,7 @@
 # Knobs for the groomer, executor, auto-Done gate, and janitor. Plain data,
 # read by scripts/tasks/*.sh and the janitor. Edit here, no apply step — the
 # jobs read this file on each invocation. Keep it conservative; widen dials
-# (especially auto_done_allow_kinds) only after the loop is proven.
+# (especially the auto_done risk bounds) only after the loop is proven.
 
 # --- Spec-drafting engine (groomer) -------------------------------------
 # The groomer drafts specs with `spec_engine`; if that engine errors (auth,
@@ -47,13 +47,37 @@ spec_deny_list:
   - vault          # secrets-manager domain (Vaultwarden)
   - vaultwarden
 
-# Auto-Done may advance a Review ticket to Done only if its single kind/*
-# label is in this list (AND all other gates pass — see auto-done.sh).
-# Start with the cheapest, lowest-blast-radius kinds. kind/feature, security,
-# secrets, and auth always stay human-gated regardless of this list.
-auto_done_allow_kinds:
-  - kind/chore
-  - kind/refactor
+# Auto-Done risk gate. A Review ticket advances to Done when `node --test`
+# passes on its branch AND the change is low-risk by ALL the heuristics below.
+# Anything that fails a heuristic is held in Review with needs-human + the
+# reason. This replaced the old kind-allow-list (chore/refactor only): the kind
+# label was a blunt proxy for "important" — a safe feature now auto-closes, and
+# only genuinely risky work reaches a human.
+#
+# NOTE: conventions is deliberately NOT a gate here. The self-audit reflects hub
+# *startup* state (not the branch), and its status can't reach `red` without 3
+# of 5 checks failing — two already fail on legacy debt — so it carried no real
+# signal. It stays an informational health metric (janitor); the merge signal is
+# `node --test` + the risk heuristics below.
+auto_done:
+  # kind/* labels that ALWAYS require a human, regardless of how safe the diff
+  # looks (judgment-heavy domains). Empty = risk heuristics alone decide.
+  always_human_kinds: []
+  # Hold for a human if the diff (main...branch) exceeds either bound.
+  max_files: 12
+  max_diff_lines: 400
+  # Hold if the branch added/changed no test file — a green `node --test` means
+  # little if nothing new exercises the change (catches "gamed the gate").
+  require_tests_touched: true
+  # Hold if any changed path matches one of these (regex, case-insensitive).
+  # Trust-boundary + dependency surfaces stay human-gated even when small.
+  sensitive_paths:
+    - 'routes/auth'
+    - 'server\.js'
+    - 'config\.env'
+    - 'config/'
+    - 'bootstrap'
+    - 'package(-lock)?\.json'
 
 # Circuit-breaker thresholds. The janitor trips the breaker (writes the pause
 # flag + mails) on ANY breach. It never auto-clears — a human removes the flag.
