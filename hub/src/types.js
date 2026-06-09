@@ -30,6 +30,7 @@
  * @property {Object} lastMetrics
  * @property {Object[]} lastContainers
  * @property {Object[]} discoveredRepos
+ * @property {Object} [discoveredServices] - { docker, systemd, ports } from discover
  * @property {number} connectedAt
  */
 

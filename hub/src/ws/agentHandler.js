@@ -97,7 +97,14 @@ export function handleAgentWs(socket) {
 
       if (msg.type === "command_result" && msg.command === "discover" && msg.repos) {
         const agent = agents.get(hostname);
-        if (agent) agent.discoveredRepos = msg.repos;
+        if (agent) {
+          agent.discoveredRepos = msg.repos;
+          agent.discoveredServices = {
+            docker: msg.docker || [],
+            systemd: msg.systemd || [],
+            ports: msg.ports || [],
+          };
+        }
       }
 
       if (msg.type === "container_logs") {
