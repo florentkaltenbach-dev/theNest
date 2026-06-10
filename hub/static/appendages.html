@@ -39,6 +39,11 @@
   .actions button.danger{color:#b91c1c;border-color:#fca5a5}
   .actions button:disabled{opacity:0.5;cursor:not-allowed}
   .actions .note{color:#6b7280;font-size:12px;font-style:italic;align-self:center}
+  .actions a.open{font:inherit;padding:6px 12px;border:1px solid #15803d;border-radius:6px;background:#15803d;color:#fff;cursor:pointer;font-weight:600;font-size:13px;text-decoration:none;display:inline-block}
+  .tabs{display:flex;gap:4px;margin-bottom:14px;border-bottom:1px solid #e5e7eb;flex-wrap:wrap}
+  .tab{padding:7px 14px;border:none;background:none;font:inherit;font-weight:600;color:#6b7280;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+  .tab.active{color:#1a1a2e;border-bottom-color:#1a1a2e}
+  .tab .count{color:#9ca3af;font-weight:500;margin-left:5px;font-size:12px}
   .err{color:#b91c1c;padding:12px;background:#fee;border:1px solid #fcc;border-radius:6px;margin-bottom:12px}
   .toast{position:fixed;bottom:16px;right:16px;background:#1a1a2e;color:#fff;padding:10px 14px;border-radius:6px;font-size:13px;box-shadow:0 4px 12px rgba(0,0,0,0.2)}
   .toast.ok{background:#15803d}
@@ -57,6 +62,7 @@
     <span class="meta" id="meta"></span>
   </div>
   <div id="invalid"></div>
+  <div class="tabs" id="tabs"></div>
   <div id="app">Loading…</div>
 </div>
 <script>
@@ -65,6 +71,38 @@ if (!t) location.href = "/login";
 
 const esc = s => String(s ?? "").replace(/[&<>"]/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
 let allHosts = [];
+let appendages = [];
+let currentTab = "all";
+
+const cap = s => String(s).charAt(0).toUpperCase() + String(s).slice(1);
+
+// Tabs: All, Installed, then one per distinct category present in the data.
+function tabsFor(list) {
+  const cats = [...new Set(list.map((a) => a.category).filter(Boolean))].sort();
+  return [
+    { id: "all", label: "All", match: () => true },
+    { id: "installed", label: "Installed", match: (a) => a.installed },
+    ...cats.map((c) => ({ id: "cat:" + c, label: cap(c), match: (a) => a.category === c })),
+  ];
+}
+
+function renderTabs() {
+  const tabs = tabsFor(appendages);
+  if (!tabs.some((t) => t.id === currentTab)) currentTab = "all";
+  document.getElementById("tabs").innerHTML = tabs.map((tab) => {
+    const n = appendages.filter(tab.match).length;
+    return `<button class="tab ${currentTab === tab.id ? "active" : ""}" data-tab="${esc(tab.id)}">${esc(tab.label)}<span class="count">${n}</span></button>`;
+  }).join("");
+}
+
+function renderGrid() {
+  const tabs = tabsFor(appendages);
+  const tab = tabs.find((t) => t.id === currentTab) || tabs[0];
+  const list = appendages.filter(tab.match);
+  document.getElementById("app").innerHTML = list.length
+    ? `<div class="grid">${list.map(renderCard).join("")}</div>`
+    : `<div class="desc">No appendages in this view.</div>`;
+}
 
 function pillClass(prefix, value) {
   return `${prefix}-${String(value).replace(/\s+/g, "-").toLowerCase()}`;
@@ -77,6 +115,20 @@ function cardClass(a) {
   return "";
 }
 
+// Open links route through the hub's auth-gated proxy (e.g. /portainer/), so
+// only local (container/compose) appendages that are installed and declare
+// routes get a button. Discovery appendages live on remote hosts — the proxy
+// targets 127.0.0.1, so it can't reach them.
+function renderOpenLinks(a) {
+  if (a.mode === "discovery" || !a.installed || !(a.routes && a.routes.length)) return "";
+  return a.routes.map((r) => {
+    const prefix = String(r.path).replace(/\/+$/, "");
+    // Root mounts aren't hub-proxied (they'd shadow the dashboard) — no button.
+    if (prefix === "") return "";
+    return `<a class="open" href="${esc(prefix + "/")}" target="_blank" rel="noopener">Open ↗</a>`;
+  }).join("");
+}
+
 function renderActions(a) {
   if (a.mode === "discovery") {
     return `<div class="note">Brownfield — observed only. No install path.</div>`;
@@ -84,6 +136,7 @@ function renderActions(a) {
   const installable = !a.installed;
   const removable = a.installed;
   return `
+    ${renderOpenLinks(a)}
     <button class="primary" data-action="install" data-id="${esc(a.id)}" ${installable ? "" : "disabled"}>Install</button>
     <button class="danger" data-action="uninstall" data-id="${esc(a.id)}" ${removable ? "" : "disabled"}>Uninstall</button>
   `;
@@ -169,12 +222,12 @@ async function load() {
       : "";
     document.getElementById("invalid").innerHTML = invalidHtml;
 
-    const installedCount = d1.appendages.filter((a) => a.installed).length;
-    document.getElementById("meta").textContent = `${installedCount} of ${d1.appendages.length} installed · ${allHosts.length} host${allHosts.length===1?"":"s"}`;
+    appendages = d1.appendages || [];
+    const installedCount = appendages.filter((a) => a.installed).length;
+    document.getElementById("meta").textContent = `${installedCount} of ${appendages.length} installed · ${allHosts.length} host${allHosts.length===1?"":"s"}`;
 
-    document.getElementById("app").innerHTML = `<div class="grid">${
-      d1.appendages.map(renderCard).join("")
-    }</div>`;
+    renderTabs();
+    renderGrid();
   } catch (e) {
     document.getElementById("app").innerHTML = `<div class="err">${esc(e.message)}</div>`;
   }
@@ -212,6 +265,14 @@ document.addEventListener("click", async (ev) => {
     toast(`${action} failed: ${e.message}`, "err");
     load();
   }
+});
+
+document.getElementById("tabs").addEventListener("click", (ev) => {
+  const btn = ev.target.closest("button[data-tab]");
+  if (!btn) return;
+  currentTab = btn.dataset.tab;
+  renderTabs();
+  renderGrid();
 });
 
 document.getElementById("refresh").addEventListener("click", load);

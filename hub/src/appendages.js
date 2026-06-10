@@ -116,6 +116,7 @@ export function validateAppendage(def) {
     else for (const r of def.routes) {
       if (typeof r?.path !== "string" || !ROUTE_PATH_RE.test(r.path)) errs.push(`routes.path: bad "${r?.path}"`);
       if (!Number.isInteger(r?.port) || r.port < 1 || r.port > 65535) errs.push(`routes.port: bad "${r?.port}"`);
+      if (r?.tls !== undefined && typeof r.tls !== "boolean") errs.push("routes.tls: must be boolean");
     }
   }
 

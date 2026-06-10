@@ -13,6 +13,6 @@
     "volumes": ["portainer-data:/data", "/var/run/docker.sock:/var/run/docker.sock"]
   },
   "routes": [
-    { "path": "/portainer", "port": 9443 }
+    { "path": "/portainer", "port": 9443, "tls": true }
   ]
 }

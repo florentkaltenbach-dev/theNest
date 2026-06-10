@@ -40,6 +40,7 @@ import { handleAgentWs, handleClientWs } from './ws/agentHandler.js';
 import { createTerminalHandler } from './ws/terminal.js';
 import { registerOpenClawProxy, handleOpenClawUpgrade } from './openclawProxy.js';
 import { registerHermesProxy, handleHermesUpgrade, isHermesProxyUrl } from './hermesProxy.js';
+import { registerAppendageProxies, handleAppendageUpgrade, isAppendageProxyUrl } from './appendageProxy.js';
 import { scanNest, nestRoutes } from './nest.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -224,6 +225,9 @@ energyhackRoutes(api);
 // registered before page routes.
 registerOpenClawProxy(router);
 registerHermesProxy(router);
+// Auth-gated reverse proxies for each installed appendage's `routes` (e.g.
+// /portainer → 127.0.0.1:9443). Reads appendage JSON at startup.
+registerAppendageProxies(router);
 
 // SSH-driven brownfield discovery (Phase 5 follow-on). Polls hosts listed in
 // config/ssh-hosts.json so /api/appendages can mark adopted stacks installed.
@@ -305,8 +309,9 @@ const server = createServer(async (req, res) => {
 
   const url = req.url.split('?')[0];
 
-  // Parse body for POST/PUT/DELETE. /claw and /hermes are proxied as streams.
-  if (req.method !== 'GET' && req.method !== 'HEAD' && !url.startsWith('/claw') && !isHermesProxyUrl(url)) {
+  // Parse body for POST/PUT/DELETE. /claw, /hermes, and appendage proxies are
+  // streamed straight to the upstream, so we must not consume the body here.
+  if (req.method !== 'GET' && req.method !== 'HEAD' && !url.startsWith('/claw') && !isHermesProxyUrl(url) && !isAppendageProxyUrl(url)) {
     try {
       req.body = await parseBody(req);
     } catch {
@@ -385,6 +390,13 @@ server.on('upgrade', async (req, socket, head) => {
   })) return;
 
   if (await handleHermesUpgrade(req, socket, head, async (upgradeReq) => {
+    const authHeader = upgradeReq.headers.authorization;
+    const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    const cookieToken = parseCookie(upgradeReq.headers.cookie, 'nest_token');
+    return tryAuth(upgradeReq, bearerToken || cookieToken);
+  })) return;
+
+  if (await handleAppendageUpgrade(req, socket, head, async (upgradeReq) => {
     const authHeader = upgradeReq.headers.authorization;
     const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
     const cookieToken = parseCookie(upgradeReq.headers.cookie, 'nest_token');
