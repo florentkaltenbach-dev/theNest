@@ -230,16 +230,15 @@ function unitLabel(u) {
 }
 
 /**
- * Bucket per-slot usage into NBARS columns over the window [tMax-hours, tMax].
- * `tMax` (epoch sec) is the chart's right edge — the next reset when it's on-axis, else now.
+ * Bucket per-slot usage into NBARS columns over the window [tMin, tMax] (both epoch sec).
+ * `tMax` is the chart's right edge (next reset when on-axis, else now); `tMin` is the left edge.
  * The signal is chosen by the source's backend-declared usageUnit:
  *  - "tokens"/"requests" → deltas of the cumulative counter `u` (a trustworthy absolute count)
  *  - "capacity" (default) → drops in the real remaining% `r` (accurate when no reliable
  *    token counter exists, e.g. Codex, whose exec-mode token logs undercount)
  * Returns { buckets, peak, unit }.
  */
-function usageBuckets(samples, id, hours, usageUnit, tMax) {
-  const tMin = tMax - hours * 3600;
+function usageBuckets(samples, id, usageUnit, tMin, tMax) {
   const useCounter = usageUnit === "tokens" || usageUnit === "requests";
   const pts = (samples || [])
     .map(e => ({ t: e.t, c: useCounter ? (e.u ? e.u[id] : null) : (e.r ? e.r[id] : null) }))
@@ -298,6 +297,23 @@ function chartDomain(nextResetAt, cadence, fallbackHours) {
   return { tMax: nowSec, hours: fallbackHours };
 }
 
+/**
+ * Left edge (epoch sec) for a chart. The window floor is `tMax - hours`, but we clamp it up to
+ * the first available sample so data sits flush against the left edge rather than leaving an
+ * empty leading gap from before the recorder existed (the recorder is younger than a 24h/weekly
+ * window). Once a full window of history accumulates, firstSampleT <= floor and the floor wins,
+ * so the chart settles to exactly one window. For unanchored sources (tMax = now) this fills the
+ * plot edge-to-edge with whatever history exists.
+ * @param {number} tMax right edge (epoch sec)
+ * @param {number} hours window span
+ * @param {?number} firstSampleT earliest in-window sample time (epoch sec), or null
+ * @returns {number}
+ */
+function windowStart(tMax, hours, firstSampleT) {
+  const floor = tMax - hours * 3600;
+  return firstSampleT != null ? Math.max(floor, firstSampleT) : floor;
+}
+
 function fmtCountdown(iso, cadence) {
   if (!iso) return null;
   const secs = (new Date(iso).getTime() - Date.now()) / 1000;
@@ -312,10 +328,10 @@ function fmtCountdown(iso, cadence) {
  * per-slot usage bars behind the line.
  * primary = [{t,v}] (5h/daily window), weekly = [{t,v}] thin overlay (optional),
  * bars = NBARS-length array of per-slot usage (auto-scaled to its own max).
- * Time domain is [tMax-hours, tMax]; `tMax` is the next reset when on-axis, else now. When
- * the right edge is a future reset, a dashed "now" marker splits past data from the gap-to-reset.
+ * Time domain is [tMin, tMax] (both epoch sec); `tMax` is the next reset when on-axis, else now.
+ * When the right edge is a future reset, a dashed "now" marker splits past data from the gap-to-reset.
  */
-function drawChart(canvas, primary, weekly, bars, barUnit, color, hours, tMax) {
+function drawChart(canvas, primary, weekly, bars, barUnit, color, tMin, tMax) {
   const dpr = window.devicePixelRatio || 1;
   const W = canvas.clientWidth, H = canvas.clientHeight;
   canvas.width = W * dpr; canvas.height = H * dpr;
@@ -326,7 +342,6 @@ function drawChart(canvas, primary, weekly, bars, barUnit, color, hours, tMax) {
   const maxBar = Math.max(0, ...(bars || []));
   const padL = 30, padR = maxBar > 0 ? 48 : 8, padT = 8, padB = 16;
   const plotW = W - padL - padR, plotH = H - padT - padB;
-  const tMin = tMax - hours * 3600;
   // Keep only samples inside the window so older fetched points don't pile up at the left edge.
   primary = (primary || []).filter(p => p.t >= tMin && p.t <= tMax);
   weekly = (weekly || []).filter(p => p.t >= tMin && p.t <= tMax);
@@ -415,7 +430,8 @@ function renderCharts(d) {
     const reset = fmtCountdown(s.nextResetAt, s.resetCadence);
     const sub = [s.resetCadence, reset ? `resets in ${reset}` : null].filter(Boolean).join(" · ");
     const dom = chartDomain(s.nextResetAt, s.resetCadence, d.hours);
-    const bars = usageBuckets(d.samples, s.id, dom.hours, s.usageUnit, dom.tMax);
+    const tMin = windowStart(dom.tMax, dom.hours, series[0]?.t);
+    const bars = usageBuckets(d.samples, s.id, s.usageUnit, tMin, dom.tMax);
     const barLegend = bars.peak > 0
       ? `<span><i style="background:${color}66"></i>${esc(unitLabel(bars.unit))} used/slot</span>`
       : "";
@@ -450,8 +466,9 @@ async function loadCharts() {
       const weekly = card.dataset.weekly === "true"
         ? (d.samples || []).filter(e => e.w && e.w[id] != null).map(e => ({ t: e.t, v: e.w[id] }))
         : [];
-      const ub = usageBuckets(d.samples, id, dom.hours, meta.usageUnit, dom.tMax);
-      drawChart(card.querySelector("canvas"), primary, weekly, ub.buckets, ub.unit, color, dom.hours, dom.tMax);
+      const tMin = windowStart(dom.tMax, dom.hours, primary[0]?.t);
+      const ub = usageBuckets(d.samples, id, meta.usageUnit, tMin, dom.tMax);
+      drawChart(card.querySelector("canvas"), primary, weekly, ub.buckets, ub.unit, color, tMin, dom.tMax);
     });
   } catch (e) {
     document.getElementById("charts").innerHTML = `<div class="err">${esc(e.message)}</div>`;
