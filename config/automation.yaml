@@ -79,6 +79,17 @@ auto_done:
     - 'bootstrap'
     - 'package(-lock)?\.json'
 
+# --- Executor routing (multi-board separation) ------------------------------
+# Team AI hosts more than the Nest roadmap: each autonomous app gets its own
+# Linear PROJECT + its own executor (different repo + verify command). The Nest
+# executor (run-executor.sh) owns every team-AI ticket EXCEPT those in the
+# project ids listed here — so a Spec'd+ai-ready ticket in an app project is
+# never picked up and built in /opt/nest. Each app executor positively filters
+# to its own project. Add a new app board's project id here when you create it.
+# Tickets with NO project stay with the Nest executor.
+external_projects:
+  - 96a1ecfb-8f67-41b9-9578-272809222db9   # "Energy Hack" → /opt/energyhack, run-eh-executor.sh
+
 # Circuit-breaker thresholds. The janitor trips the breaker (writes the pause
 # flag + mails) on ANY breach. It never auto-clears — a human removes the flag.
 circuit_breaker:

@@ -34,10 +34,18 @@ lbl(){ echo "$BOOT" | jq -r --arg n "$1" '.teams.nodes[0].labels.nodes[]|select(
 WORKING=$(st Working); REVIEW=$(st Review)
 L_BLOCKED=$(lbl blocked); L_NEEDHUMAN=$(lbl needs-human)
 
+# --- routing: app projects this (Nest) executor must NOT touch --------------
+# Each autonomous app board lives in its own Linear project with its own
+# executor (different repo + verify). Exclude those project ids; tickets with no
+# project stay ours. See config/automation.yaml `external_projects`.
+EXTERNAL_PROJECTS=$(automation_cfg external_projects '[]')
+not_external='select((.project.id // "") as $p | ($ext | index($p)) | not)'
+
 # --- WIP guard (Working ≤ 2) -----------------------------------------------
 WIPC=$(gql 'query($t:ID!){ issues(filter:{team:{id:{eq:$t}},
-  state:{name:{eq:"Working"}}}){ nodes{ id } } }' \
-  "$(jq -n --arg t "$TID" '{t:$t}')" | jq '.issues.nodes|length')
+  state:{name:{eq:"Working"}}}){ nodes{ id project{ id } } } }' \
+  "$(jq -n --arg t "$TID" '{t:$t}')" \
+  | jq --argjson ext "$EXTERNAL_PROJECTS" "[.issues.nodes[] | $not_external] | length")
 if [ "$WIPC" -ge 2 ]; then
   jq -n --argjson w "$WIPC" '{skipped:"Working at WIP limit", working:$w}'; exit 0
 fi
@@ -45,13 +53,14 @@ fi
 # --- pick: highest-priority Spec'd + ai-ready, skip the rest ---------------
 ELIG=$(gql 'query($t:ID!){ issues(first:50, filter:{ team:{id:{eq:$t}},
   state:{name:{eq:"Spec'"'"'d"}} }){ nodes{ id identifier title description
-  branchName priority labels{ nodes{ id name } } } } }' \
+  branchName priority project{ id } labels{ nodes{ id name } } } } }' \
   "$(jq -n --arg t "$TID" '{t:$t}')" \
-  | jq -c '[.issues.nodes[]
-      | select([.labels.nodes[].name] | index("ai-ready"))
-      | select(([.labels.nodes[].name] | index("human-only")) | not)
-      | select(([.labels.nodes[].name] | index("needs-spec")) | not)
-      | select(([.labels.nodes[].name] | index("blocked")) | not)]')
+  | jq -c --argjson ext "$EXTERNAL_PROJECTS" "[.issues.nodes[]
+      | $not_external
+      | select([.labels.nodes[].name] | index(\"ai-ready\"))
+      | select(([.labels.nodes[].name] | index(\"human-only\")) | not)
+      | select(([.labels.nodes[].name] | index(\"needs-spec\")) | not)
+      | select(([.labels.nodes[].name] | index(\"blocked\")) | not)]")
 if [ -n "$WANT" ]; then
   PICK=$(echo "$ELIG" | jq -c --arg w "$WANT" '[.[]|select(.identifier==$w)] | .[0] // empty')
   [ -z "$PICK" ] && { jq -n --arg w "$WANT" '{skipped:("requested ticket "+$w+" is not an eligible Spec'"'"'d+ai-ready ticket")}'; exit 0; }
