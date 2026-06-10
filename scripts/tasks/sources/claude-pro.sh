@@ -9,6 +9,7 @@
 
 set -Eeuo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LATEST_FILE="${NEST_CLAUDE_LATEST:-/opt/nest/data/token-claude-latest.json}"
 PROJECTS_DIR="${CLAUDE_CODE_PROJECTS_DIR:-/home/claude/.claude/projects}"
 RESET_DAY="${NEST_CAP_CLAUDE_PRO_RESET_DAY:-1}"
@@ -25,30 +26,31 @@ fi
 period_start_iso=$(date -u -d "@$((period_start_ms/1000))" -Iseconds)
 period_end_iso=$(date -u -d "$(date -u -d "@$((period_start_ms/1000))" +%Y-%m-%d) +1 month" -Iseconds)
 
-shopt -s nullglob
-JSONLS=()
-for p in "$PROJECTS_DIR"/*/*.jsonl; do JSONLS+=("$p"); done
-MONTHLY_TOKENS=0
-if [ "${#JSONLS[@]}" -gt 0 ]; then
-  MONTHLY_TOKENS=$(jq -cs --arg cutoff "$period_start_iso" '
-    [ .[]
-      | select(.timestamp != null and .timestamp >= $cutoff)
-      | (.message.usage // {})
-      | ((.input_tokens // 0) + (.output_tokens // 0) + (.cache_creation_input_tokens // 0))
-    ] | add // 0
-  ' "${JSONLS[@]}" 2>/dev/null || echo 0)
-fi
+# Per-model token breakdown + API-equivalent cost + contributing factors, from local Claude
+# Code session logs (the same data `/usage` reads). Dedupes streaming-duplicated records and
+# prices cache reads/writes correctly — strictly more accurate than the old cache-read-less sum.
+CLAUDE_USAGE_JSON=$(PERIOD_START_ISO="$period_start_iso" PROJECTS_DIR="$PROJECTS_DIR" \
+  python3 "$SCRIPT_DIR/claude-usage.py" 2>/dev/null || echo '{}')
+[ -n "$CLAUDE_USAGE_JSON" ] || CLAUDE_USAGE_JSON='{}'
+echo "$CLAUDE_USAGE_JSON" | jq -e . >/dev/null 2>&1 || CLAUDE_USAGE_JSON='{}'
+MONTHLY_TOKENS=$(echo "$CLAUDE_USAGE_JSON" | jq -r '.totalTokens // 0')
 
 # No live snapshot yet → remaining unknown (do NOT fall back to a meaningless estimate).
 if [ ! -f "$LATEST_FILE" ]; then
   jq -n --arg now "$NOW_ISO" --arg ps "$period_start_iso" --arg pe "$period_end_iso" \
-        --argjson monthlyTokens "$MONTHLY_TOKENS" '{
+        --argjson monthlyTokens "$MONTHLY_TOKENS" --argjson usage "$CLAUDE_USAGE_JSON" '{
     id: "claude-pro", kind: "oauth-sub", label: "Claude Max 5x (Claude Code)", engine: "claude-code",
     period: { start: $ps, end: $pe, resetCadence: "rolling-5h" },
     cap: { unit: "pct_5h", amount: 100 },
     used: { amount: null, asOf: $now },
     remaining: { amount: null, percent: null, unknown: true },
-    metrics: { monthlyTokens: $monthlyTokens, capSource: "anthropic-unified-headers" },
+    metrics: {
+      monthlyTokens: $monthlyTokens,
+      byModel: ($usage.byModel // []),
+      factors: ($usage.factors // {}),
+      periodCostUsdEquivalent: ($usage.totalCostUsdEquivalent // null),
+      capSource: "anthropic-unified-headers"
+    },
     warnings: ["no Claude rate-limit snapshot yet; hub tokens.js sampler has not written token-claude-latest.json"]
   }'
   exit 0
@@ -61,6 +63,7 @@ jq -n \
   --arg monthlyStart "$period_start_iso" \
   --arg monthlyEnd "$period_end_iso" \
   --argjson monthlyTokens "$MONTHLY_TOKENS" \
+  --argjson usage "$CLAUDE_USAGE_JSON" \
   --slurpfile snap "$LATEST_FILE" '
   ($snap[0]) as $s
   | ($s.session.utilization_pct // 0) as $used5h
@@ -90,6 +93,9 @@ jq -n \
       overageAvailable: ($s.overage_available // null),
       monthlyTokens: $monthlyTokens,
       usageTokensComplete: true,
+      byModel: ($usage.byModel // []),
+      factors: ($usage.factors // {}),
+      periodCostUsdEquivalent: ($usage.totalCostUsdEquivalent // null),
       monthlyPeriod: { start: $monthlyStart, end: $monthlyEnd },
       capSource: "anthropic-unified-headers",
       snapshotAt: ($s.fetchedAt // null)

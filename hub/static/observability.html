@@ -110,6 +110,35 @@ function fracClass(frac) {
 function fmtTs(iso) { try { return new Date(iso).toLocaleString(); } catch { return iso; } }
 function fmtNum(n) { return (n ?? 0).toLocaleString(); }
 
+// Per-model token breakdown + "what's driving usage" factors (mirrors Claude Code's /usage).
+// Tokens are real volume; the $ figure is the pay-per-use equivalent, not billed on a subscription.
+function renderUsageDetail(metrics) {
+  if (!metrics) return "";
+  let html = "";
+  const models = metrics.byModel || [];
+  if (models.length) {
+    const rows = models.map(m => {
+      const short = String(m.model).replace(/^claude-/, "").replace(/-\d{8}$/, "");
+      const cost = m.costUsdEquivalent != null ? ` · $${Number(m.costUsdEquivalent).toFixed(2)} API-eq` : "";
+      return `<tr><td>${esc(short)}</td><td class="num">${fmtCompact(m.input)}</td><td class="num">${fmtCompact(m.output)}</td>` +
+        `<td class="num">${fmtCompact(m.cacheRead)}</td><td class="num">${fmtCompact(m.cacheWrite)}</td><td>${cost}</td></tr>`;
+    }).join("");
+    html += `<table style="margin:4px 0;font-size:11px;border-collapse:collapse">` +
+      `<thead><tr style="color:#9ca3af"><th style="text-align:left;padding-right:8px">model</th><th>in</th><th>out</th><th>cache rd</th><th>cache wr</th><th></th></tr></thead>` +
+      `<tbody>${rows}</tbody></table>`;
+  }
+  const f = metrics.factors;
+  if (f) {
+    const parts = [];
+    if (f.over150kContextPct) parts.push(`${f.over150kContextPct}% of cost at &gt;150k context`);
+    if (f.subagentPct) parts.push(`${f.subagentPct}% subagents`);
+    const mcp = f.mcpByServerPct || {};
+    Object.entries(mcp).filter(([, v]) => v >= 0.5).forEach(([k, v]) => parts.push(`MCP ${esc(k)} ${v}%`));
+    if (parts.length) html += `<div class="warn" style="color:#6b7280">drivers: ${parts.join(" · ")}</div>`;
+  }
+  return html;
+}
+
 function renderLedger(d) {
   const sources = d.sources || [];
   if (sources.length === 0) {
@@ -140,15 +169,16 @@ function renderLedger(d) {
       if (s.metrics.periodTokens != null) bits.push(`${fmtNum(s.metrics.periodTokens)} monthly tokens`);
       if (s.metrics.tokens5h != null) bits.push(`${fmtNum(s.metrics.tokens5h)} tokens / 5h`);
       if (s.metrics.calls5h != null) bits.push(`${fmtNum(s.metrics.calls5h)} calls / 5h`);
-      if (s.metrics.periodCostUsdEquivalent != null) bits.push(`$${Number(s.metrics.periodCostUsdEquivalent).toFixed(2)} API-rate equivalent`);
+      if (s.metrics.periodCostUsdEquivalent != null) bits.push(`$${Number(s.metrics.periodCostUsdEquivalent).toFixed(2)} API-equivalent (subscription · $0 billed)`);
       if (s.metrics.openrouterTotalCredits != null) bits.push(`${fmtNum(s.metrics.openrouterTotalCredits)} OpenRouter credits purchased`);
       if (s.metrics.openrouterTotalUsageUsd != null) bits.push(`$${Number(s.metrics.openrouterTotalUsageUsd).toFixed(2)} OpenRouter paid usage`);
       if (s.metrics.plan) bits.push(`plan: ${esc(s.metrics.plan)}`);
       if (s.metrics.capSource) bits.push(`cap: ${esc(s.metrics.capSource)}`);
       metricsExtra = bits.length ? `<div class="warn" style="color:#374151">${bits.join(" · ")}</div>` : "";
     }
+    const usageDetail = renderUsageDetail(s.metrics);
     return `<tr>
-      <td><strong>${esc(s.label)}</strong> <span class="pill">${esc(s.kind)}</span>${warnings}${metricsExtra}</td>
+      <td><strong>${esc(s.label)}</strong> <span class="pill">${esc(s.kind)}</span>${warnings}${metricsExtra}${usageDetail}</td>
       <td class="num">${fmtNum(used)}</td>
       <td class="num">${capCell}</td>
       <td class="num">${remCell}</td>
