@@ -62,11 +62,20 @@ async function loadOrRegenerate(cachePath, aggregatorPath, args, freshIf) {
   return { payload, source: "regenerated" };
 }
 
+/**
+ * Load the C10 token ledger, using the 5-min cache when fresh. Shared by the
+ * /observability/tokens endpoint and the token-history recorder (tokenHistory.js).
+ * @returns {Promise<{ payload: Object, source: string }>}
+ */
+export function loadTokenLedger() {
+  return loadOrRegenerate(TOKENS_FILE, TOKENS_AGGREGATOR, {});
+}
+
 export function observabilityRoutes(router) {
   // C10 multi-source token ledger.
   router.get("/observability/tokens", async (req, res) => {
     try {
-      const { payload, source } = await loadOrRegenerate(TOKENS_FILE, TOKENS_AGGREGATOR, {});
+      const { payload, source } = await loadTokenLedger();
       sendJson(res, { ...payload, _source: source });
     } catch (err) {
       sendError(res, 500, `Token ledger aggregation failed: ${err.message}`);
