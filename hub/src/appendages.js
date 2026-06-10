@@ -8,7 +8,7 @@ import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const NEST_ROOT = join(__dirname, "../..");
-const APPENDAGES_DIR = process.env.NEST_APPENDAGES_DIR || join(NEST_ROOT, "appendages");
+export const APPENDAGES_DIR = process.env.NEST_APPENDAGES_DIR || join(NEST_ROOT, "appendages");
 
 // Hand-rolled validator for the small subset of JSON-Schema we use in
 // appendage-schema.json. Avoids pulling in ajv just for this.

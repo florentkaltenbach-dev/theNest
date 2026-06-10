@@ -40,7 +40,7 @@ import { handleAgentWs, handleClientWs } from './ws/agentHandler.js';
 import { createTerminalHandler } from './ws/terminal.js';
 import { registerOpenClawProxy, handleOpenClawUpgrade } from './openclawProxy.js';
 import { registerHermesProxy, handleHermesUpgrade, isHermesProxyUrl } from './hermesProxy.js';
-import { registerAppendageProxies, handleAppendageUpgrade, isAppendageProxyUrl } from './appendageProxy.js';
+import { watchAppendages, handleAppendageHttp, handleAppendageUpgrade, isAppendageProxyUrl } from './appendageProxy.js';
 import { scanNest, nestRoutes } from './nest.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -225,9 +225,10 @@ energyhackRoutes(api);
 // registered before page routes.
 registerOpenClawProxy(router);
 registerHermesProxy(router);
-// Auth-gated reverse proxies for each installed appendage's `routes` (e.g.
-// /portainer → 127.0.0.1:9443). Reads appendage JSON at startup.
-registerAppendageProxies(router);
+// Auth-gated reverse proxies for each appendage's `routes` (e.g. /portainer →
+// 127.0.0.1:9443). Resolved per-request from a watched cache, so a new
+// appendage definition takes effect without a hub restart.
+watchAppendages();
 
 // SSH-driven brownfield discovery (Phase 5 follow-on). Polls hosts listed in
 // config/ssh-hosts.json so /api/appendages can mark adopted stacks installed.
@@ -334,6 +335,13 @@ const server = createServer(async (req, res) => {
       console.error(`Error handling ${req.method} ${req.url}:`, err);
       if (!res.writableEnded) sendError(res, 500, 'Internal server error');
     }
+    return;
+  }
+
+  // Appendage proxies, resolved dynamically (no restart when a definition is
+  // added). Checked after the static router misses so it can't shadow pages.
+  if (isAppendageProxyUrl(url)) {
+    await handleAppendageHttp(req, res);
     return;
   }
 
