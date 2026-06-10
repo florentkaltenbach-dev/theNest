@@ -262,6 +262,15 @@ function unitLabel(u) {
   return u === "tokens" ? "tokens" : u === "requests" ? "requests" : u === "capacity" ? "window %" : u;
 }
 
+// X-axis tick label for an epoch-sec time, formatted by the chart's total span: clock time for
+// day-or-shorter windows (5h/24h), calendar date for multi-day windows (7d).
+function fmtAxisLabel(t, spanHours) {
+  const d = new Date(t * 1000);
+  if (spanHours <= 24) return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  if (spanHours <= 48) return d.toLocaleString([], { weekday: "short", hour: "2-digit" });
+  return d.toLocaleDateString([], { month: "numeric", day: "numeric" });
+}
+
 /**
  * Bucket per-slot usage into NBARS columns over the window [tMin, tMax] (both epoch sec).
  * `tMax` is the chart's right edge (next reset when on-axis, else now); `tMin` is the left edge.
@@ -312,21 +321,17 @@ function chartDomain(windowHours) {
 }
 
 /**
- * Left edge (epoch sec) for a chart. The history depth is measured back from *now*, not from
- * tMax: when tMax is pushed out to a future reset to preview the countdown gap, the data window
- * must still be `hours` long ending at now (else the gap would eat into the visible history).
- * The floor is then clamped up to the first available sample so data sits flush against the left
- * edge rather than leaving an empty leading gap from before the recorder existed (it is younger
- * than a 24h/weekly window). Once a full window accumulates, firstSampleT <= floor and the floor
- * wins, so the chart settles to exactly one window.
+ * Left edge (epoch sec) for a chart: always a full `hours`-wide window ending at now, so the
+ * selector visibly zooms. When history is younger than the window (e.g. only a few hours recorded
+ * against a 7d window) the data sits flush on the right and the left is genuinely blank until more
+ * accumulates — we deliberately do NOT clamp the edge up to the first sample, because that made the
+ * 24h and 7d windows collapse to the same span and the selector looked like a no-op.
  * @param {number} tMax right edge (epoch sec)
  * @param {number} hours window span
- * @param {?number} firstSampleT earliest in-window sample time (epoch sec), or null
  * @returns {number}
  */
-function windowStart(tMax, hours, firstSampleT) {
-  const floor = Math.min(tMax, Date.now() / 1000) - hours * 3600;
-  return firstSampleT != null ? Math.max(floor, firstSampleT) : floor;
+function windowStart(tMax, hours) {
+  return Math.min(tMax, Date.now() / 1000) - hours * 3600;
 }
 
 function fmtCountdown(iso, cadence) {
@@ -371,6 +376,22 @@ function drawChart(canvas, primary, weekly, bars, barUnit, color, tMin, tMax) {
     ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
     ctx.fillStyle = "#9ca3af"; ctx.textAlign = "right";
     ctx.fillText(g + "%", padL - 4, y);
+  }
+
+  // X-axis time ticks across the full window [tMin, tMax]. Spacing scales with width; the right
+  // edge is always "now". Labels make the selected span (5h/24h/7d) visible even when the line
+  // itself only covers part of it because history is still filling.
+  const spanH = (tMax - tMin) / 3600;
+  const nTicks = Math.max(2, Math.min(5, Math.round(plotW / 90)));
+  ctx.textBaseline = "alphabetic";
+  ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
+  for (let i = 0; i <= nTicks; i++) {
+    const frac = i / nTicks;
+    const x = padL + frac * plotW;
+    ctx.beginPath(); ctx.moveTo(x, padT + plotH); ctx.lineTo(x, padT + plotH + 3); ctx.stroke();
+    ctx.fillStyle = "#9ca3af";
+    ctx.textAlign = i === 0 ? "left" : i === nTicks ? "right" : "center";
+    ctx.fillText(i === nTicks ? "now" : fmtAxisLabel(tMin + frac * (tMax - tMin), spanH), x, H - 3);
   }
 
   if (!primary.length) {
@@ -503,7 +524,7 @@ function renderCharts(d) {
     const reset = fmtCountdown(s.nextResetAt, s.resetCadence);
     const sub = [s.resetCadence, reset ? `resets in ${reset}` : null].filter(Boolean).join(" · ");
     const dom = chartDomain(d.hours);
-    const tMin = windowStart(dom.tMax, dom.hours, series[0]?.t);
+    const tMin = windowStart(dom.tMax, dom.hours);
     const bars = usageBuckets(d.samples, s.id, s.usageUnit, tMin, dom.tMax);
     const barLegend = bars.peak > 0
       ? `<span><i style="background:${color}66"></i>${esc(unitLabel(bars.unit))} used/slot</span>`
@@ -539,7 +560,7 @@ async function loadCharts() {
       const weekly = card.dataset.weekly === "true"
         ? (d.samples || []).filter(e => e.w && e.w[id] != null).map(e => ({ t: e.t, v: e.w[id] }))
         : [];
-      const tMin = windowStart(dom.tMax, dom.hours, primary[0]?.t);
+      const tMin = windowStart(dom.tMax, dom.hours);
       const ub = usageBuckets(d.samples, id, meta.usageUnit, tMin, dom.tMax);
       const canvas = card.querySelector("canvas");
       drawChart(canvas, primary, weekly, ub.buckets, ub.unit, color, tMin, dom.tMax);
