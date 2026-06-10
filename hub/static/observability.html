@@ -280,16 +280,35 @@ function fmtAxisLabel(t, spanHours) {
  *    token counter exists, e.g. Codex, whose exec-mode token logs undercount)
  * Returns { buckets, peak, unit }.
  */
+// A cumulative counter (e.g. month-to-date tokens) has two discontinuities that are NOT usage:
+// a downward step (monthly reset) and a one-off upward leap when the metric's definition changes
+// (e.g. the day cache-read tokens were folded in: 17.6M → 199.7M in one sample). Either one, taken
+// as a delta, dwarfs every real per-slot delta and — since bars auto-scale to the tallest — flattens
+// the whole chart to invisibility. Downward steps are dropped by d<=0; upward leaps are caught here:
+// a real 5-min slot never exceeds DISCONTINUITY_FACTOR× the median positive delta (observed real
+// max ~23× median; a definition change is ~1600×), so anything past that is a counter artifact.
+const DISCONTINUITY_FACTOR = 50;
+
 function usageBuckets(samples, id, usageUnit, tMin, tMax) {
   const useCounter = usageUnit === "tokens" || usageUnit === "requests";
   const pts = (samples || [])
     .map(e => ({ t: e.t, c: useCounter ? (e.u ? e.u[id] : null) : (e.r ? e.r[id] : null) }))
     .filter(p => p.c != null && p.t >= tMin && p.t <= tMax);
-  const buckets = new Array(NBARS).fill(0);
+  const deltas = [];
   for (let i = 1; i < pts.length; i++) {
-    const d = useCounter ? (pts[i].c - pts[i - 1].c) : (pts[i - 1].c - pts[i].c);   // counter rises / remaining% falls
-    if (d <= 0) continue;
-    const frac = (pts[i].t - tMin) / (tMax - tMin);
+    deltas.push({ t: pts[i].t, d: useCounter ? (pts[i].c - pts[i - 1].c) : (pts[i - 1].c - pts[i].c) });
+  }
+  // Robust ceiling on a single counter delta, from the median of positive deltas in-window.
+  // Needs ≥4 positives for the median to be meaningful; below that, don't filter (tiny window).
+  let ceil = Infinity;
+  if (useCounter) {
+    const pos = deltas.map(x => x.d).filter(d => d > 0).sort((a, b) => a - b);
+    if (pos.length >= 4) ceil = pos[Math.floor(pos.length / 2)] * DISCONTINUITY_FACTOR;
+  }
+  const buckets = new Array(NBARS).fill(0);
+  for (const { t, d } of deltas) {
+    if (d <= 0 || d > ceil) continue;            // counter rises / remaining% falls; skip artifacts
+    const frac = (t - tMin) / (tMax - tMin);
     if (frac < 0 || frac > 1) continue;
     buckets[Math.min(NBARS - 1, Math.floor(frac * NBARS))] += d;
   }
@@ -571,7 +590,7 @@ async function loadCharts() {
   }
 }
 
-async function load() {
+async function load(force) {
   const win = document.getElementById("window").value;
   document.getElementById("ledger").innerHTML = "Loading…";
   document.getElementById("requests").innerHTML = "Loading…";
@@ -579,7 +598,7 @@ async function load() {
   const headers = { Authorization: "Bearer " + t };
 
   try {
-    const r1 = await fetch(`/api/observability/tokens`, { headers });
+    const r1 = await fetch(`/api/observability/tokens${force ? "?refresh=1" : ""}`, { headers });
     if (r1.status === 401) { localStorage.removeItem("nest_token"); location.href = "/login"; return; }
     if (!r1.ok) throw new Error(`tokens HTTP ${r1.status}: ${await r1.text()}`);
     const d1 = await r1.json();
@@ -599,8 +618,8 @@ async function load() {
   }
 }
 
-document.getElementById("refresh").addEventListener("click", load);
-document.getElementById("window").addEventListener("change", load);
+document.getElementById("refresh").addEventListener("click", () => load(true));
+document.getElementById("window").addEventListener("change", () => load(false));
 document.getElementById("histRefresh").addEventListener("click", loadCharts);
 document.getElementById("histWindow").addEventListener("change", loadCharts);
 load();

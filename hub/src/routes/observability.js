@@ -8,6 +8,7 @@ import { spawn } from "child_process";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { sendJson, sendError } from '../server.js';
+import { sampleLimits } from './tokens.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const NEST_ROOT = join(__dirname, "../../..");
@@ -48,10 +49,11 @@ function runAggregator(script, args) {
  * @param {string} aggregatorPath
  * @param {Object} args
  * @param {(payload: Object) => boolean} [freshIf]
+ * @param {boolean} [force] skip the cache and regenerate unconditionally (manual refresh)
  * @returns {Promise<{ payload: Object, source: string }>}
  */
-async function loadOrRegenerate(cachePath, aggregatorPath, args, freshIf) {
-  if (existsSync(cachePath)) {
+async function loadOrRegenerate(cachePath, aggregatorPath, args, freshIf, force) {
+  if (!force && existsSync(cachePath)) {
     const st = await stat(cachePath);
     if (Date.now() - st.mtimeMs < STALE_AFTER_MS) {
       const payload = JSON.parse(await readFile(cachePath, "utf-8"));
@@ -65,10 +67,11 @@ async function loadOrRegenerate(cachePath, aggregatorPath, args, freshIf) {
 /**
  * Load the C10 token ledger, using the 5-min cache when fresh. Shared by the
  * /observability/tokens endpoint and the token-history recorder (tokenHistory.js).
+ * @param {boolean} [force] bypass the cache and regenerate (manual refresh)
  * @returns {Promise<{ payload: Object, source: string }>}
  */
-export function loadTokenLedger() {
-  return loadOrRegenerate(TOKENS_FILE, TOKENS_AGGREGATOR, {});
+export function loadTokenLedger(force) {
+  return loadOrRegenerate(TOKENS_FILE, TOKENS_AGGREGATOR, {}, undefined, force);
 }
 
 /**
@@ -89,10 +92,14 @@ export async function peekTokenLedger() {
 }
 
 export function observabilityRoutes(router) {
-  // C10 multi-source token ledger.
+  // C10 multi-source token ledger. ?refresh=1 forces a live resample (fresh Claude 5h/7d
+  // snapshot) + a full ledger regen, so the manual Refresh button shows up-to-the-second data
+  // instead of the ≤5-min cached copy.
   router.get("/observability/tokens", async (req, res) => {
     try {
-      const { payload, source } = await loadTokenLedger();
+      const force = req.query?.refresh != null && req.query.refresh !== "0";
+      if (force) await sampleLimits().catch(() => {});   // best-effort; regen still uses last snapshot
+      const { payload, source } = await loadTokenLedger(force);
       sendJson(res, { ...payload, _source: source });
     } catch (err) {
       sendError(res, 500, `Token ledger aggregation failed: ${err.message}`);

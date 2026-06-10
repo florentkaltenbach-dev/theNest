@@ -8,7 +8,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { sendJson, sendError } from '../server.js';
 
 const CACHE_TTL_MS = 60_000;
-const SAMPLE_INTERVAL_MS = 15 * 60 * 1000;
+const SAMPLE_INTERVAL_MS = 5 * 60 * 1000;   // 5min: keep the live 5h/7d snapshot ≤5min stale
 const WINDOWS_FILE = "/opt/nest/data/token-windows.jsonl";
 const STATE_FILE = "/opt/nest/data/token-state.json";
 // Latest normalized Claude rate-limit snapshot, written every sample so the C10
@@ -60,7 +60,7 @@ function decodeJwtPayload(token) {
  * peak/reset bookkeeping, and append a completed window to the JSONL log
  * when the 5h reset rolls over. Returns the normalized result object.
  */
-async function sampleLimits() {
+export async function sampleLimits() {
   const now = Date.now();
   const apiRes = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",

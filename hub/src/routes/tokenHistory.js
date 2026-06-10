@@ -5,7 +5,7 @@
 // Background sampler starts on import (disable with NEST_DISABLE_TOKEN_SAMPLER). Depends: loadTokenLedger from observability.js.
 
 import { readFile, appendFile, writeFile, mkdir } from "fs/promises";
-import { existsSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { sendJson, sendError } from '../server.js';
@@ -25,6 +25,7 @@ const DEFAULT_HOURS = 24;
 const MAX_HOURS = 168;                        // 7 days
 
 let lastRecordedAt = null;
+let lastRecordedT = null;
 let appendsSinceTrim = 0;
 
 /**
@@ -79,9 +80,14 @@ async function recordSnapshot() {
   const { payload } = await loadTokenLedger();
   const entry = sampleFromLedger(payload);
   if (Object.keys(entry.r).length === 0) return;
+  // The sampler runs every 5min, but the ledger's generatedAt only advances when its cache
+  // expires/regenerates — so consecutive samples can carry the same `t`. Writing them would
+  // duplicate lines (and double-weight that instant when the chart deltas the counter). Skip.
+  if (entry.t === lastRecordedT) return;
 
   await mkdir(dirname(HISTORY_FILE), { recursive: true });
   await appendFile(HISTORY_FILE, JSON.stringify(entry) + "\n");
+  lastRecordedT = entry.t;
   lastRecordedAt = new Date(entry.t * 1000).toISOString();
 
   // Trim oldest lines past the retention cap. Reading + rewriting the whole file is the
@@ -157,6 +163,13 @@ async function sourceMeta() {
 
 // ── Boot: schedule background sampling ───────────────────────────────────────
 if (!process.env.NEST_DISABLE_TOKEN_SAMPLER) {
+  // Seed the dedup guard from the last recorded line so a restart doesn't re-append it.
+  try {
+    if (existsSync(HISTORY_FILE)) {
+      const last = readFileSync(HISTORY_FILE, "utf-8").trimEnd().split("\n").pop();
+      if (last) lastRecordedT = JSON.parse(last).t ?? null;
+    }
+  } catch { /* no/partial history yet — first sample will seed it */ }
   recordSnapshot().catch((e) => console.warn('initial token-history sample failed:', e.message));
   const timer = setInterval(
     () => recordSnapshot().catch((e) => console.warn('token-history sample failed:', e.message)),
