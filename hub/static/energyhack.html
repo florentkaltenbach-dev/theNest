@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nest — Energy Hack</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f5f5; color: #1a1a2e; min-height: 100vh; }
+a { color: inherit; }
+.mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+
+.topbar { display: flex; align-items: center; gap: 14px; padding: 12px 18px; background: #0c2a22; color: #fff; position: sticky; top: 0; z-index: 10; }
+.topbar h1 { font-size: 16px; font-weight: 600; }
+.pill { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 999px; letter-spacing: .4px; text-transform: uppercase; }
+.pill.running { background: #16351f; color: #4ade80; }
+.pill.paused { background: #3a1d1d; color: #f87171; }
+.spacer { flex: 1; }
+.topbar a.applink { font-size: 12px; color: #6ee7b7; text-decoration: none; font-weight: 600; }
+.topbar a.applink:hover { text-decoration: underline; }
+.topbar button { background: rgba(255,255,255,.1); border: 0; color: #fff; padding: 6px 13px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.topbar button:hover { background: rgba(255,255,255,.2); }
+.topbar button.danger { background: #7f1d1d; } .topbar button.danger:hover { background: #991b1b; }
+.topbar button.go { background: #166534; } .topbar button.go:hover { background: #15803d; }
+.refreshed { font-size: 11px; color: #8b8fa3; }
+
+.wrap { max-width: 1100px; margin: 0 auto; padding: 18px; display: flex; flex-direction: column; gap: 18px; }
+.section-title { font-size: 11px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: #8b8fa3; margin-bottom: 8px; }
+.card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px; }
+
+.hero { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 760px) { .hero { grid-template-columns: 1fr; } }
+.progresswrap { margin-top: 8px; }
+.bar { height: 14px; background: #e5e7eb; border-radius: 999px; overflow: hidden; }
+.bar > span { display: block; height: 100%; background: linear-gradient(90deg,#16a34a,#4ade80); transition: width .4s; }
+.bigstat { font-size: 30px; font-weight: 800; }
+.bigstat small { font-size: 14px; color: #8b8fa3; font-weight: 600; }
+.build { font-size: 12px; color: #444; }
+.build code { background: #f1f5f9; padding: 1px 5px; border-radius: 4px; }
+
+.timers { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.timer { border-left: 3px solid #cbd5e1; }
+.timer.on { border-left-color: #22c55e; } .timer.off { border-left-color: #ef4444; }
+.timer h3 { font-size: 14px; display: flex; align-items: center; gap: 8px; }
+.timer .dot { width: 8px; height: 8px; border-radius: 50%; background: #ef4444; }
+.timer.on .dot { background: #22c55e; }
+.timer.busy .dot { background: #f59e0b; animation: pulse 1s infinite; }
+@keyframes pulse { 50% { opacity: .3; } }
+.kv { display: flex; justify-content: space-between; font-size: 12px; margin-top: 6px; color: #555; }
+.kv b { color: #1a1a2e; font-weight: 600; }
+.timer .run { margin-top: 10px; width: 100%; padding: 6px; border: 1px solid #d1d5db; background: #f9fafb; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.timer .run:hover { background: #ecfdf5; border-color: #6ee7b7; }
+.warn { font-size: 12px; color: #92400e; background: #fef3c7; border: 1px solid #fde68a; border-radius: 8px; padding: 8px 10px; }
+
+.pipeline { display: flex; gap: 8px; flex-wrap: wrap; }
+.stage { flex: 1; min-width: 80px; text-align: center; background: #fafafa; border: 1px solid #eee; border-radius: 8px; padding: 10px 6px; }
+.stage .n { font-size: 22px; font-weight: 700; }
+.stage .l { font-size: 10px; text-transform: uppercase; letter-spacing: .5px; color: #8b8fa3; margin-top: 2px; }
+.stage.Working .n { color: #f59e0b; } .stage.Review .n { color: #3b82f6; } .stage.Done .n { color: #22c55e; }
+
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 760px) { .cols { grid-template-columns: 1fr; } }
+.tix { list-style: none; display: flex; flex-direction: column; gap: 6px; max-height: 360px; overflow-y: auto; }
+.tix li { display: flex; align-items: center; gap: 8px; padding: 7px 9px; background: #fafafa; border: 1px solid #eee; border-radius: 7px; font-size: 13px; }
+.tix li.next { background: #ecfdf5; border-color: #a7f3d0; }
+.tix a.id { font-weight: 700; color: #047857; text-decoration: none; flex-shrink: 0; }
+.tix .t { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #333; }
+.tag { font-size: 9px; font-weight: 600; padding: 1px 6px; border-radius: 4px; background: #ecfdf5; color: #047857; }
+.tag.needs-human, .tag.blocked { background: #fef3c7; color: #92400e; }
+.muted { color: #9ca3af; font-size: 12px; }
+
+.dec { list-style: none; display: flex; flex-direction: column; gap: 5px; max-height: 320px; overflow-y: auto; }
+.dec li { display: flex; align-items: baseline; gap: 8px; font-size: 12px; padding: 5px 0; border-bottom: 1px solid #f1f1f1; }
+.dec .badge { font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 4px; flex-shrink: 0; text-transform: uppercase; }
+.badge.done, .badge.review { background: #dcfce7; color: #166534; }
+.badge.blocked { background: #fee2e2; color: #991b1b; }
+.badge.working, .badge.token_limit { background: #e0e7ff; color: #3730a3; }
+.dec .when { color: #9ca3af; flex-shrink: 0; font-size: 11px; }
+
+.files { list-style: none; display: flex; flex-wrap: wrap; gap: 5px; }
+.files li { font-size: 11px; background: #f1f5f9; border-radius: 5px; padding: 2px 7px; color: #334155; }
+.cfg { font-size: 12px; color: #444; }
+.err { color: #b91c1c; font-size: 12px; }
+.toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: #0c2a22; color: #fff; padding: 10px 18px; border-radius: 8px; font-size: 13px; opacity: 0; transition: opacity .2s; z-index: 100; }
+.toast.show { opacity: 1; }
+</style>
+<script src="/sidebar.js"></script>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>⚡ Energy Hack</h1>
+  <span class="pill" id="statusPill">…</span>
+  <span class="spacer"></span>
+  <a class="applink" id="appLink" href="#" target="_blank" rel="noopener">↗ live app</a>
+  <span class="refreshed" id="refreshed"></span>
+  <button id="pauseBtn" onclick="togglePause()">…</button>
+  <button onclick="load()">↻ Refresh</button>
+</div>
+
+<div class="wrap" id="wrap">
+  <div class="muted">Loading…</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const TOKEN = localStorage.getItem('nest_token');
+let STATE = null;
+
+function authHeaders(extra) {
+  const h = { ...(extra || {}) };
+  if (TOKEN) h['Authorization'] = 'Bearer ' + TOKEN;
+  return h;
+}
+async function api(path, opts = {}) {
+  const headers = authHeaders(opts.body ? { 'Content-Type': 'application/json', ...(opts.headers || {}) } : opts.headers);
+  const r = await fetch('/api' + path, { credentials: 'same-origin', headers, ...opts });
+  if (r.status === 401) { location.href = '/login'; return null; }
+  return r;
+}
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2600);
+}
+function ago(ms) {
+  if (!ms) return '—';
+  const d = Date.now() - ms, s = Math.round(Math.abs(d) / 1000), fut = d < 0;
+  const v = s < 60 ? s + 's' : s < 3600 ? Math.round(s / 60) + 'm' : s < 86400 ? Math.round(s / 3600) + 'h' : Math.round(s / 86400) + 'd';
+  return fut ? 'in ' + v : v + ' ago';
+}
+function esc(s) { return String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+async function load() {
+  try {
+    const r = await api('/energyhack/state'); if (!r) return;
+    STATE = await r.json();
+    render();
+  } catch (e) {
+    document.getElementById('wrap').innerHTML = '<div class="err">Failed to load: ' + esc(e.message) + '</div>';
+  }
+}
+
+function render() {
+  const s = STATE;
+  const pill = document.getElementById('statusPill');
+  pill.textContent = s.paused ? 'Paused' : 'Running';
+  pill.className = 'pill ' + (s.paused ? 'paused' : 'running');
+  const pb = document.getElementById('pauseBtn');
+  pb.textContent = s.paused ? '▶ Resume loop' : '⏸ Pause loop';
+  pb.className = s.paused ? 'go' : 'danger';
+  const al = document.getElementById('appLink');
+  al.href = (s.build && s.build.appUrl) || '#';
+  document.getElementById('refreshed').textContent = 'updated ' + new Date().toLocaleTimeString();
+
+  const W = [];
+  W.push(heroCard(s));
+  W.push(timerCard(s.timer));
+  W.push(pipelineCard(s.pipeline));
+  W.push(buildCard(s.build));
+  W.push(decisionsCard(s.decisions));
+  W.push(configCard(s.config));
+  document.getElementById('wrap').innerHTML = W.join('');
+}
+
+function heroCard(s) {
+  const p = s.pipeline || {}, c = p.counts || {};
+  const total = (c.Backlog || 0) + (c["Spec'd"] || 0) + (c.Working || 0) + (c.Review || 0) + (c.Done || 0);
+  const done = c.Done || 0;
+  const pct = total ? Math.round(done / total * 100) : 0;
+  const b = s.build || {};
+  const buildLine = b.branchExists
+    ? `<code>build</code> · ${b.commitsAhead} commit${b.commitsAhead === 1 ? '' : 's'} · ${esc(b.lastCommit || '')}`
+    : 'build branch not created yet — runs on the first ticket';
+  return `<div class="hero">
+    <div class="card">
+      <div class="section-title">Scaffold progress</div>
+      <div class="bigstat">${done}<small> / ${total} tickets done</small></div>
+      <div class="progresswrap"><div class="bar"><span style="width:${pct}%"></span></div></div>
+      <div class="muted" style="margin-top:6px">${pct}% complete${(c.Review ? ` · ${c.Review} awaiting you` : '')}</div>
+    </div>
+    <div class="card">
+      <div class="section-title">Build branch</div>
+      <div class="build" style="margin-top:4px">${buildLine}</div>
+      <div class="build" style="margin-top:8px">App will serve from the <code>build</code> branch at<br>
+        <a href="${esc(b.appUrl || '#')}" target="_blank" rel="noopener" style="color:#047857;font-weight:600">${esc(b.appUrl || '')}</a></div>
+    </div>
+  </div>`;
+}
+
+function timerCard(t) {
+  if (!t) return '';
+  const burning = STATE.burning;
+  const busy = burning || (t && t.running);
+  const cls = 'timer card ' + (busy ? 'busy' : 'on');
+  const result = t.lastResult ? (t.lastResult === 'success' ? '✓ ok' : '✗ ' + t.lastResult) : '—';
+  const state = burning ? '🔥 burning through' : (t.running ? 'building one ticket' : 'idle');
+  const note = burning
+    ? `<div class="warn" style="background:#ecfdf5;border-color:#a7f3d0;color:#047857">Sprinting through tickets back-to-back. Stops on its own when the queue empties or tokens run out.</div>`
+    : `<div class="muted" style="margin-top:8px">No timer — manual mode. <b>Burn through</b> sprints the queue with no waits until tokens run out; <b>Run one</b> does a single ticket.</div>`;
+  return `<div><div class="section-title">Executor — burn mode</div>
+    <div class="${cls}">
+      <h3><span class="dot"></span>eh-executor</h3>
+      <div class="kv"><span>state</span><b>${esc(state)}</b></div>
+      <div class="kv"><span>last run</span><b>${ago(t.lastRun)}</b></div>
+      <div class="kv"><span>last result</span><b>${esc(result)}</b></div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="run" style="background:#047857;color:#fff;border-color:#047857" onclick="runBurn()" ${burning ? 'disabled' : ''}>🔥 ${burning ? 'Burning…' : 'Burn through remaining'}</button>
+        <button class="run" onclick="runNow()" ${burning ? 'disabled' : ''}>Run one ticket</button>
+      </div>
+      ${note}
+    </div></div>`;
+}
+
+function pipelineCard(p) {
+  if (!p || p.error) return `<div class="card err">Linear pipeline unavailable: ${esc(p?.error || 'unknown')}</div>`;
+  const stages = (p.order || []).map((st) => `<div class="stage ${esc(st.replace(/\W/g, ''))}"><div class="n">${p.counts[st] || 0}</div><div class="l">${esc(st)}</div></div>`).join('');
+  return `<div>
+    <div class="section-title">Pipeline — team EH</div>
+    <div class="card"><div class="pipeline">${stages}</div>
+    <div class="cols" style="margin-top:14px">
+      <div><div class="section-title">Up next — Spec'd queue (build order)</div>${tixList(p.specd, 'Queue empty — all tickets pulled', true)}</div>
+      <div>
+        <div class="section-title">Building now</div>${tixList(p.working, 'Nothing in flight')}
+        <div class="section-title" style="margin-top:12px">Needs human — exceptions</div>${tixList((p.review || []).filter(needsHuman), 'No exceptions 🎉')}
+      </div>
+    </div></div></div>`;
+}
+function needsHuman(i) { return (i.labels || []).some((l) => l === 'needs-human' || l === 'blocked'); }
+function tixList(items, empty, markNext) {
+  if (!items || !items.length) return `<div class="muted">${esc(empty)}</div>`;
+  return '<ul class="tix">' + items.map((i, idx) => {
+    const tags = (i.labels || []).filter((l) => l === 'needs-human' || l === 'blocked')
+      .map((l) => `<span class="tag ${esc(l)}">${esc(l)}</span>`).join('');
+    const cls = (markNext && idx === 0) ? ' class="next"' : '';
+    const idHtml = i.url ? `<a class="id" href="${esc(i.url)}" target="_blank" rel="noopener">${esc(i.id)}</a>` : `<span class="id">${esc(i.id)}</span>`;
+    return `<li${cls}>${idHtml}<span class="t">${esc(i.title)}</span>${(markNext && idx === 0) ? '<span class="tag">next</span>' : ''}${tags}</li>`;
+  }).join('') + '</ul>';
+}
+
+function buildCard(b) {
+  if (!b || !b.branchExists || !b.files || !b.files.length) return '';
+  return `<div><div class="section-title">Files on the build branch (${b.files.length})</div>
+    <div class="card"><ul class="files">${b.files.map((f) => `<li class="mono">${esc(f)}</li>`).join('')}</ul></div></div>`;
+}
+
+function decisionsCard(dec) {
+  if (!dec || !dec.length) return '';
+  const rows = dec.map((d) => {
+    const badge = d.action || 'run';
+    const label = d.reason || d.note || (d.sha ? ('merged ' + d.sha.slice(0, 7)) : '');
+    const when = d.ts ? ago(Date.parse(d.ts)) : '';
+    return `<li><span class="badge ${esc(badge)}">${esc(badge)}</span><b>${esc(d.issue || '')}</b><span style="flex:1;color:#555">${esc(label)}</span><span class="when">${esc(when)}</span></li>`;
+  }).join('');
+  return `<div><div class="section-title">Recent decisions</div><div class="card"><ul class="dec">${rows}</ul></div></div>`;
+}
+
+function configCard(cfg) {
+  if (!cfg) return '';
+  return `<div><div class="section-title">Config — config/automation-eh.yaml</div><div class="card cfg">
+    <div class="kv"><span>repo</span><b class="mono">${esc(cfg.repo)}</b></div>
+    <div class="kv"><span>build branch</span><b class="mono">${esc(cfg.build_branch)}</b></div>
+    <div class="kv"><span>verify</span><b>pytest -q (whole suite)</b></div>
+    <div class="kv"><span>auto-Done on green</span><b>${esc(cfg.auto_done)}</b></div>
+    <div class="kv"><span>WIP limit</span><b>${esc(cfg.wip_max)}</b></div>
+    <div class="kv"><span>push build to origin</span><b>${esc(cfg.push_on_merge)}</b></div>
+    <div class="kv"><span>token-wall handling</span><b>revert to Spec'd, retry next tick</b></div>
+  </div></div>`;
+}
+
+async function togglePause() {
+  const paused = !STATE.paused;
+  if (!paused && !confirm('Resume the Energy Hack loop? The executor will start building tickets in /opt/energyhack.')) return;
+  const r = await api('/energyhack/pause', { method: 'POST', body: JSON.stringify({ paused }) });
+  if (!r) return;
+  if (!r.ok) { toast('Failed (admin only?)'); return; }
+  toast(paused ? 'Loop paused' : 'Loop resumed');
+  load();
+}
+async function runNow() {
+  if (!confirm('Build one ticket now? The executor will pick the next Spec\'d ticket and implement it.')) return;
+  const r = await api('/energyhack/run', { method: 'POST', body: '{}' });
+  if (!r) return;
+  const d = await r.json();
+  toast(r.ok ? 'Executor started — building one ticket' : ('Failed: ' + (d.error || r.status)));
+  setTimeout(load, 2000);
+}
+async function runBurn() {
+  if (!confirm('Burn through the remaining tickets back-to-back? It sprints with no waits and stops on its own when the queue empties or your tokens run out.')) return;
+  const r = await api('/energyhack/burn', { method: 'POST', body: '{}' });
+  if (!r) return;
+  const d = await r.json();
+  toast(r.ok ? '🔥 Burning through the queue…' : ('Failed: ' + (d.error || r.status)));
+  setTimeout(load, 2000);
+}
+
+load();
+setInterval(load, 12000);
+</script>
+</body>
+</html>

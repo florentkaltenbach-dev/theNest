@@ -1,0 +1,18 @@
+# scripts/setup/systemd/nest-eh-executor.timer
+#
+# Fires the oneshot EH executor periodically until the EH backlog drains. The
+# executor self-guards with a flock + WIP≤1 + EH pause-flag, so overlapping or
+# extra fires are harmless. A short interval keeps the build moving AND is the
+# resume mechanism after a token/rate-limit window: a wall reverts the ticket to
+# Spec'd and the next fire retries. Enable only when opting into the loop:
+#   sudo systemctl enable --now nest-eh-executor.timer
+[Unit]
+Description=Run the Energy Hack executor periodically
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=8min
+Persistent=false
+
+[Install]
+WantedBy=timers.target

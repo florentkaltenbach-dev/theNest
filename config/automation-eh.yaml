@@ -1,0 +1,58 @@
+# config/automation-eh.yaml — Energy Hack autonomous board tuning
+#
+# DORMANT 2026-06-10. The standalone Linear team EH was archived to free a team
+# slot on the free tier; its 16 (all Done) tickets were migrated into team AI
+# under the "Energy Hack" PROJECT. The board is complete and the executor timer
+# is disabled — nothing left to build — but the executor is now project-scoped
+# and SAFE to re-enable if EH work resumes (it acts only on the Energy Hack
+# project, and the Nest executor excludes that project — see config/automation
+# .yaml `external_projects`). The two boards no longer collide.
+#
+# Knobs for the EH executor (scripts/tasks/run-eh-executor.sh). Plain data, read
+# on each invocation — no apply step. This board shares team AI with the Nest
+# board but is partitioned by project: different repo, different verify (pytest,
+# not node --test), different pause flag, different log dir.
+
+# Target repo + integration model -----------------------------------------
+# Each ticket branches from build_branch (which already holds every completed
+# ticket — the "accumulate" model), implements, verifies with pytest, and on
+# green merges back into build_branch. So tickets compound; greenfield works.
+repo: /opt/energyhack
+build_branch: build          # long-lived integration branch the app runs from
+team_key: AI                 # board now lives in team AI (EH team archived 2026-06-10)
+project_id: 96a1ecfb-8f67-41b9-9578-272809222db9  # "Energy Hack" — this executor's scope
+venv: /opt/energyhack/.venv  # verify runs in this venv (pytest + requirements)
+
+# Verification --------------------------------------------------------------
+# The gate is a green `pytest -q` over the WHOLE accumulated suite (so a new
+# ticket can't silently break an earlier one) AND at least one test collected
+# (pytest rc 5 = "no tests" is treated as a gamed gate → blocked).
+
+# Autonomy ------------------------------------------------------------------
+wip_max: 1                   # one ticket in Working at a time (sequential accumulate)
+auto_done: true              # green pytest → straight to Done (near-zero human)
+push_on_merge: false         # push build_branch to origin after each merge (needs git creds)
+
+# Token-window handling -----------------------------------------------------
+# If the headless engine run shows one of these (case-insensitive) AND made no
+# commit, the executor treats it as a TRANSIENT token/rate-limit wall: it reverts
+# the ticket to Spec'd (NOT needs-human) and exits cleanly, so the next timer
+# fire retries once the window resets. This is the "don't get interrupted and
+# forget to resume" guarantee — the systemd timer is the resume mechanism.
+token_limit_patterns:
+  - 'usage limit'
+  - 'rate limit'
+  - 'rate_limit'
+  - 'overloaded'
+  - 'too many requests'
+  - '429'
+  - '529'
+  - 'quota'
+  - 'insufficient_quota'
+
+# Pause flag (EH-specific). When present, the EH executor no-ops. A human
+# removes it to resume. Gitignored (data/ is).
+pause_flag: /opt/nest/data/automation-eh.paused
+
+# Where the EH executor appends its JSONL decision log + per-ticket run logs.
+log_dir: /opt/nest/data/automation-eh

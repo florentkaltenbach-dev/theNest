@@ -1,0 +1,26 @@
+# scripts/setup/systemd/nest-eh-drain.service
+#
+# Burn-through runner for the Energy Hack board: sprints the EH executor through
+# the Spec'd queue back-to-back (no timer, no waits) until the queue empties, a
+# token/rate-limit wall is hit, or the loop is paused. Start it when you have
+# tokens to spend:  sudo systemctl start nest-eh-drain.service  (or the "Burn
+# through" button on /energyhack). It exits on its own; re-start it when you have
+# more tokens. There is intentionally NO timer for this unit.
+[Unit]
+Description=Energy Hack burn-through — run EH tickets back-to-back until done/out-of-tokens
+After=network-online.target nest-hub.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=claude
+Group=claude
+WorkingDirectory=/opt/energyhack
+Environment=HOME=/home/claude
+Environment=PATH=/home/claude/.local/bin:/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=-/opt/nest/config.env
+ExecStart=/opt/nest/scripts/tasks/eh-drain.sh
+StandardInput=null
+# A full drain of the remaining backlog (incl. the heavier streamlit/pulp
+# pip installs) can run a while. No hard cap — it stops itself.
+TimeoutStartSec=0

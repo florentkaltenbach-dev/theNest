@@ -1,0 +1,26 @@
+# scripts/setup/systemd/nest-eh-executor.service
+#
+# Oneshot Energy Hack executor: implements exactly one EH ticket per activation
+# (in /opt/energyhack, pytest-gated, accumulate model), then exits. Driven by
+# nest-eh-executor.timer. Install: copy both units to /etc/systemd/system,
+# `systemctl daemon-reload`. Leave the TIMER disabled until you opt into the
+# autonomous loop. Separate from nest-executor (different repo + board).
+[Unit]
+Description=Energy Hack executor — implement one EH ticket then exit
+After=network-online.target nest-hub.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=claude
+Group=claude
+WorkingDirectory=/opt/energyhack
+# HOME so claude finds its OAuth + the linear MCP; PATH so node/claude/jq/git
+# resolve under systemd's minimal environment.
+Environment=HOME=/home/claude
+Environment=PATH=/home/claude/.local/bin:/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=-/opt/nest/config.env
+ExecStart=/opt/nest/scripts/tasks/run-eh-executor.sh
+StandardInput=null
+# venv bootstrap (streamlit+pandas+pulp) on the first ticket can take a few min.
+TimeoutStartSec=2400

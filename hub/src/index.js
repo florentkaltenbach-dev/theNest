@@ -32,6 +32,7 @@ import { canvasRoutes } from './routes/canvas.js';
 import { observabilityRoutes } from './routes/observability.js';
 import { mailRoutes } from './routes/mail.js';
 import { automationRoutes } from './routes/automation.js';
+import { energyhackRoutes } from './routes/energyhack.js';
 import { startSshDiscovery } from './ssh-discovery.js';
 import { startAlertWatchdog } from './alerts.js';
 import { handleAgentWs, handleClientWs } from './ws/agentHandler.js';
@@ -215,6 +216,7 @@ canvasRoutes(api);
 observabilityRoutes(api);
 mailRoutes(api);
 automationRoutes(api);
+energyhackRoutes(api);
 
 // Authenticated OpenClaw WebChat and Hermes dashboard proxies. Must be
 // registered before page routes.
