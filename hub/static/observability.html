@@ -60,15 +60,16 @@
 
   <h2 class="section-h">Token capacity over time</h2>
   <div class="controls">
-    <label>Window:</label>
+    <label>History:</label>
     <select id="histWindow">
-      <option value="5">Last 5h (live)</option>
+      <option value="5">Last 5h</option>
       <option value="24" selected>Last 24h</option>
       <option value="168">Last 7d</option>
     </select>
     <button id="histRefresh">Refresh</button>
     <span class="meta" id="histMeta"></span>
   </div>
+  <p class="meta" style="margin:0 0 10px 0">How far back to plot — a zoom level, not a quota. The line is remaining capacity; Anthropic enforces only a rolling 5h window and a 7-day window (there is no daily quota).</p>
   <div id="charts">Loading…</div>
 
   <h2 class="section-h">Token ledger</h2>
@@ -265,43 +266,19 @@ function cadenceHorizon(cadence) {
   return Infinity;
 }
 
-// Length (hours) of a fixed rolling quota window, or null if the source has no such window.
-function cadenceSpanHours(cadence) {
-  if (/5h/.test(cadence || "")) return 5;
-  if (/daily/.test(cadence || "")) return 24;
-  if (/week/.test(cadence || "")) return 24 * 7;
-  return null;
-}
-
 /**
  * Chart x-domain for a source: { tMax (right-edge epoch sec), hours (span) }.
- * The span is always the user-selected history window (`windowHours`) so the 5h/24h/7d
- * selector actually changes how much history is shown. When the source has a fixed rolling
- * window (5h/daily/weekly) with a plausible next reset, the right edge is pinned to that reset
- * so the series fills left→right toward it and the empty gap past "now" previews the countdown;
- * otherwise the right edge is now (e.g. Codex, whose reported period.end is a monthly boundary).
- * Early on (little data yet) windowStart() clamps the left edge to the first sample so the
- * series fills from the left instead of bunching at the right edge.
- * @param {?string} nextResetAt ISO time of the next reset
- * @param {?string} cadence reset cadence label (5h/daily/weekly)
- * @param {number} windowHours selected history span (left edge = right edge - windowHours)
+ * The chart is a plain rolling history ending at "now" that spans the user-selected window
+ * (5h/24h/7d). The right edge is always now — we deliberately do NOT reserve empty space out to
+ * the next reset: that left a big blank gap on the right right after a window reset. The reset is
+ * still visible as the sawtooth where remaining% jumps back to 100%, and as "resets in …" in the
+ * sub-header. windowStart() handles the left edge (flush-left when history is younger than the
+ * window) so the plot is blank only where data genuinely does not exist yet.
+ * @param {number} windowHours selected history span (left edge = now - windowHours)
  * @returns {{ tMax: number, hours: number }}
  */
-function chartDomain(nextResetAt, cadence, windowHours) {
-  const nowSec = Date.now() / 1000;
-  const span = cadenceSpanHours(cadence);
-  if (span && nextResetAt) {
-    const endSec = new Date(nextResetAt).getTime() / 1000;
-    const gapHours = (endSec - nowSec) / 3600;
-    // Pin the right edge to the next reset to preview the countdown gap — but only when it's a
-    // real rolling-window reset (cadenceHorizon guards a monthly period.end) AND it falls within
-    // the selected window. A far-future reset (e.g. a daily reset 18h out viewed at the 5h window)
-    // would otherwise push the whole window past "now", leaving the chart empty ("collecting data").
-    if (isFinite(endSec) && endSec > nowSec && gapHours <= cadenceHorizon(cadence) && gapHours <= windowHours) {
-      return { tMax: endSec, hours: windowHours };
-    }
-  }
-  return { tMax: nowSec, hours: windowHours };
+function chartDomain(windowHours) {
+  return { tMax: Date.now() / 1000, hours: windowHours };
 }
 
 /**
@@ -336,8 +313,7 @@ function fmtCountdown(iso, cadence) {
  * per-slot usage bars behind the line.
  * primary = [{t,v}] (5h/daily window), weekly = [{t,v}] thin overlay (optional),
  * bars = NBARS-length array of per-slot usage (auto-scaled to its own max).
- * Time domain is [tMin, tMax] (both epoch sec); `tMax` is the next reset when on-axis, else now.
- * When the right edge is a future reset, a dashed "now" marker splits past data from the gap-to-reset.
+ * Time domain is [tMin, tMax] (both epoch sec); `tMax` is "now" — the chart is a rolling history.
  */
 function drawChart(canvas, primary, weekly, bars, barUnit, color, tMin, tMax) {
   const dpr = window.devicePixelRatio || 1;
@@ -412,17 +388,6 @@ function drawChart(canvas, primary, weekly, bars, barUnit, color, tMin, tMax) {
     for (const p of weekly) ctx.lineTo(xOf(p.t), yOf(p.v));
     ctx.strokeStyle = "#6b7280"; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
     ctx.stroke(); ctx.setLineDash([]);
-  }
-
-  // "now" marker: when the right edge is a future reset, everything to its right is the
-  // gap until capacity refills. Drawing it lets you read how close the window is.
-  const nowSec = Date.now() / 1000;
-  if (tMax - nowSec > 60) {
-    const xn = xOf(nowSec);
-    ctx.strokeStyle = "#b6b9c0"; ctx.lineWidth = 1; ctx.setLineDash([2, 3]);
-    ctx.beginPath(); ctx.moveTo(xn, padT); ctx.lineTo(xn, yOf(0)); ctx.stroke(); ctx.setLineDash([]);
-    ctx.fillStyle = "#9ca3af"; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
-    ctx.fillText("now", xn, H);
   }
 
   // Stash geometry + series so the hover handler can map cursor → value and redraw a crosshair.
@@ -507,13 +472,13 @@ function renderCharts(d) {
     const nowCls = now == null ? "" : fracClass(now / 100);
     const reset = fmtCountdown(s.nextResetAt, s.resetCadence);
     const sub = [s.resetCadence, reset ? `resets in ${reset}` : null].filter(Boolean).join(" · ");
-    const dom = chartDomain(s.nextResetAt, s.resetCadence, d.hours);
+    const dom = chartDomain(d.hours);
     const tMin = windowStart(dom.tMax, dom.hours, series[0]?.t);
     const bars = usageBuckets(d.samples, s.id, s.usageUnit, tMin, dom.tMax);
     const barLegend = bars.peak > 0
       ? `<span><i style="background:${color}66"></i>${esc(unitLabel(bars.unit))} used/slot</span>`
       : "";
-    const legend = `<div class="legend"><span><i style="background:${color}"></i>5h/daily remaining</span>${hasWeekly ? `<span><i style="background:#6b7280"></i>weekly remaining</span>` : ""}${barLegend}</div>`;
+    const legend = `<div class="legend"><span><i style="background:${color}"></i>session remaining</span>${hasWeekly ? `<span><i style="background:#6b7280"></i>weekly remaining</span>` : ""}${barLegend}</div>`;
     return `<div class="chart-card" data-id="${esc(s.id)}" data-color="${color}" data-weekly="${hasWeekly}">
       <div class="chart-head"><span class="title">${esc(s.label)}</span><span class="now ${nowCls}">${now == null ? "–" : now + "%"}</span></div>
       <div class="sub">${esc(sub || "remaining capacity")}</div>
@@ -539,7 +504,7 @@ async function loadCharts() {
     const metaById = Object.fromEntries((d.sources || []).map(s => [s.id, s]));
     document.querySelectorAll("#charts .chart-card").forEach((card, i) => {
       const id = card.dataset.id, color = card.dataset.color, meta = metaById[id] || {};
-      const dom = chartDomain(meta.nextResetAt, meta.resetCadence, hours);
+      const dom = chartDomain(hours);
       const primary = (d.samples || []).filter(e => e.r && e.r[id] != null).map(e => ({ t: e.t, v: e.r[id] }));
       const weekly = card.dataset.weekly === "true"
         ? (d.samples || []).filter(e => e.w && e.w[id] != null).map(e => ({ t: e.t, v: e.w[id] }))
