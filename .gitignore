@@ -19,3 +19,6 @@ hub/dist/
 
 tokens.json
 state/linear.json
+
+# Agent "dreams" runtime cache — regenerated recall index + event log, not source.
+memory/.dreams/
