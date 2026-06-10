@@ -90,6 +90,26 @@ auto_done:
 external_projects:
   - 96a1ecfb-8f67-41b9-9578-272809222db9   # "Energy Hack" → /opt/energyhack, run-eh-executor.sh
 
+# --- Token-window handling --------------------------------------------------
+# If the headless engine run shows one of these (case-insensitive) AND made no
+# commit, the executor treats it as a TRANSIENT token/rate-limit wall: it reverts
+# the ticket to Spec'd (NOT needs-human/blocked) and exits cleanly, so the next
+# timer fire retries once the window resets. Subscriptions are use-it-or-lose-it,
+# so a drained window is not a ticket failure — it must not strand work in
+# Working (where the circuit-breaker would trip at working_max_age_hours) or burn
+# a needs-human escalation. The systemd timer IS the resume mechanism. Mirrors
+# the EH executor (config/automation-eh.yaml) so both boards recover identically.
+token_limit_patterns:
+  - 'usage limit'
+  - 'rate limit'
+  - 'rate_limit'
+  - 'overloaded'
+  - 'too many requests'
+  - '429'
+  - '529'
+  - 'quota'
+  - 'insufficient_quota'
+
 # Circuit-breaker thresholds. The janitor trips the breaker (writes the pause
 # flag + mails) on ANY breach. It never auto-clears — a human removes the flag.
 circuit_breaker:

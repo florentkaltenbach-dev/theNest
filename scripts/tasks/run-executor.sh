@@ -3,7 +3,9 @@
 # @description Executor loop: pulls ONE Spec'd+ai-ready ticket → Working, lets
 #              headless Claude implement it on the ticket's branch, verifies
 #              tests + conventions (no-regression), then → Review (SHA + verify
-#              command) or blocked+needs-human. One ticket per invocation.
+#              command) or blocked+needs-human. Token/rate-limit walls with no
+#              commit revert the ticket to Spec'd (NOT needs-human) so the next
+#              timer fire resumes. One ticket per invocation.
 # @target      local
 # @args        json   ({}; {"dry_run":true} = select + plan only, no changes)
 set -Eeuo pipefail
@@ -17,6 +19,7 @@ ARGS=$(cat || true); [ -z "$ARGS" ] && ARGS='{}'
 DRY=$(echo "$ARGS" | jq -r '.dry_run // false')
 WANT=$(echo "$ARGS" | jq -r '.issue // empty')   # optional: force one ticket
 LOGDIR=$(automation_cfg log_dir "$NEST_ROOT/data/automation"); mkdir -p "$LOGDIR"
+TOKPATS=$(automation_cfg token_limit_patterns '[]' | jq -r 'join("|")')
 
 # --- single-flight lock (shared with auto-done: both mutate the working tree)-
 exec 9>"$LOGDIR/repo.lock"
@@ -31,7 +34,7 @@ BOOT=$(gql 'query{ teams(filter:{key:{eq:"AI"}}){ nodes{ id
 TID=$(echo "$BOOT" | jq -r '.teams.nodes[0].id')
 st(){ echo "$BOOT" | jq -r --arg n "$1" '.teams.nodes[0].states.nodes[]|select(.name==$n)|.id'; }
 lbl(){ echo "$BOOT" | jq -r --arg n "$1" '.teams.nodes[0].labels.nodes[]|select(.name==$n)|.id'; }
-WORKING=$(st Working); REVIEW=$(st Review)
+SPECD=$(st "Spec'd"); WORKING=$(st Working); REVIEW=$(st Review)
 L_BLOCKED=$(lbl blocked); L_NEEDHUMAN=$(lbl needs-human)
 
 # --- routing: app projects this (Nest) executor must NOT touch --------------
@@ -123,10 +126,26 @@ claude -p "$PROMPT" --mcp-config "$NEST_ROOT/.mcp.json" \
   </dev/null >"$RUNLOG" 2>&1
 set -e
 
-# --- verify (never trust the agent's word) ---------------------------------
+# --- classify the run ------------------------------------------------------
 NEW_SHA=$(git rev-parse HEAD)
 MADE_COMMIT=$([ "$(git rev-list --count "$START_SHA"..HEAD)" -gt 0 ] && echo true || echo false)
 BLOCKED_MARK=$(grep -oE 'EXECUTOR_BLOCKED:.*' "$RUNLOG" | head -1 || true)
+TOKEN_HIT=$([ -n "$TOKPATS" ] && grep -qiE "$TOKPATS" "$RUNLOG" && echo true || echo false)
+
+# Token/rate-limit wall with no commit → transient, not a ticket failure. Revert
+# to Spec'd (no blame, no needs-human) and exit cleanly; the EXIT trap returns
+# the tree to main, discarding the half-branch, and the next timer fire retries
+# once the window resets. Mirrors run-eh-executor.sh. (A wall AFTER a commit
+# falls through to the normal verify path — the partial work is judged on merit.)
+if [ "$TOKEN_HIT" = true ] && [ "$MADE_COMMIT" != true ]; then
+  gql 'mutation($id:String!,$i:IssueUpdateInput!){issueUpdate(id:$id,input:$i){success}}' \
+    "$(jq -n --arg id "$ID" --arg s "$SPECD" '{id:$id,i:{stateId:$s}}')" >/dev/null || true
+  alog executor.jsonl "$(jq -n --arg id "$IDENT" --arg t "$TS" '{ts:$t,issue:$id,action:"token_limit",note:"reverted to Spec'"'"'d; will retry next tick"}')"
+  jq -n --arg id "$IDENT" '{executed:$id, result:"token_limit", note:"reverted to Spec'"'"'d for retry"}'
+  exit 0
+fi
+
+# --- verify (never trust the agent's word) ---------------------------------
 node --test >>"$RUNLOG" 2>&1 && TESTS_OK=true || TESTS_OK=false
 NOW_FAILS=$(conventions_fail_count)
 NO_REGRESS=$([ "$NOW_FAILS" -le "$BASE_FAILS" ] && echo true || echo false)
