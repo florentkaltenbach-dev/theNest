@@ -275,28 +275,29 @@ function cadenceSpanHours(cadence) {
 
 /**
  * Chart x-domain for a source: { tMax (right-edge epoch sec), hours (span) }.
- * When the source has a fixed rolling window (5h/daily/weekly) with a plausible next reset,
- * the chart spans exactly that window — left edge = window open, right edge = next reset — so
- * the series fills left→right toward the reset and the empty gap past "now" previews the
- * countdown. Early in a window (little data yet) it fills from the left instead of bunching at
- * the right edge. Otherwise it falls back to [now-fallbackHours, now] (the selected history
- * window ending at now), e.g. for Codex, whose reported period.end is a monthly boundary.
+ * The span is always the user-selected history window (`windowHours`) so the 5h/24h/7d
+ * selector actually changes how much history is shown. When the source has a fixed rolling
+ * window (5h/daily/weekly) with a plausible next reset, the right edge is pinned to that reset
+ * so the series fills left→right toward it and the empty gap past "now" previews the countdown;
+ * otherwise the right edge is now (e.g. Codex, whose reported period.end is a monthly boundary).
+ * Early on (little data yet) windowStart() clamps the left edge to the first sample so the
+ * series fills from the left instead of bunching at the right edge.
  * @param {?string} nextResetAt ISO time of the next reset
  * @param {?string} cadence reset cadence label (5h/daily/weekly)
- * @param {number} fallbackHours span to use when there is no on-axis rolling window
+ * @param {number} windowHours selected history span (left edge = right edge - windowHours)
  * @returns {{ tMax: number, hours: number }}
  */
-function chartDomain(nextResetAt, cadence, fallbackHours) {
+function chartDomain(nextResetAt, cadence, windowHours) {
   const nowSec = Date.now() / 1000;
   const span = cadenceSpanHours(cadence);
   if (span && nextResetAt) {
     const endSec = new Date(nextResetAt).getTime() / 1000;
     // Guard against a period.end that is really a monthly boundary, not the rolling window.
     if (isFinite(endSec) && endSec > nowSec && (endSec - nowSec) / 3600 <= cadenceHorizon(cadence)) {
-      return { tMax: endSec, hours: span };
+      return { tMax: endSec, hours: windowHours };
     }
   }
-  return { tMax: nowSec, hours: fallbackHours };
+  return { tMax: nowSec, hours: windowHours };
 }
 
 /**
