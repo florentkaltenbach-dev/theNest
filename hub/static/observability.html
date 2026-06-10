@@ -230,19 +230,20 @@ function unitLabel(u) {
 }
 
 /**
- * Bucket per-slot usage into NBARS columns over the window [now-hours, now].
+ * Bucket per-slot usage into NBARS columns over the window [tMax-hours, tMax].
+ * `tMax` (epoch sec) is the chart's right edge — the next reset when it's on-axis, else now.
  * The signal is chosen by the source's backend-declared usageUnit:
  *  - "tokens"/"requests" → deltas of the cumulative counter `u` (a trustworthy absolute count)
  *  - "capacity" (default) → drops in the real remaining% `r` (accurate when no reliable
  *    token counter exists, e.g. Codex, whose exec-mode token logs undercount)
  * Returns { buckets, peak, unit }.
  */
-function usageBuckets(samples, id, hours, usageUnit) {
-  const tMax = Date.now() / 1000, tMin = tMax - hours * 3600;
+function usageBuckets(samples, id, hours, usageUnit, tMax) {
+  const tMin = tMax - hours * 3600;
   const useCounter = usageUnit === "tokens" || usageUnit === "requests";
   const pts = (samples || [])
     .map(e => ({ t: e.t, c: useCounter ? (e.u ? e.u[id] : null) : (e.r ? e.r[id] : null) }))
-    .filter(p => p.c != null);
+    .filter(p => p.c != null && p.t >= tMin && p.t <= tMax);
   const buckets = new Array(NBARS).fill(0);
   for (let i = 1; i < pts.length; i++) {
     const d = useCounter ? (pts[i].c - pts[i - 1].c) : (pts[i - 1].c - pts[i].c);   // counter rises / remaining% falls
@@ -263,6 +264,40 @@ function cadenceHorizon(cadence) {
   return Infinity;
 }
 
+// Length (hours) of a fixed rolling quota window, or null if the source has no such window.
+function cadenceSpanHours(cadence) {
+  if (/5h/.test(cadence || "")) return 5;
+  if (/daily/.test(cadence || "")) return 24;
+  if (/week/.test(cadence || "")) return 24 * 7;
+  return null;
+}
+
+/**
+ * Chart x-domain for a source: { tMax (right-edge epoch sec), hours (span) }.
+ * When the source has a fixed rolling window (5h/daily/weekly) with a plausible next reset,
+ * the chart spans exactly that window — left edge = window open, right edge = next reset — so
+ * the series fills left→right toward the reset and the empty gap past "now" previews the
+ * countdown. Early in a window (little data yet) it fills from the left instead of bunching at
+ * the right edge. Otherwise it falls back to [now-fallbackHours, now] (the selected history
+ * window ending at now), e.g. for Codex, whose reported period.end is a monthly boundary.
+ * @param {?string} nextResetAt ISO time of the next reset
+ * @param {?string} cadence reset cadence label (5h/daily/weekly)
+ * @param {number} fallbackHours span to use when there is no on-axis rolling window
+ * @returns {{ tMax: number, hours: number }}
+ */
+function chartDomain(nextResetAt, cadence, fallbackHours) {
+  const nowSec = Date.now() / 1000;
+  const span = cadenceSpanHours(cadence);
+  if (span && nextResetAt) {
+    const endSec = new Date(nextResetAt).getTime() / 1000;
+    // Guard against a period.end that is really a monthly boundary, not the rolling window.
+    if (isFinite(endSec) && endSec > nowSec && (endSec - nowSec) / 3600 <= cadenceHorizon(cadence)) {
+      return { tMax: endSec, hours: span };
+    }
+  }
+  return { tMax: nowSec, hours: fallbackHours };
+}
+
 function fmtCountdown(iso, cadence) {
   if (!iso) return null;
   const secs = (new Date(iso).getTime() - Date.now()) / 1000;
@@ -277,9 +312,10 @@ function fmtCountdown(iso, cadence) {
  * per-slot usage bars behind the line.
  * primary = [{t,v}] (5h/daily window), weekly = [{t,v}] thin overlay (optional),
  * bars = NBARS-length array of per-slot usage (auto-scaled to its own max).
- * Time domain is anchored to now: [now-hours, now], so the right edge is "now".
+ * Time domain is [tMax-hours, tMax]; `tMax` is the next reset when on-axis, else now. When
+ * the right edge is a future reset, a dashed "now" marker splits past data from the gap-to-reset.
  */
-function drawChart(canvas, primary, weekly, bars, barUnit, color, hours) {
+function drawChart(canvas, primary, weekly, bars, barUnit, color, hours, tMax) {
   const dpr = window.devicePixelRatio || 1;
   const W = canvas.clientWidth, H = canvas.clientHeight;
   canvas.width = W * dpr; canvas.height = H * dpr;
@@ -290,7 +326,10 @@ function drawChart(canvas, primary, weekly, bars, barUnit, color, hours) {
   const maxBar = Math.max(0, ...(bars || []));
   const padL = 30, padR = maxBar > 0 ? 48 : 8, padT = 8, padB = 16;
   const plotW = W - padL - padR, plotH = H - padT - padB;
-  const tMax = Date.now() / 1000, tMin = tMax - hours * 3600;
+  const tMin = tMax - hours * 3600;
+  // Keep only samples inside the window so older fetched points don't pile up at the left edge.
+  primary = (primary || []).filter(p => p.t >= tMin && p.t <= tMax);
+  weekly = (weekly || []).filter(p => p.t >= tMin && p.t <= tMax);
   const xOf = t => padL + Math.max(0, Math.min(1, (t - tMin) / (tMax - tMin))) * plotW;
   const yOf = v => padT + (1 - Math.max(0, Math.min(100, v)) / 100) * plotH;
 
@@ -351,6 +390,17 @@ function drawChart(canvas, primary, weekly, bars, barUnit, color, hours) {
     ctx.strokeStyle = "#6b7280"; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
     ctx.stroke(); ctx.setLineDash([]);
   }
+
+  // "now" marker: when the right edge is a future reset, everything to its right is the
+  // gap until capacity refills. Drawing it lets you read how close the window is.
+  const nowSec = Date.now() / 1000;
+  if (tMax - nowSec > 60) {
+    const xn = xOf(nowSec);
+    ctx.strokeStyle = "#b6b9c0"; ctx.lineWidth = 1; ctx.setLineDash([2, 3]);
+    ctx.beginPath(); ctx.moveTo(xn, padT); ctx.lineTo(xn, yOf(0)); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = "#9ca3af"; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+    ctx.fillText("now", xn, H);
+  }
 }
 
 function renderCharts(d) {
@@ -364,7 +414,8 @@ function renderCharts(d) {
     const nowCls = now == null ? "" : fracClass(now / 100);
     const reset = fmtCountdown(s.nextResetAt, s.resetCadence);
     const sub = [s.resetCadence, reset ? `resets in ${reset}` : null].filter(Boolean).join(" · ");
-    const bars = usageBuckets(d.samples, s.id, d.hours, s.usageUnit);
+    const dom = chartDomain(s.nextResetAt, s.resetCadence, d.hours);
+    const bars = usageBuckets(d.samples, s.id, dom.hours, s.usageUnit, dom.tMax);
     const barLegend = bars.peak > 0
       ? `<span><i style="background:${color}66"></i>${esc(unitLabel(bars.unit))} used/slot</span>`
       : "";
@@ -391,15 +442,16 @@ async function loadCharts() {
       ? `Last sample ${fmtTs(d.lastRecordedAt)} · every ${Math.round(d.sampleIntervalSec / 60)} min`
       : "No samples recorded yet — the recorder samples every 5 min.";
     // Draw each card's canvas from its stashed series.
-    const unitById = Object.fromEntries((d.sources || []).map(s => [s.id, s.usageUnit]));
+    const metaById = Object.fromEntries((d.sources || []).map(s => [s.id, s]));
     document.querySelectorAll("#charts .chart-card").forEach((card, i) => {
-      const id = card.dataset.id, color = card.dataset.color;
+      const id = card.dataset.id, color = card.dataset.color, meta = metaById[id] || {};
+      const dom = chartDomain(meta.nextResetAt, meta.resetCadence, hours);
       const primary = (d.samples || []).filter(e => e.r && e.r[id] != null).map(e => ({ t: e.t, v: e.r[id] }));
       const weekly = card.dataset.weekly === "true"
         ? (d.samples || []).filter(e => e.w && e.w[id] != null).map(e => ({ t: e.t, v: e.w[id] }))
         : [];
-      const ub = usageBuckets(d.samples, id, hours, unitById[id]);
-      drawChart(card.querySelector("canvas"), primary, weekly, ub.buckets, ub.unit, color, hours);
+      const ub = usageBuckets(d.samples, id, dom.hours, meta.usageUnit, dom.tMax);
+      drawChart(card.querySelector("canvas"), primary, weekly, ub.buckets, ub.unit, color, dom.hours, dom.tMax);
     });
   } catch (e) {
     document.getElementById("charts").innerHTML = `<div class="err">${esc(e.message)}</div>`;
