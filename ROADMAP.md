@@ -268,3 +268,15 @@ Captured ideas not yet scoped for a sprint. One doc per idea in `docs/`.
 
 - **AI-12** — C7 — script-runner skill
 - **AI-11** — C6 — container-manager skill
+
+## Shipped 2026-W24 (auto-reconciled 2026-06-08)
+
+- **AI-55** — Stand up the self-running board — Lab automation (groomer · executor · auto-Done · janitor)
+- **AI-39** — I7 — Per-period log archival (7d/30d/delete)
+- **AI-29** — U6 — i18n (English + German string tables)
+- **AI-26** — A8 — Git discovery (agent/nest_agent/git.py)
+- **AI-25** — A7 — Extend discovery.py: Docker / systemd / listening-port
+- **AI-23** — A5 — Surface appendage logs on detail page
+- **AI-22** — A4 — Wizard step rendering on /appendages
+- **AI-12** — C7 — script-runner skill
+- **AI-11** — C6 — container-manager skill
