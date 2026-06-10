@@ -9,7 +9,7 @@ import { existsSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { sendJson, sendError } from '../server.js';
-import { loadTokenLedger } from './observability.js';
+import { loadTokenLedger, peekTokenLedger } from './observability.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const NEST_ROOT = join(__dirname, "../../..");
@@ -140,7 +140,7 @@ function nextResetIso(s) {
  */
 async function sourceMeta() {
   try {
-    const { payload } = await loadTokenLedger();
+    const { payload } = await peekTokenLedger();
     return (payload.sources || [])
       .filter((s) => s?.id && s.remaining != null && s.remaining.unknown !== true && typeof s.remaining.percent === "number")
       .map((s) => ({

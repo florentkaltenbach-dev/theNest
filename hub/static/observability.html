@@ -292,8 +292,12 @@ function chartDomain(nextResetAt, cadence, windowHours) {
   const span = cadenceSpanHours(cadence);
   if (span && nextResetAt) {
     const endSec = new Date(nextResetAt).getTime() / 1000;
-    // Guard against a period.end that is really a monthly boundary, not the rolling window.
-    if (isFinite(endSec) && endSec > nowSec && (endSec - nowSec) / 3600 <= cadenceHorizon(cadence)) {
+    const gapHours = (endSec - nowSec) / 3600;
+    // Pin the right edge to the next reset to preview the countdown gap — but only when it's a
+    // real rolling-window reset (cadenceHorizon guards a monthly period.end) AND it falls within
+    // the selected window. A far-future reset (e.g. a daily reset 18h out viewed at the 5h window)
+    // would otherwise push the whole window past "now", leaving the chart empty ("collecting data").
+    if (isFinite(endSec) && endSec > nowSec && gapHours <= cadenceHorizon(cadence) && gapHours <= windowHours) {
       return { tMax: endSec, hours: windowHours };
     }
   }
@@ -301,19 +305,20 @@ function chartDomain(nextResetAt, cadence, windowHours) {
 }
 
 /**
- * Left edge (epoch sec) for a chart. The window floor is `tMax - hours`, but we clamp it up to
- * the first available sample so data sits flush against the left edge rather than leaving an
- * empty leading gap from before the recorder existed (the recorder is younger than a 24h/weekly
- * window). Once a full window of history accumulates, firstSampleT <= floor and the floor wins,
- * so the chart settles to exactly one window. For unanchored sources (tMax = now) this fills the
- * plot edge-to-edge with whatever history exists.
+ * Left edge (epoch sec) for a chart. The history depth is measured back from *now*, not from
+ * tMax: when tMax is pushed out to a future reset to preview the countdown gap, the data window
+ * must still be `hours` long ending at now (else the gap would eat into the visible history).
+ * The floor is then clamped up to the first available sample so data sits flush against the left
+ * edge rather than leaving an empty leading gap from before the recorder existed (it is younger
+ * than a 24h/weekly window). Once a full window accumulates, firstSampleT <= floor and the floor
+ * wins, so the chart settles to exactly one window.
  * @param {number} tMax right edge (epoch sec)
  * @param {number} hours window span
  * @param {?number} firstSampleT earliest in-window sample time (epoch sec), or null
  * @returns {number}
  */
 function windowStart(tMax, hours, firstSampleT) {
-  const floor = tMax - hours * 3600;
+  const floor = Math.min(tMax, Date.now() / 1000) - hours * 3600;
   return firstSampleT != null ? Math.max(floor, firstSampleT) : floor;
 }
 

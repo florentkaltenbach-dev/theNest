@@ -71,6 +71,23 @@ export function loadTokenLedger() {
   return loadOrRegenerate(TOKENS_FILE, TOKENS_AGGREGATOR, {});
 }
 
+/**
+ * Cheap read of the cached token ledger that never re-runs the (~2s, live-API) aggregator.
+ * For consumers needing only stable metadata (labels, reset cadence/time) and tolerant of
+ * up-to-5-min staleness — e.g. the history chart's sourceMeta(), called on every window change.
+ * Keeping the live regen out of that path is what makes window switching instant; the dedicated
+ * /observability/tokens endpoint and the 5-min sampler keep the cache fresh. Falls back to a
+ * full regen only when no cache file exists yet (first boot).
+ * @returns {Promise<{ payload: Object, source: string }>}
+ */
+export async function peekTokenLedger() {
+  if (existsSync(TOKENS_FILE)) {
+    try { return { payload: JSON.parse(await readFile(TOKENS_FILE, "utf-8")), source: "cache" }; }
+    catch { /* corrupt/partial cache — fall through to a full regen */ }
+  }
+  return loadTokenLedger();
+}
+
 export function observabilityRoutes(router) {
   // C10 multi-source token ledger.
   router.get("/observability/tokens", async (req, res) => {
