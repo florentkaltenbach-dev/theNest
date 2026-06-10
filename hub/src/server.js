@@ -141,7 +141,10 @@ export function sendFile(res, filePath) {
   if (!existsSync(resolved)) return sendError(res, 404, 'Not found');
   const ext = extname(resolved);
   const contentType = MIME[ext] || 'application/octet-stream';
-  res.writeHead(200, { 'Content-Type': contentType, ...SECURITY_HEADERS });
+  // No build step / content hashing here, so let browsers revalidate HTML every load —
+  // otherwise dashboard edits (e.g. the observability charts) hide behind a stale cache.
+  const cache = ext === '.html' ? { 'Cache-Control': 'no-cache' } : {};
+  res.writeHead(200, { 'Content-Type': contentType, ...cache, ...SECURITY_HEADERS });
   createReadStream(resolved).pipe(res);
 }
 
