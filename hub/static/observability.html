@@ -43,7 +43,9 @@
   .chart-head .title{font-weight:700}
   .chart-head .now{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}
   .chart-card .sub{font-size:12px;color:#6b7280;margin:2px 0 8px 0}
-  .chart-card canvas{width:100%;height:120px;display:block}
+  .chart-card canvas{width:100%;height:120px;display:block;cursor:crosshair}
+  #chart-tip{position:fixed;z-index:50;pointer-events:none;display:none;background:#1a1a2e;color:#fff;font-size:11px;line-height:1.55;padding:6px 9px;border-radius:6px;box-shadow:0 2px 10px rgba(0,0,0,.25);max-width:190px;font-variant-numeric:tabular-nums}
+  #chart-tip .t-when{color:#9ca3af;font-size:10px;margin-bottom:2px}
   .legend{font-size:11px;color:#6b7280;margin-top:8px;display:flex;gap:14px;flex-wrap:wrap}
   .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:middle}
   .err{color:#b91c1c;padding:12px;background:#fee;border:1px solid #fcc;border-radius:6px}
@@ -416,6 +418,76 @@ function drawChart(canvas, primary, weekly, bars, barUnit, color, tMin, tMax) {
     ctx.fillStyle = "#9ca3af"; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
     ctx.fillText("now", xn, H);
   }
+
+  // Stash geometry + series so the hover handler can map cursor → value and redraw a crosshair.
+  canvas._chart = { padL, padR, padT, plotW, plotH, W, H, tMin, tMax, primary, weekly, bars, barUnit, color, maxBar };
+  canvas._render = () => drawChart(canvas, primary, weekly, bars, barUnit, color, tMin, tMax);
+}
+
+// ── Hover readout ────────────────────────────────────────────────────────────
+function chartTip() {
+  let el = document.getElementById("chart-tip");
+  if (!el) { el = document.createElement("div"); el.id = "chart-tip"; document.body.appendChild(el); }
+  return el;
+}
+
+/** Nearest sample to time `t` in an ascending [{t,v}] series, or null. */
+function nearestSample(series, t) {
+  let best = null, bd = Infinity;
+  for (const p of series || []) { const d = Math.abs(p.t - t); if (d < bd) { bd = d; best = p; } }
+  return best;
+}
+
+/**
+ * Wire a canvas for hover: on mousemove, map the cursor x to a window time, read the nearest
+ * remaining%/weekly% sample and the usage bar for that slot, draw a crosshair + dot, and show a
+ * tooltip. Reads the geometry stashed on canvas._chart by drawChart.
+ * @param {HTMLCanvasElement} canvas
+ */
+function attachHover(canvas) {
+  const tip = chartTip();
+  canvas.addEventListener("mousemove", (e) => {
+    const g = canvas._chart; if (!g) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left, y = e.clientY - rect.top;
+    if (x < g.padL || x > g.W - g.padR || y < g.padT || y > g.padT + g.plotH) {
+      tip.style.display = "none"; canvas._render(); return;
+    }
+    const frac = (x - g.padL) / g.plotW;
+    const t = g.tMin + frac * (g.tMax - g.tMin);
+    const p = nearestSample(g.primary, t);
+    const wp = (g.weekly && g.weekly.length) ? nearestSample(g.weekly, t) : null;
+    const slot = Math.min(NBARS - 1, Math.max(0, Math.floor(frac * NBARS)));
+    const barVal = (g.bars && g.bars[slot]) || 0;
+
+    // Redraw the base chart, then overlay a crosshair and a dot on the line.
+    canvas._render();
+    const ctx = canvas.getContext("2d");
+    const xc = g.padL + frac * g.plotW;
+    ctx.strokeStyle = "#9aa0aa"; ctx.lineWidth = 1; ctx.setLineDash([2, 2]);
+    ctx.beginPath(); ctx.moveTo(xc, g.padT); ctx.lineTo(xc, g.padT + g.plotH); ctx.stroke(); ctx.setLineDash([]);
+    if (p) {
+      const yOf = v => g.padT + (1 - Math.max(0, Math.min(100, v)) / 100) * g.plotH;
+      const xOf = tt => g.padL + Math.max(0, Math.min(1, (tt - g.tMin) / (g.tMax - g.tMin))) * g.plotW;
+      ctx.fillStyle = g.color; ctx.beginPath(); ctx.arc(xOf(p.t), yOf(p.v), 3, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // Tooltip text.
+    const when = p ? new Date(p.t * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+    const rows = [];
+    if (p) rows.push(`<b>${p.v}%</b> remaining`);
+    if (wp) rows.push(`<span style="color:#9ca3af">${wp.v}% weekly</span>`);
+    if (g.maxBar > 0) {
+      const bv = g.barUnit === "capacity" ? barVal.toFixed(1) + "%" : fmtCompact(barVal);
+      rows.push(`${esc(unitLabel(g.barUnit))}/slot: <b>${bv}</b>`);
+    }
+    tip.innerHTML = `<div class="t-when">${when}</div>${rows.join("<br>")}`;
+    tip.style.display = "block";
+    const tw = 190;
+    tip.style.left = (e.clientX + 14 + tw > window.innerWidth ? e.clientX - 14 - tw : e.clientX + 14) + "px";
+    tip.style.top = (e.clientY + 14) + "px";
+  });
+  canvas.addEventListener("mouseleave", () => { tip.style.display = "none"; canvas._render(); });
 }
 
 function renderCharts(d) {
@@ -468,7 +540,9 @@ async function loadCharts() {
         : [];
       const tMin = windowStart(dom.tMax, dom.hours, primary[0]?.t);
       const ub = usageBuckets(d.samples, id, meta.usageUnit, tMin, dom.tMax);
-      drawChart(card.querySelector("canvas"), primary, weekly, ub.buckets, ub.unit, color, tMin, dom.tMax);
+      const canvas = card.querySelector("canvas");
+      drawChart(canvas, primary, weekly, ub.buckets, ub.unit, color, tMin, dom.tMax);
+      attachHover(canvas);
     });
   } catch (e) {
     document.getElementById("charts").innerHTML = `<div class="err">${esc(e.message)}</div>`;

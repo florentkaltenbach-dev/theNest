@@ -119,6 +119,21 @@ async function readHistory(hours) {
 }
 
 /**
+ * Best next-reset time (ISO) for the source's primary rolling window. Prefer the live
+ * rolling-window reset when present: for Codex, `period.end` is a monthly billing boundary,
+ * but `metrics.sessionResetAt` (primary_window.reset_at from the ChatGPT usage endpoint, epoch
+ * seconds) is the real 5h reset. Falls back to `period.end`, which already is the correct
+ * rolling/daily reset for Claude and Hermes.
+ * @param {Object} s
+ * @returns {?string}
+ */
+function nextResetIso(s) {
+  const sec = s.metrics?.sessionResetAt;
+  if (typeof sec === "number" && isFinite(sec) && sec > 0) return new Date(sec * 1000).toISOString();
+  return s.period?.end || null;
+}
+
+/**
  * Pull current source metadata (label, reset cadence, next-reset time) from the latest
  * ledger so the chart can label series and mark when capacity refills.
  * @returns {Promise<Array<{id:string,label:string,resetCadence:string,nextResetAt:?string}>>}
@@ -132,7 +147,7 @@ async function sourceMeta() {
         id: s.id,
         label: s.label || s.id,
         resetCadence: s.period?.resetCadence || null,
-        nextResetAt: s.period?.end || null,
+        nextResetAt: nextResetIso(s),
         usageUnit: usageSignal(s).unit,
       }));
   } catch {
