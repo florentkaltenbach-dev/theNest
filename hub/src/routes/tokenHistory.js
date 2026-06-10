@@ -28,17 +28,22 @@ let lastRecordedAt = null;
 let appendsSinceTrim = 0;
 
 /**
- * Cumulative usage counter for a source, used to derive per-slot usage bars via deltas.
- * Prefers real token volume (monthlyTokens/periodTokens); falls back to a request counter
- * (used.amount when the cap is request-based). Returns null when nothing usable is exposed.
+ * Decide the trustworthy per-slot usage signal for a source.
+ * - "tokens": real token volume, but only when the engine logs complete per-message usage
+ *   (metrics.usageTokensComplete === true). Codex exec-mode sessions log null, so its token
+ *   sum undercounts — we deliberately skip it and fall back to capacity.
+ * - "requests": a real local request counter (e.g. Hermes free-tier daily requests).
+ * - "capacity": no trustworthy absolute counter, so bars are derived from the drop in the
+ *   real remaining% (accurate, from the live rate-limit endpoint).
+ * `counter` is the cumulative value to delta (null for capacity, which uses remaining% instead).
  * @param {Object} s
- * @returns {?number}
+ * @returns {{ unit: string, counter: ?number }}
  */
-function usageCounter(s) {
+function usageSignal(s) {
   const toks = s.metrics?.monthlyTokens ?? s.metrics?.periodTokens;
-  if (typeof toks === "number") return toks;
-  if (typeof s.used?.amount === "number" && /request/.test(s.cap?.unit || "")) return s.used.amount;
-  return null;
+  if (typeof toks === "number" && s.metrics?.usageTokensComplete === true) return { unit: "tokens", counter: toks };
+  if (typeof s.used?.amount === "number" && /request/.test(s.cap?.unit || "")) return { unit: "requests", counter: s.used.amount };
+  return { unit: "capacity", counter: null };
 }
 
 /**
@@ -60,8 +65,8 @@ function sampleFromLedger(ledger) {
     r[s.id] = Math.round(pct);
     const weekly = s.metrics?.weekly?.remainingPct;
     if (typeof weekly === "number") w[s.id] = Math.round(weekly);
-    const used = usageCounter(s);
-    if (used != null) u[s.id] = used;
+    const { counter } = usageSignal(s);
+    if (counter != null) u[s.id] = counter;
   }
   return { t: Math.floor(Date.parse(ledger.generatedAt || "") / 1000) || Math.floor(Date.now() / 1000), r, w, u };
 }
@@ -128,9 +133,7 @@ async function sourceMeta() {
         label: s.label || s.id,
         resetCadence: s.period?.resetCadence || null,
         nextResetAt: s.period?.end || null,
-        usageUnit: (typeof s.metrics?.monthlyTokens === "number" || typeof s.metrics?.periodTokens === "number")
-          ? "tokens"
-          : (/request/.test(s.cap?.unit || "") ? "requests" : null),
+        usageUnit: usageSignal(s).unit,
       }));
   } catch {
     return [];

@@ -89,6 +89,7 @@ jq -n \
       overallStatus: ($s.status // null),
       overageAvailable: ($s.overage_available // null),
       monthlyTokens: $monthlyTokens,
+      usageTokensComplete: true,
       monthlyPeriod: { start: $monthlyStart, end: $monthlyEnd },
       capSource: "anthropic-unified-headers",
       snapshotAt: ($s.fetchedAt // null)

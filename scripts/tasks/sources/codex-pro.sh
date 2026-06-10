@@ -129,6 +129,7 @@ jq -n \
       creditsBalance: ($usage.credits.balance // null),
       hasCredits: ($usage.credits.has_credits // null),
       monthlyTokens: $used,
+      usageTokensComplete: false,
       monthlyCostUsdEquivalent: $cost,
       tokens5h: $tokens5h,
       cost5hUsdEquivalent: $cost5h,

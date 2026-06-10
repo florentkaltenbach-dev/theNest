@@ -225,26 +225,33 @@ function unitShort(u) {
   return u === "tokens" ? "tok" : u === "requests" ? "req" : u === "capacity" ? "%" : "";
 }
 
+function unitLabel(u) {
+  return u === "tokens" ? "tokens" : u === "requests" ? "requests" : u === "capacity" ? "window %" : u;
+}
+
 /**
  * Bucket per-slot usage into NBARS columns over the window [now-hours, now].
- * Uses cumulative-counter deltas (`u`, tokens/requests) when present; otherwise falls
- * back to drops in remaining% (capacity consumed). Returns { buckets, peak, unit }.
+ * The signal is chosen by the source's backend-declared usageUnit:
+ *  - "tokens"/"requests" → deltas of the cumulative counter `u` (a trustworthy absolute count)
+ *  - "capacity" (default) → drops in the real remaining% `r` (accurate when no reliable
+ *    token counter exists, e.g. Codex, whose exec-mode token logs undercount)
+ * Returns { buckets, peak, unit }.
  */
 function usageBuckets(samples, id, hours, usageUnit) {
   const tMax = Date.now() / 1000, tMin = tMax - hours * 3600;
-  const hasU = (samples || []).some(e => e.u && e.u[id] != null);
+  const useCounter = usageUnit === "tokens" || usageUnit === "requests";
   const pts = (samples || [])
-    .map(e => ({ t: e.t, c: hasU ? (e.u ? e.u[id] : null) : (e.r ? e.r[id] : null) }))
+    .map(e => ({ t: e.t, c: useCounter ? (e.u ? e.u[id] : null) : (e.r ? e.r[id] : null) }))
     .filter(p => p.c != null);
   const buckets = new Array(NBARS).fill(0);
   for (let i = 1; i < pts.length; i++) {
-    const d = hasU ? (pts[i].c - pts[i - 1].c) : (pts[i - 1].c - pts[i].c);   // counter rises / remaining falls
+    const d = useCounter ? (pts[i].c - pts[i - 1].c) : (pts[i - 1].c - pts[i].c);   // counter rises / remaining% falls
     if (d <= 0) continue;
     const frac = (pts[i].t - tMin) / (tMax - tMin);
     if (frac < 0 || frac > 1) continue;
     buckets[Math.min(NBARS - 1, Math.floor(frac * NBARS))] += d;
   }
-  return { buckets, peak: Math.max(0, ...buckets), unit: hasU ? (usageUnit || "used") : "capacity" };
+  return { buckets, peak: Math.max(0, ...buckets), unit: useCounter ? usageUnit : "capacity" };
 }
 
 // Max plausible horizon (hours) for a "resets in" countdown, by cadence. Guards against
@@ -359,7 +366,7 @@ function renderCharts(d) {
     const sub = [s.resetCadence, reset ? `resets in ${reset}` : null].filter(Boolean).join(" · ");
     const bars = usageBuckets(d.samples, s.id, d.hours, s.usageUnit);
     const barLegend = bars.peak > 0
-      ? `<span><i style="background:${color}66"></i>${esc(bars.unit)} used/slot</span>`
+      ? `<span><i style="background:${color}66"></i>${esc(unitLabel(bars.unit))} used/slot</span>`
       : "";
     const legend = `<div class="legend"><span><i style="background:${color}"></i>5h/daily remaining</span>${hasWeekly ? `<span><i style="background:#6b7280"></i>weekly remaining</span>` : ""}${barLegend}</div>`;
     return `<div class="chart-card" data-id="${esc(s.id)}" data-color="${color}" data-weekly="${hasWeekly}">
