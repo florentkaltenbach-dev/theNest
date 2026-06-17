@@ -30,10 +30,12 @@ import { tokenRoutes } from './routes/tokens.js';
 import { artifactRoutes } from './routes/artifacts.js';
 import { canvasRoutes } from './routes/canvas.js';
 import { observabilityRoutes } from './routes/observability.js';
+import { hermesEvalRoutes } from './routes/hermesEval.js';
 import { tokenHistoryRoutes } from './routes/tokenHistory.js';
 import { mailRoutes } from './routes/mail.js';
 import { automationRoutes } from './routes/automation.js';
 import { energyhackRoutes } from './routes/energyhack.js';
+import { councilRoutes } from './routes/council.js';
 import { startSshDiscovery } from './ssh-discovery.js';
 import { startAlertWatchdog } from './alerts.js';
 import { handleAgentWs, handleClientWs } from './ws/agentHandler.js';
@@ -216,10 +218,12 @@ tokenRoutes(api);
 artifactRoutes(api);
 canvasRoutes(api);
 observabilityRoutes(api);
+hermesEvalRoutes(api);
 tokenHistoryRoutes(api);
 mailRoutes(api);
 automationRoutes(api);
 energyhackRoutes(api);
+councilRoutes(api);
 
 // Authenticated OpenClaw WebChat and Hermes dashboard proxies. Must be
 // registered before page routes.

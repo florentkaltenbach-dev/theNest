@@ -37,10 +37,12 @@ The `Topic` column groups pages for the unifying address sidebar. Pages with top
 | `/scripts` | `scripts.html` | Scripts | Interact | yes |
 | `/automation` | `automation.html` | Auto Coder | Interact | yes |
 | `/energyhack` | `energyhack.html` | Energy Hack | Interact | yes |
+| `/council` | `council.html` | Council | Interact | yes |
 | `/nest` | `nest.html` | Nest Explorer | Inspect | yes |
 | `/routes` | `routes.html` | Routes | Inspect | yes |
 | `/projects` | `projects.html` | Projects | Inspect | yes |
 | `/artifacts` | `artifacts.html` | Artifacts | Inspect | yes |
+| `/hermes-eval` | `hermes-eval.html` | Hermes Eval | Inspect | yes |
 | `/settings` | `settings.html` | Settings | Configure | yes |
 | `/tokens` | `tokens.html` | Tokens | Configure | yes |
 | `/secrets` | `secrets.html` | Secrets | Configure | yes |
@@ -54,7 +56,7 @@ The last entry — `/nest` — is the self-generated interface. One HTML page th
 
 Static assets (icons, manifest) are served from `hub/static/` by filename. No directory listing. No path traversal.
 
-Proxy routes are registered in code, not the page table. `/claw` and `/claw/*` are Hub-owned reverse-proxy routes to OpenClaw: Nest auth is required before proxying, WebSocket upgrades must be same-origin, and the Hub remains a transparent infrastructure layer (no OpenClaw app-frame parsing).
+Proxy routes are registered in code, not the page table. `/claw` and `/claw/*` are Hub-owned reverse-proxy routes to OpenClaw; `/hermes` and `/hermes/*` are Hub-owned reverse-proxy routes to Hermes. Nest auth is required before proxying, WebSocket upgrades must be same-origin, and the Hub remains a transparent infrastructure layer (no app-frame parsing). The sidebar includes `/claw/` and `/hermes/` as synthetic `Interact` links from `hub/src/nest.js` so they stay discoverable without registering fake static pages.
 
 ---
 

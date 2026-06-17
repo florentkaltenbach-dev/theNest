@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nest - Hermes Eval</title>
+<style>
+  :root {
+    --bg: #f6f5f1;
+    --ink: #181c1f;
+    --muted: #667076;
+    --line: #ddd8cf;
+    --panel: #fffdfa;
+    --panel-2: #eef3ef;
+    --green: #267451;
+    --amber: #a66316;
+    --red: #b33b2e;
+    --blue: #285f9f;
+    --violet: #6750a4;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 14px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  .page { max-width: 1120px; margin: 0 auto; padding: 18px; }
+  .hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
+    gap: 18px;
+    align-items: stretch;
+    margin-bottom: 18px;
+  }
+  .hero-main {
+    background: #172026;
+    color: #f8f6ef;
+    border-radius: 8px;
+    padding: 22px;
+    min-height: 230px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .eyebrow {
+    color: #d2aa61;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  h1 { margin: 8px 0 10px; font-size: clamp(30px, 5vw, 58px); line-height: 0.96; letter-spacing: 0; }
+  .lead { color: #d7ddd9; max-width: 740px; font-size: 15px; }
+  .hero-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 20px; }
+  .metric {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 8px;
+    padding: 12px;
+  }
+  .metric .k { color: #aeb9bd; font-size: 11px; text-transform: uppercase; letter-spacing: .7px; font-weight: 800; }
+  .metric .v { font-size: 23px; font-weight: 850; margin-top: 3px; }
+  .verdict {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 18px;
+  }
+  .verdict h2, .section h2 { margin: 0 0 10px; font-size: 18px; }
+  .verdict p { margin: 0 0 10px; color: #3c4549; }
+  .badge {
+    display: inline-block;
+    border-radius: 999px;
+    padding: 3px 8px;
+    font-size: 11px;
+    font-weight: 800;
+    background: #e7ece8;
+    color: #274f3b;
+    margin: 2px 4px 2px 0;
+  }
+  .section {
+    border-top: 1px solid var(--line);
+    padding: 18px 0;
+    margin-bottom: 2px;
+  }
+  .section.alt { background: transparent; }
+  .section-head { display: flex; justify-content: space-between; gap: 14px; align-items: baseline; margin-bottom: 10px; }
+  .note { color: var(--muted); font-size: 13px; }
+  .cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  .card {
+    background: #fff;
+    border: 1px solid #e2ded6;
+    border-radius: 8px;
+    padding: 12px;
+  }
+  .card .title { font-weight: 850; margin-bottom: 5px; }
+  .card p { margin: 0; color: #465056; font-size: 13px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 7px; border-bottom: 1px solid #ebe6dc; vertical-align: top; }
+  th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .6px; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .score { font-weight: 900; }
+  .ok { color: var(--green); }
+  .warn { color: var(--amber); }
+  .bad { color: var(--red); }
+  .blue { color: var(--blue); }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+  .split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+  ul { margin: 8px 0 0 18px; padding: 0; }
+  li { margin: 5px 0; }
+  .sources a { color: var(--blue); text-decoration: none; }
+  .sources a:hover { text-decoration: underline; }
+  .callout {
+    border-left: 4px solid var(--amber);
+    padding: 10px 12px;
+    background: #fff8e8;
+    border-radius: 0 8px 8px 0;
+    margin-top: 10px;
+  }
+  .small { font-size: 12px; color: var(--muted); }
+  @media (max-width: 860px) {
+    .hero, .split { grid-template-columns: 1fr; }
+    .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .hero-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 560px) {
+    .page { padding: 12px; }
+    .cards { grid-template-columns: 1fr; }
+    table { font-size: 12px; }
+    th, td { padding: 7px 5px; }
+  }
+</style>
+<script src="/sidebar.js"></script>
+</head>
+<body>
+<main class="page">
+  <section class="hero">
+    <div class="hero-main">
+      <div>
+        <div class="eyebrow">OpenRouter free-token evaluation</div>
+        <h1>Hermes is useful as a cheap scout, not a closer.</h1>
+        <p class="lead">Tested on 2026-06-10 with the installed Hermes CLI, OpenRouter provider, and free-model settings. Daily runs now test the eligible free-model pool without repeating old baselines: new models get the baseline suite, known models get fresh rotating prompts.</p>
+      </div>
+      <div class="hero-grid">
+        <div class="metric"><div class="k">Free cap</div><div class="v">1000/day</div></div>
+        <div class="metric"><div class="k">Default pass rate</div><div class="v">4/4</div></div>
+        <div class="metric"><div class="k">Median latency</div><div class="v">42s</div></div>
+      </div>
+    </div>
+    <aside class="verdict">
+      <h2>Verdict</h2>
+      <p>Use Hermes to burn idle free capacity on bounded, reversible work: summaries, first-pass code review, triage, test-case ideas, small policy drafts, and background research briefs.</p>
+      <p>Do not hand it production edits, secrets work, external actions, or ambiguous repo automation without a stronger agent reviewing the output.</p>
+      <span class="badge">read-only first</span>
+      <span class="badge">bounded prompts</span>
+      <span class="badge">human/OpenClaw review</span>
+      <span class="badge">no paid fallback</span>
+    </aside>
+  </section>
+
+  <section class="section">
+    <div class="section-head">
+      <h2>Current Setup</h2>
+      <div class="note">Observed locally before testing</div>
+    </div>
+    <div class="cards">
+      <div class="card"><div class="title">Provider</div><p class="mono">openrouter</p></div>
+      <div class="card"><div class="title">Default model</div><p class="mono">openrouter/free</p></div>
+      <div class="card"><div class="title">Gateway</div><p>Hermes dashboard and Telegram gateway are running.</p></div>
+      <div class="card"><div class="title">Account tier</div><p>OpenRouter reports purchased credits at the threshold for the 1000/day free-model cap.</p></div>
+    </div>
+    <div class="callout">
+      The existing Nest token ledger counts Hermes gateway responses from <span class="mono">gateway.log</span>. These CLI one-shot tests did not increment that source, so CLI-driven Hermes work currently needs separate accounting if it becomes routine.
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-head">
+      <h2>Daily Benchmarks</h2>
+      <div class="note" id="benchMeta">Loading history...</div>
+    </div>
+    <div id="dailyBenchmarks">
+      <div class="card"><div class="title">Waiting for data</div><p>The daily task writes JSONL to <span class="mono">data/hermes-eval/runs.jsonl</span>.</p></div>
+    </div>
+  </section>
+
+  <section class="section alt">
+    <div class="section-head">
+      <h2>Seed Challenge Grades</h2>
+      <div class="note">Initial manual run from 2026-06-10; daily runs above replace this over time</div>
+    </div>
+    <table>
+      <thead>
+        <tr><th>Case</th><th>Model</th><th>Result</th><th class="num">Latency</th><th class="num">Score</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Reasoning puzzle</td>
+          <td class="mono">openrouter/free</td>
+          <td>Correct code <strong>2691</strong>; concise and checked constraints.</td>
+          <td class="num">31s</td>
+          <td class="num score ok">9</td>
+        </tr>
+        <tr>
+          <td>Code review</td>
+          <td class="mono">openrouter/free</td>
+          <td>Found assignment-vs-comparison bug, mutation risk, minimal fix, and focused tests.</td>
+          <td class="num">22s</td>
+          <td class="num score ok">9</td>
+        </tr>
+        <tr>
+          <td>Ops policy</td>
+          <td class="mono">openrouter/free</td>
+          <td>Useful broad shape, but invented local files/processes and ignored the requested word limit.</td>
+          <td class="num">52s</td>
+          <td class="num score warn">5</td>
+        </tr>
+        <tr>
+          <td>Repo triage from snippets</td>
+          <td class="mono">openrouter/free</td>
+          <td>Picked the right path style and verification idea, but got HUB auth wrong by saying public instead of yes.</td>
+          <td class="num">68s</td>
+          <td class="num score warn">7</td>
+        </tr>
+        <tr>
+          <td>Reasoning puzzle</td>
+          <td class="mono">openai/gpt-oss-120b:free</td>
+          <td>Correct and more rigorous than the router result.</td>
+          <td class="num">46s</td>
+          <td class="num score ok">9</td>
+        </tr>
+        <tr>
+          <td>Code review</td>
+          <td class="mono">qwen/qwen3-coder:free</td>
+          <td>Failed after retries with HTTP 429 from provider.</td>
+          <td class="num">47s</td>
+          <td class="num score bad">0</td>
+        </tr>
+        <tr>
+          <td>Ops policy</td>
+          <td class="mono">nousresearch/hermes-3-llama-3.1-405b:free</td>
+          <td>Failed with no endpoint supporting Hermes tool use.</td>
+          <td class="num">11s</td>
+          <td class="num score bad">0</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="section">
+    <div class="section-head">
+      <h2>Best Uses</h2>
+      <div class="note">Where Hermes should spend idle free quota</div>
+    </div>
+    <div class="split">
+      <div class="card">
+        <div class="title ok">Good fits</div>
+        <ul>
+          <li>First-pass issue triage, duplicate detection, and acceptance-criteria cleanup.</li>
+          <li>Read-only repo reconnaissance with explicit snippets or file lists.</li>
+          <li>Drafting test cases, review checklists, runbooks, and changelog summaries.</li>
+          <li>Nightly or heartbeat background briefs that are cheap to discard.</li>
+          <li>Second opinions on simple bugs where the answer can be verified locally.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="title bad">Avoid</div>
+        <ul>
+          <li>Autonomous code edits or deployments.</li>
+          <li>Tasks involving secrets, OAuth, payments, or external messages.</li>
+          <li>Open-ended architecture decisions without source context.</li>
+          <li>Pinned free-model dependence unless the model is rechecked that day.</li>
+          <li>Anything where hallucinated local process names would cause damage.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-head">
+      <h2>Operating Rules</h2>
+      <div class="note">Conservative defaults for Nest</div>
+    </div>
+    <div class="cards">
+      <div class="card"><div class="title">Default route</div><p>Prefer <span class="mono">openrouter/free</span> for generic background tasks. It was more reliable than pinned free models in this run.</p></div>
+      <div class="card"><div class="title">Pinned route</div><p>Use pinned models only for isolated experiments or when today's provider availability has been checked.</p></div>
+      <div class="card"><div class="title">Budget</div><p>Keep bursts under 20 RPM. The daily benchmark may use up to an estimated 66% of currently available free requests, leaving roughly a third untouched.</p></div>
+      <div class="card"><div class="title">Review</div><p>Treat Hermes output as a draft. OpenClaw/Codex or the human validates anything that changes state.</p></div>
+    </div>
+  </section>
+
+  <section class="section sources">
+    <div class="section-head">
+      <h2>Research Notes</h2>
+      <div class="note">Checked 2026-06-10</div>
+    </div>
+    <ul>
+      <li>OpenRouter documents free <span class="mono">:free</span> models at 20 requests/minute, with 50/day before $10 purchased credits and 1000/day after that: <a href="https://openrouter.ai/docs/api/reference/limits">OpenRouter limits</a>.</li>
+      <li>Hermes' OpenRouter integration supports <span class="mono">openrouter/free</span>, pinned model IDs, provider routing, fallback providers, and auxiliary model routing: <a href="https://openrouter.ai/docs/cookbook/coding-agents/hermes-integration">Hermes Agent integration</a>.</li>
+      <li>OpenRouter's model API can list current free model IDs, context windows, pricing, and supported parameters: <a href="https://openrouter.ai/docs/api/api-reference/models/get-models">Models API</a>.</li>
+      <li>OpenRouter usage accounting is returned in API responses, but Nest's current Hermes ledger source only counts gateway log responses, not CLI one-shots: <a href="https://openrouter.ai/docs/cookbook/administration/usage-accounting">Usage accounting</a>.</li>
+    </ul>
+    <p class="small">Raw local test outputs were captured under <span class="mono">/tmp/hermes-eval-20260610T191600Z</span>.</p>
+  </section>
+</main>
+<script>
+const token = localStorage.getItem("nest_token");
+if (!token) location.href = "/login";
+
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"]/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]));
+}
+
+function fmtDate(iso) {
+  if (!iso) return "never";
+  try { return new Date(iso).toLocaleString(); } catch { return iso; }
+}
+
+function cls(score) {
+  if (score >= 8) return "ok";
+  if (score >= 5) return "warn";
+  return "bad";
+}
+
+function avg(rows, key) {
+  if (!rows.length) return 0;
+  return rows.reduce((sum, r) => sum + Number(r[key] || 0), 0) / rows.length;
+}
+
+function renderDaily(data) {
+  const latest = data.latest;
+  const runs = data.runs || [];
+  const meta = document.getElementById("benchMeta");
+  const target = document.getElementById("dailyBenchmarks");
+  if (!latest) {
+    meta.textContent = "No benchmark runs yet";
+    target.innerHTML = '<div class="card"><div class="title">No runs yet</div><p>Run <span class="mono">echo {} | scripts/tasks/hermes-eval-benchmark.sh</span> or wait for the daily timer.</p></div>';
+    return;
+  }
+
+  const budget = latest.budget || {};
+  const dailyChallenges = latest.dailyChallenges || [];
+  const generatedCount = dailyChallenges.filter(c => c.generated).length;
+  const challengeText = dailyChallenges.length
+    ? " · daily challenges: " + dailyChallenges.length + " (" + generatedCount + " generated)"
+    : (latest.rotatingChallenge ? " · rotating: " + (latest.rotatingChallengeTitle || latest.rotatingChallenge) : "");
+  const budgetText = budget.freeRequestCap
+    ? " · budget " + Math.round(Number(budget.fraction || 0) * 100) + "% of " + budget.freeRequestCap + " free requests; used " + (budget.benchmarkCallsThisRun ?? "?") + " calls"
+    : "";
+  meta.textContent = "Latest: " + fmtDate(latest.generatedAt) + " · " + (latest.modelPool?.eligibleFreeToolModels ?? "?") + " eligible free tool models" + challengeText + budgetText;
+  const summary = latest.summary || [];
+  const rows = summary.map(s => '<tr>' +
+    '<td><strong>' + esc(s.modelName || s.model) + '</strong><div class="mono">' + esc(s.model) + '</div></td>' +
+    '<td class="num score ' + cls(Number(s.avgScore || 0)) + '">' + Number(s.avgScore || 0).toFixed(1) + '</td>' +
+    '<td class="num">' + esc(s.successes) + '/' + esc(s.attempts) + '</td>' +
+    '<td class="num">' + Number(s.avgSeconds || 0).toFixed(1) + 's</td>' +
+  '</tr>').join("");
+
+  const allSummaries = runs.flatMap(r => (r.summary || []).map(s => ({ ...s, day: r.day })));
+  const byModel = new Map();
+  for (const s of allSummaries) {
+    if (!byModel.has(s.model)) byModel.set(s.model, []);
+    byModel.get(s.model).push(s);
+  }
+  const leaderboard = [...byModel.entries()].map(([model, items]) => ({
+    model,
+    name: items[0].modelName || model,
+    runs: items.length,
+    avgScore: avg(items, "avgScore"),
+    avgSeconds: avg(items, "avgSeconds"),
+  })).sort((a, b) => b.avgScore - a.avgScore || a.avgSeconds - b.avgSeconds).slice(0, 8);
+
+  const leadRows = leaderboard.map(s => '<tr>' +
+    '<td><strong>' + esc(s.name) + '</strong><div class="mono">' + esc(s.model) + '</div></td>' +
+    '<td class="num">' + esc(s.runs) + '</td>' +
+    '<td class="num score ' + cls(s.avgScore) + '">' + s.avgScore.toFixed(1) + '</td>' +
+    '<td class="num">' + s.avgSeconds.toFixed(1) + 's</td>' +
+  '</tr>').join("");
+
+  const runRows = runs.slice(0, 10).map(r => {
+    const best = (r.summary || []).slice().sort((a, b) => Number(b.avgScore || 0) - Number(a.avgScore || 0))[0];
+    return '<tr>' +
+      '<td>' + esc(r.day) + '<div class="mono">' + esc(r.runId) + '</div></td>' +
+      '<td>' + esc(best?.model || "none") + '</td>' +
+      '<td class="num score ' + cls(Number(best?.avgScore || 0)) + '">' + Number(best?.avgScore || 0).toFixed(1) + '</td>' +
+      '<td class="num">' + esc((r.summary || []).length) + '</td>' +
+    '</tr>';
+  }).join("");
+
+  target.innerHTML =
+    '<div class="split">' +
+      '<div class="card"><div class="title">Latest run</div><table><thead><tr><th>Model</th><th class="num">Score</th><th class="num">OK</th><th class="num">Avg time</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      '<div class="card"><div class="title">Rolling leaderboard</div><table><thead><tr><th>Model</th><th class="num">Runs</th><th class="num">Score</th><th class="num">Avg time</th></tr></thead><tbody>' + leadRows + '</tbody></table></div>' +
+    '</div>' +
+    '<div class="card" style="margin-top:10px"><div class="title">Recent runs</div><table><thead><tr><th>Day</th><th>Best model</th><th class="num">Best score</th><th class="num">Models</th></tr></thead><tbody>' + runRows + '</tbody></table></div>';
+}
+
+fetch("/api/hermes-eval?limit=30", { headers: { Authorization: "Bearer " + token } })
+  .then(async r => {
+    if (r.status === 401) { localStorage.removeItem("nest_token"); location.href = "/login"; return null; }
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "API " + r.status);
+    return r.json();
+  })
+  .then(d => { if (d) renderDaily(d); })
+  .catch(err => {
+    document.getElementById("benchMeta").textContent = "History failed to load";
+    document.getElementById("dailyBenchmarks").innerHTML = '<div class="card"><div class="title bad">Error</div><p>' + esc(err.message) + '</p></div>';
+  });
+</script>
+</body>
+</html>

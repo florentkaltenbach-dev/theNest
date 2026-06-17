@@ -1,0 +1,19 @@
+# scripts/setup/systemd/nest-hermes-eval.service
+# Daily Hermes/OpenRouter free-model benchmark. Writes only under
+# /opt/nest/data/hermes-eval.
+[Unit]
+Description=Nest Hermes evaluation benchmark
+After=network-online.target nest-hub.service hermes-gateway.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=claude
+Group=claude
+WorkingDirectory=/opt/nest
+Environment=HOME=/home/claude
+Environment=PATH=/home/claude/.local/bin:/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=-/opt/nest/config.env
+ExecStart=/opt/nest/scripts/tasks/hermes-eval-benchmark.sh
+StandardInput=null
+TimeoutStartSec=7200

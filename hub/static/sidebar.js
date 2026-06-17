@@ -16,6 +16,8 @@
   const STORAGE_TOPICS = 'nest-sidebar-topics';
   const RAIL = 64;
   const PANEL = 220;
+  const MOBILE_RAIL = 56;
+  const MOBILE_PANEL = 216;
 
   // U+FE0E forces text-style (monochrome) rendering for the gear glyph.
   const GLYPHS = {
@@ -35,7 +37,7 @@
 
   // ctx is mutable: refs to mounted rail/panel + current state, so a later
   // refetch can re-render in place without rebuilding the DOM tree.
-  const ctx = { rail: null, panel: null, state: null, topics: null };
+  const ctx = { rail: null, panel: null, mobileToggle: null, backdrop: null, state: null, topics: null };
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', boot);
@@ -50,7 +52,9 @@
     const cached = readCache();
     if (cached) mount(cached);
 
-    fetch('/api/nest/topics', { credentials: 'same-origin' })
+    const token = localStorage.getItem('nest_token');
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    fetch('/api/nest/topics', { credentials: 'same-origin', headers })
       .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
       .then(({ topics }) => {
         writeCache(topics);
@@ -61,8 +65,11 @@
         // Pre-auth or session expired — drop reservation and any stale shell.
         html.classList.remove('nest-sidebar');
         html.classList.remove('nest-sidebar-collapsed');
+        closeMobileMenu();
         if (ctx.rail) ctx.rail.remove();
         if (ctx.panel) ctx.panel.remove();
+        if (ctx.mobileToggle) ctx.mobileToggle.remove();
+        if (ctx.backdrop) ctx.backdrop.remove();
         console.warn('[nest-sidebar] failed to load topics:', err);
       });
   }
@@ -95,10 +102,25 @@
     ctx.topics = topics;
     ctx.rail = el('nav', 'nest-rail');
     ctx.panel = el('aside', 'nest-panel');
+    ctx.mobileToggle = buildMobileToggle();
+    ctx.backdrop = el('button', 'nest-mobile-backdrop');
+    ctx.backdrop.type = 'button';
+    ctx.backdrop.title = 'Close menu';
+    ctx.backdrop.setAttribute('aria-label', 'Close menu');
+    ctx.backdrop.addEventListener('click', closeMobileMenu);
 
     renderInto();
+    document.body.appendChild(ctx.mobileToggle);
+    document.body.appendChild(ctx.backdrop);
     document.body.appendChild(ctx.rail);
     document.body.appendChild(ctx.panel);
+
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape') closeMobileMenu();
+    });
+    window.addEventListener('resize', () => {
+      if (!isMobile()) closeMobileMenu();
+    });
   }
 
   function refresh(topics) {
@@ -136,15 +158,32 @@
     btn.type = 'button';
     btn.title = 'Toggle panel';
     const sync = () => {
-      btn.textContent = html.classList.contains('nest-sidebar-collapsed') ? '›' : '‹';
+      btn.textContent = isMobile()
+        ? '×'
+        : html.classList.contains('nest-sidebar-collapsed') ? '›' : '‹';
     };
     sync();
     btn.addEventListener('click', () => {
+      if (isMobile()) {
+        closeMobileMenu();
+        return;
+      }
       html.classList.toggle('nest-sidebar-collapsed');
       const collapsed = html.classList.contains('nest-sidebar-collapsed');
       localStorage.setItem(STORAGE_COLLAPSED, collapsed ? '1' : '0');
       sync();
     });
+    return btn;
+  }
+
+  function buildMobileToggle() {
+    const btn = el('button', 'nest-mobile-menu');
+    btn.type = 'button';
+    btn.title = 'Open menu';
+    btn.setAttribute('aria-label', 'Open menu');
+    btn.setAttribute('aria-expanded', 'false');
+    btn.textContent = '☰';
+    btn.addEventListener('click', toggleMobileMenu);
     return btn;
   }
 
@@ -164,6 +203,7 @@
         html.classList.remove('nest-sidebar-collapsed');
         localStorage.setItem(STORAGE_COLLAPSED, '0');
       }
+      if (isMobile()) openMobileMenu();
       render();
     });
     return btn;
@@ -198,6 +238,7 @@
       a.href = p.path;
       a.textContent = p.title;
       if (p.path === currentPath) a.classList.add('active');
+      a.addEventListener('click', () => closeMobileMenu());
       list.appendChild(a);
     }
 
@@ -241,6 +282,34 @@
     const e = document.createElement(tag);
     if (cls) e.className = cls;
     return e;
+  }
+
+  function isMobile() {
+    return window.matchMedia('(max-width: 720px)').matches;
+  }
+
+  function openMobileMenu() {
+    html.classList.add('nest-sidebar-mobile-open');
+    syncMobileToggle();
+  }
+
+  function closeMobileMenu() {
+    html.classList.remove('nest-sidebar-mobile-open');
+    syncMobileToggle();
+  }
+
+  function toggleMobileMenu() {
+    html.classList.toggle('nest-sidebar-mobile-open');
+    syncMobileToggle();
+  }
+
+  function syncMobileToggle() {
+    if (!ctx.mobileToggle) return;
+    const open = html.classList.contains('nest-sidebar-mobile-open');
+    ctx.mobileToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    ctx.mobileToggle.title = open ? 'Close menu' : 'Open menu';
+    ctx.mobileToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    ctx.mobileToggle.textContent = open ? '×' : '☰';
   }
 
   function injectStyle() {
@@ -298,6 +367,10 @@
         opacity: 0;
         pointer-events: none;
       }
+      .nest-mobile-menu,
+      .nest-mobile-backdrop {
+        display: none;
+      }
       .nest-address {
         padding: 12px 14px;
         border-bottom: 1px solid #2a2a4a;
@@ -333,8 +406,106 @@
         background: #1f1f3a;
       }
       @media (max-width: 720px) {
-        html.nest-sidebar body { padding-left: 0; }
-        .nest-rail, .nest-panel { display: none; }
+        html.nest-sidebar body {
+          padding-left: 0;
+          padding-top: calc(54px + env(safe-area-inset-top));
+          overflow-x: hidden;
+        }
+        html.nest-sidebar body > :not(.nest-rail):not(.nest-panel):not(.nest-mobile-menu):not(.nest-mobile-backdrop) {
+          transition: transform 220ms ease;
+        }
+        html.nest-sidebar.nest-sidebar-mobile-open body > :not(.nest-rail):not(.nest-panel):not(.nest-mobile-menu):not(.nest-mobile-backdrop) {
+          transform: translateX(${MOBILE_RAIL + MOBILE_PANEL}px);
+        }
+        .nest-mobile-menu {
+          position: fixed;
+          top: calc(7px + env(safe-area-inset-top));
+          left: max(10px, env(safe-area-inset-left));
+          z-index: 1102;
+          width: 44px;
+          height: 44px;
+          border: 1px solid #2a2a4a;
+          border-radius: 8px;
+          background: #1a1a2e;
+          color: #fff;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+          cursor: pointer;
+          font: 700 24px/1 system-ui, -apple-system, sans-serif;
+          transform: translateX(0);
+          transition: transform 220ms ease, box-shadow 220ms ease;
+        }
+        html.nest-sidebar.nest-sidebar-mobile-open .nest-mobile-menu {
+          opacity: 0;
+          pointer-events: none;
+        }
+        .nest-mobile-backdrop {
+          position: fixed;
+          inset: 0;
+          z-index: 998;
+          border: 0;
+          background: rgba(10, 10, 22, 0.48);
+          cursor: pointer;
+          display: block;
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 220ms ease;
+        }
+        .nest-rail {
+          display: flex;
+          width: ${MOBILE_RAIL}px;
+          z-index: 1101;
+          transform: translateX(-${MOBILE_RAIL}px);
+          transition: transform 220ms ease;
+          box-shadow: 12px 0 24px rgba(0, 0, 0, 0.24);
+        }
+        .nest-collapse {
+          height: 44px;
+          font-size: 22px;
+          color: #d7d9e0;
+        }
+        .nest-rail-item {
+          padding: 9px 0;
+        }
+        .nest-rail-glyph {
+          font-size: 20px;
+          width: 28px;
+        }
+        .nest-rail-label {
+          font-size: 8px;
+          letter-spacing: 0;
+        }
+        .nest-panel {
+          display: flex;
+          left: ${MOBILE_RAIL}px;
+          width: min(${MOBILE_PANEL}px, calc(100vw - ${MOBILE_RAIL}px));
+          z-index: 1100;
+          transform: translateX(-${MOBILE_RAIL + MOBILE_PANEL}px);
+          opacity: 1;
+          pointer-events: none;
+        }
+        .nest-address {
+          display: none;
+        }
+        .nest-pages {
+          padding-top: 0;
+        }
+        .nest-page-link {
+          padding: 11px 14px;
+          font-size: 14px;
+        }
+        html.nest-sidebar.nest-sidebar-mobile-open .nest-rail,
+        html.nest-sidebar.nest-sidebar-mobile-open .nest-panel {
+          transform: translateX(0);
+          opacity: 1;
+          pointer-events: auto;
+        }
+        html.nest-sidebar.nest-sidebar-mobile-open .nest-mobile-backdrop {
+          opacity: 1;
+          pointer-events: auto;
+        }
       }
     `;
     const style = document.createElement('style');

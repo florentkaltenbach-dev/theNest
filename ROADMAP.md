@@ -280,3 +280,48 @@ Captured ideas not yet scoped for a sprint. One doc per idea in `docs/`.
 - **AI-22** — A4 — Wizard step rendering on /appendages
 - **AI-12** — C7 — script-runner skill
 - **AI-11** — C6 — container-manager skill
+
+## Shipped 2026-W25 (auto-reconciled 2026-06-15)
+
+- **AI-105** — UI: Time range slider with "current" mode as default
+- **AI-98** — UI: Inverter residual heatmap on overview page
+- **AI-96** — Agent rail · answers link back into UI
+- **AI-95** — Agent rail · seeded entry points
+- **AI-94** — Agent rail · context-aware side panel
+- **AI-93** — NEXT · Limitations / next-steps slide
+- **AI-92** — NEXT · Uncertainty + sample counts
+- **AI-91** — NEXT · Exportable Fix-First work order
+- **AI-90** — NEXT · Forward projection to threshold
+- **AI-89** — NEXT · Module-type degradation comparison
+- **AI-88** — NEXT · Group-level (combiner) drift
+- **AI-87** — NEXT · Repair-effectiveness (before/after)
+- **AI-86** — NEXT · Validate 2–3 inverters
+- **AI-85** — NEXT · Lead-time vs ticket (timeline graphic)
+- **AI-84** — NEXT · Fleet recoverable-€ headline
+- **AI-83** — M8 · Demo discipline & pitch
+- **AI-82** — M7 · Thin two-page dashboard
+- **AI-81** — M6 · Thin decision agent
+- **AI-80** — M5 · Error-code + ticket evidence
+- **AI-79** — M4 · Financial attribution (lost kWh → €)
+- **AI-78** — M3 · Degradation, incidents & curtailment exclusion
+- **AI-77** — M2 · Healthy-year-1 expected-power baseline
+- **AI-76** — M1 · Data spine (schema, joins, DuckDB tables)
+- **AI-75** — M0 · Commit & de-risk the toolchain
+- **AI-57** — Serve energyhack.kaltenbach.dev — Streamlit service + kaltenbach nginx proxy
+- **AI-58** — Docs — ARCHITECTURE.md + DEMO_SCRIPTS.md + README.md
+- **AI-59** — preflight.py — no-network PASS/FAIL harness
+- **AI-73** — Offline-hardening pass — friendly errors + backend badge
+- **AI-72** — toolkit/branding.py — reframe/rename presets
+- **AI-71** — pages/2_Battery_Brain.py — dispatch page
+- **AI-70** — toolkit/battery_opt.py — PuLP dispatch LP
+- **AI-69** — pages/1_Asset_Copilot.py — flagship flow
+- **AI-68** — app.py — landing + portfolio overview
+- **AI-67** — toolkit/charts.py — reusable Plotly builders
+- **AI-66** — toolkit/llm_writer.py — offline-first writer + template fallback
+- **AI-65** — toolkit/anomaly.py — detection rule tree + graceful degrade
+- **AI-64** — toolkit/sample_data.py — story-shaped demo data + load_demo()
+- **AI-63** — toolkit/financials.py — revenue loss + monthly KPIs
+- **AI-62** — toolkit/pv_model.py — expected generation + PR + peer fallback
+- **AI-61** — toolkit/data_mapper.py — EN/DE schema mapping
+- **AI-60** — Scaffold: repo layout + requirements + .env.example
+- **AI-51** — Mathviz appendage — ManimCE 3D math visualizer

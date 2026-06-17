@@ -23,6 +23,11 @@ const SERVICES = [
   { id: 'meta', role: 'The spec', root: '' },
 ];
 
+const SIDEBAR_PROXY_PAGES = [
+  { path: '/claw/', title: 'Claw', topic: 'Interact' },
+  { path: '/hermes/', title: 'Hermes', topic: 'Interact' },
+];
+
 // ── File walking ───────────────────────────────────────
 
 function walkDir(dir, exts, recursive = false) {
@@ -521,7 +526,7 @@ export function nestRoutes(router, nestState, fullRouter, pages = []) {
   router.get('/nest/topics', (req, res) => {
     const order = [];
     const groups = new Map();
-    for (const p of pages) {
+    for (const p of [...pages, ...SIDEBAR_PROXY_PAGES]) {
       if (!p.topic) continue;
       if (!groups.has(p.topic)) {
         groups.set(p.topic, []);

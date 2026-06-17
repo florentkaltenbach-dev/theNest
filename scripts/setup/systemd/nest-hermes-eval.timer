@@ -1,0 +1,12 @@
+# scripts/setup/systemd/nest-hermes-eval.timer
+# Enable with: sudo systemctl enable --now nest-hermes-eval.timer
+[Unit]
+Description=Run the Nest Hermes evaluation benchmark daily
+
+[Timer]
+OnCalendar=*-*-* 03:17:00
+Persistent=true
+RandomizedDelaySec=10min
+
+[Install]
+WantedBy=timers.target
